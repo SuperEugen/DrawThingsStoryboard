@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 /// ViewModel for app-wide settings.
 @MainActor
@@ -8,11 +9,13 @@ final class SettingsViewModel: ObservableObject {
         static let baseURL = "dts.baseURL"
     }
 
-    @Published var baseURL: String {
-        didSet { UserDefaults.standard.set(baseURL, forKey: Keys.baseURL) }
-    }
+    @Published var baseURL: String
 
     init() {
         self.baseURL = UserDefaults.standard.string(forKey: Keys.baseURL) ?? "http://localhost:7888"
+    }
+
+    func save() {
+        UserDefaults.standard.set(baseURL, forKey: Keys.baseURL)
     }
 }
