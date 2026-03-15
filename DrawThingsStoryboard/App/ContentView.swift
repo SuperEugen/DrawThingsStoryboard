@@ -6,16 +6,25 @@ import SwiftUI
 /// Right  = properties of the selected item (ItemDetailView)
 struct ContentView: View {
 
-    @State private var selectedSection: AppSection? = .briefing
+    @State private var selectedSection: AppSection? = .casting
+    @State private var selectedCastingItem: CastingItem? = nil
     @State private var selectedItemID: String? = nil
 
     var body: some View {
         NavigationSplitView {
             SidebarView(selectedSection: $selectedSection)
         } content: {
-            ItemBrowserView(section: selectedSection, selectedItemID: $selectedItemID)
+            ItemBrowserView(
+                section: selectedSection,
+                selectedCastingItem: $selectedCastingItem,
+                selectedItemID: $selectedItemID
+            )
         } detail: {
-            ItemDetailView(section: selectedSection, itemID: selectedItemID)
+            ItemDetailView(
+                section: selectedSection,
+                selectedCastingItem: $selectedCastingItem,
+                selectedItemID: selectedItemID
+            )
         }
         .frame(minWidth: 1100, minHeight: 680)
     }
