@@ -36,7 +36,7 @@ struct ItemDetailView: View {
     }
 }
 
-// MARK: - Casting detail
+// MARK: - Casting detail (top-level coordinator)
 
 struct CastingItemDetailView: View {
 
@@ -45,25 +45,28 @@ struct CastingItemDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                thumbnailSection
-                statusSection
+                ThumbnailSection(item: item)
+                StatusSection(item: $item)
                 Divider().padding(.vertical, 8)
-                libraryLevelSection
+                LibraryLevelSection(item: $item)
                 Divider().padding(.vertical, 8)
-                nameSection
-                descriptionSection
+                NameSection(item: $item)
+                DescriptionSection(item: $item)
                 Divider().padding(.vertical, 8)
-                productionSection
+                ProductionSection(item: $item)
                 Spacer(minLength: 20)
             }
             .padding(14)
         }
         .background(Color(NSColor.windowBackgroundColor))
     }
+}
 
-    // MARK: Sub-sections (split out to help the type-checker)
+// MARK: - Sub-section structs
 
-    @ViewBuilder private var thumbnailSection: some View {
+private struct ThumbnailSection: View {
+    let item: CastingItem
+    var body: some View {
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 10)
                 .fill(thumbnailColor.opacity(0.12))
@@ -84,8 +87,14 @@ struct CastingItemDetailView: View {
         }
         .padding(.bottom, 16)
     }
+    private var typeLabel: String     { item.type == .character ? "Character" : "Location" }
+    private var thumbnailColor: Color { item.type == .character ? .blue : .teal }
+    private var thumbnailIcon: String { item.type == .character ? "person.fill" : "map" }
+}
 
-    @ViewBuilder private var statusSection: some View {
+private struct StatusSection: View {
+    @Binding var item: CastingItem
+    var body: some View {
         DetailSection(title: "Status") {
             VStack(spacing: 4) {
                 ForEach(GenerationStatus.allCases) { s in
@@ -106,7 +115,9 @@ struct CastingItemDetailView: View {
                     .padding(.horizontal, 8)
                     .background(
                         RoundedRectangle(cornerRadius: 7)
-                            .fill(item.status == s ? Color.accentColor.opacity(0.07) : Color.clear)
+                            .fill(item.status == s
+                                  ? Color.accentColor.opacity(0.07)
+                                  : Color.clear)
                     )
                     .contentShape(Rectangle())
                     .onTapGesture { item.status = s }
@@ -114,8 +125,11 @@ struct CastingItemDetailView: View {
             }
         }
     }
+}
 
-    @ViewBuilder private var libraryLevelSection: some View {
+private struct LibraryLevelSection: View {
+    @Binding var item: CastingItem
+    var body: some View {
         DetailSection(title: "Library level") {
             VStack(spacing: 4) {
                 ForEach(LibraryLevel.allCases) { level in
@@ -141,7 +155,9 @@ struct CastingItemDetailView: View {
                     .padding(.horizontal, 8)
                     .background(
                         RoundedRectangle(cornerRadius: 7)
-                            .fill(item.libraryLevel == level ? Color.accentColor.opacity(0.07) : Color.clear)
+                            .fill(item.libraryLevel == level
+                                  ? Color.accentColor.opacity(0.07)
+                                  : Color.clear)
                     )
                     .contentShape(Rectangle())
                     .onTapGesture { item.libraryLevel = level }
@@ -149,15 +165,21 @@ struct CastingItemDetailView: View {
             }
         }
     }
+}
 
-    @ViewBuilder private var nameSection: some View {
+private struct NameSection: View {
+    @Binding var item: CastingItem
+    var body: some View {
         DetailSection(title: "Name") {
             TextField("Name", text: $item.name)
                 .textFieldStyle(.roundedBorder)
         }
     }
+}
 
-    @ViewBuilder private var descriptionSection: some View {
+private struct DescriptionSection: View {
+    @Binding var item: CastingItem
+    var body: some View {
         DetailSection(title: "Description") {
             TextEditor(text: $item.description)
                 .font(.callout)
@@ -168,8 +190,11 @@ struct CastingItemDetailView: View {
                 )
         }
     }
+}
 
-    @ViewBuilder private var productionSection: some View {
+private struct ProductionSection: View {
+    @Binding var item: CastingItem
+    var body: some View {
         DetailSection(title: "Production") {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
@@ -204,12 +229,6 @@ struct CastingItemDetailView: View {
             }
         }
     }
-
-    // MARK: Helpers
-
-    private var typeLabel: String      { item.type == .character ? "Character" : "Location" }
-    private var thumbnailColor: Color  { item.type == .character ? .blue : .teal }
-    private var thumbnailIcon: String  { item.type == .character ? "person.fill" : "map" }
 }
 
 // MARK: - Generic detail (non-casting)
@@ -241,7 +260,7 @@ private struct GenericDetailView: View {
     }
 }
 
-// MARK: - Helper view
+// MARK: - Shared helper
 
 private struct DetailSection<Content: View>: View {
     let title: String
