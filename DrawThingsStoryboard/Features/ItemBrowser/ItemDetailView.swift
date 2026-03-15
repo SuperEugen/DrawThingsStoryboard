@@ -36,10 +36,9 @@ struct ItemDetailView: View {
     }
 }
 
-// MARK: - Casting detail (top-level coordinator)
+// MARK: - Casting detail
 
 struct CastingItemDetailView: View {
-
     @Binding var item: CastingItem
 
     var body: some View {
@@ -62,10 +61,14 @@ struct CastingItemDetailView: View {
     }
 }
 
-// MARK: - Sub-section structs
+// MARK: - ThumbnailSection
 
 private struct ThumbnailSection: View {
     let item: CastingItem
+    private var typeLabel: String     { item.type == .character ? "Character" : "Location" }
+    private var thumbnailColor: Color { item.type == .character ? .blue : .teal }
+    private var thumbnailIcon: String { item.type == .character ? "person.fill" : "map" }
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 10)
@@ -87,100 +90,120 @@ private struct ThumbnailSection: View {
         }
         .padding(.bottom, 16)
     }
-    private var typeLabel: String     { item.type == .character ? "Character" : "Location" }
-    private var thumbnailColor: Color { item.type == .character ? .blue : .teal }
-    private var thumbnailIcon: String { item.type == .character ? "person.fill" : "map" }
 }
+
+// MARK: - StatusSection
 
 private struct StatusSection: View {
     @Binding var item: CastingItem
+
     var body: some View {
-        DetailSection(title: "Status") {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionLabel("Status")
             VStack(spacing: 4) {
-                ForEach(GenerationStatus.allCases) { s in
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(s.color)
-                            .frame(width: 8, height: 8)
-                        Text(s.label)
-                            .font(.callout)
-                        Spacer()
-                        if item.status == s {
-                            Image(systemName: "checkmark")
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(.accentColor)
-                        }
-                    }
-                    .padding(.vertical, 5)
-                    .padding(.horizontal, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 7)
-                            .fill(item.status == s
-                                  ? Color.accentColor.opacity(0.07)
-                                  : Color.clear)
-                    )
-                    .contentShape(Rectangle())
-                    .onTapGesture { item.status = s }
-                }
+                statusRow(GenerationStatus.notYetGenerated)
+                statusRow(GenerationStatus.previewGenerated)
+                statusRow(GenerationStatus.finalGenerated)
             }
         }
+        .padding(.bottom, 12)
+    }
+
+    private func statusRow(_ s: GenerationStatus) -> some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(s.color)
+                .frame(width: 8, height: 8)
+            Text(s.label)
+                .font(.callout)
+            Spacer()
+            if item.status == s {
+                Image(systemName: "checkmark")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.accentColor)
+            }
+        }
+        .padding(.vertical, 5)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 7)
+                .fill(item.status == s ? Color.accentColor.opacity(0.07) : Color.clear)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture { item.status = s }
     }
 }
+
+// MARK: - LibraryLevelSection
 
 private struct LibraryLevelSection: View {
     @Binding var item: CastingItem
+
     var body: some View {
-        DetailSection(title: "Library level") {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionLabel("Library level")
             VStack(spacing: 4) {
-                ForEach(LibraryLevel.allCases) { level in
-                    HStack(spacing: 8) {
-                        Image(systemName: level.icon)
-                            .frame(width: 16)
-                            .foregroundStyle(.secondary)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(level.rawValue)
-                                .font(.callout)
-                            Text(level.description)
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                        }
-                        Spacer()
-                        if item.libraryLevel == level {
-                            Image(systemName: "checkmark")
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(.accentColor)
-                        }
-                    }
-                    .padding(.vertical, 5)
-                    .padding(.horizontal, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 7)
-                            .fill(item.libraryLevel == level
-                                  ? Color.accentColor.opacity(0.07)
-                                  : Color.clear)
-                    )
-                    .contentShape(Rectangle())
-                    .onTapGesture { item.libraryLevel = level }
-                }
+                levelRow(LibraryLevel.studio)
+                levelRow(LibraryLevel.customer)
+                levelRow(LibraryLevel.episode)
             }
         }
+        .padding(.bottom, 12)
+    }
+
+    private func levelRow(_ level: LibraryLevel) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: level.icon)
+                .frame(width: 16)
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(level.rawValue)
+                    .font(.callout)
+                Text(level.description)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            Spacer()
+            if item.libraryLevel == level {
+                Image(systemName: "checkmark")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.accentColor)
+            }
+        }
+        .padding(.vertical, 5)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 7)
+                .fill(item.libraryLevel == level ? Color.accentColor.opacity(0.07) : Color.clear)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture { item.libraryLevel = level }
     }
 }
+
+// MARK: - NameSection
 
 private struct NameSection: View {
     @Binding var item: CastingItem
+
     var body: some View {
-        DetailSection(title: "Name") {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionLabel("Name")
             TextField("Name", text: $item.name)
                 .textFieldStyle(.roundedBorder)
         }
+        .padding(.bottom, 12)
     }
 }
 
+// MARK: - DescriptionSection
+
 private struct DescriptionSection: View {
     @Binding var item: CastingItem
+
     var body: some View {
-        DetailSection(title: "Description") {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionLabel("Description")
             TextEditor(text: $item.description)
                 .font(.callout)
                 .frame(minHeight: 72)
@@ -189,13 +212,18 @@ private struct DescriptionSection: View {
                         .stroke(Color.secondary.opacity(0.25), lineWidth: 0.5)
                 )
         }
+        .padding(.bottom, 12)
     }
 }
 
+// MARK: - ProductionSection
+
 private struct ProductionSection: View {
     @Binding var item: CastingItem
+
     var body: some View {
-        DetailSection(title: "Production") {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionLabel("Production")
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("Variants")
@@ -228,13 +256,15 @@ private struct ProductionSection: View {
                 .disabled(item.name.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
+        .padding(.bottom, 12)
     }
 }
 
-// MARK: - Generic detail (non-casting)
+// MARK: - Generic detail
 
 private struct GenericDetailView: View {
     let item: MockItem
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
@@ -260,22 +290,14 @@ private struct GenericDetailView: View {
     }
 }
 
-// MARK: - Shared helper
+// MARK: - Shared free function (avoids generic DetailSection entirely)
 
-private struct DetailSection<Content: View>: View {
-    let title: String
-    @ViewBuilder let content: () -> Content
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .textCase(.uppercase)
-                .tracking(0.5)
-            content()
-        }
-        .padding(.bottom, 12)
-    }
+private func sectionLabel(_ title: String) -> some View {
+    Text(title)
+        .font(.caption)
+        .foregroundStyle(.tertiary)
+        .textCase(.uppercase)
+        .tracking(0.5)
 }
 
 #Preview {
