@@ -120,7 +120,7 @@ private struct StatusSection: View {
             if item.status == s {
                 Image(systemName: "checkmark")
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(Color.accentColor)
             }
         }
         .padding(.vertical, 5)
@@ -167,7 +167,7 @@ private struct LibraryLevelSection: View {
             if item.libraryLevel == level {
                 Image(systemName: "checkmark")
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(Color.accentColor)
             }
         }
         .padding(.vertical, 5)
@@ -242,7 +242,7 @@ private struct ProductionSection: View {
                         Spacer()
                         Text("#\(approved)")
                             .font(.caption.monospacedDigit())
-                            .foregroundStyle(.green)
+                            .foregroundStyle(Color.green)
                     }
                 }
                 Button {
@@ -290,7 +290,7 @@ private struct GenericDetailView: View {
     }
 }
 
-// MARK: - Shared free function (avoids generic DetailSection entirely)
+// MARK: - Shared free function
 
 private func sectionLabel(_ title: String) -> some View {
     Text(title)
