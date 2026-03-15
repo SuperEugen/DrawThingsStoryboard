@@ -6,11 +6,18 @@ struct SidebarView: View {
 
     var body: some View {
         List(selection: $selectedSection) {
-            Section("Generate") {
-                Label(AppSection.imageGeneration.title, systemImage: AppSection.imageGeneration.icon)
-                    .tag(AppSection.imageGeneration)
+
+            Section("Project") {
+                ForEach([AppSection.briefing, .casting, .writing, .production]) { section in
+                    Label(section.title, systemImage: section.icon)
+                        .tag(section)
+                }
             }
-            // New sections added here as features are built
+
+            Section("Assets") {
+                Label(AppSection.library.title, systemImage: AppSection.library.icon)
+                    .tag(AppSection.library)
+            }
         }
         .listStyle(.sidebar)
         .navigationTitle("DrawThingsStoryboard")
@@ -18,5 +25,5 @@ struct SidebarView: View {
 }
 
 #Preview {
-    SidebarView(selectedSection: .constant(.imageGeneration))
+    SidebarView(selectedSection: .constant(.briefing))
 }
