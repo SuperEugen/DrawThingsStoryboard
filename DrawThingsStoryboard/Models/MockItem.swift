@@ -4,7 +4,7 @@ import SwiftUI
 
 /// Generation lifecycle of an asset.
 enum GenerationStatus: String, CaseIterable, Identifiable {
-    case notYetGenerated = "not-yet-generated"
+    case notYetGenerated  = "not-yet-generated"
     case previewGenerated = "preview-generated"
     case finalGenerated   = "final-generated"
 
@@ -12,7 +12,7 @@ enum GenerationStatus: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .notYetGenerated: return "Not yet generated"
+        case .notYetGenerated:  return "Not yet generated"
         case .previewGenerated: return "Preview generated"
         case .finalGenerated:   return "Final generated"
         }
@@ -20,7 +20,7 @@ enum GenerationStatus: String, CaseIterable, Identifiable {
 
     var color: Color {
         switch self {
-        case .notYetGenerated: return .gray
+        case .notYetGenerated:  return .gray
         case .previewGenerated: return .orange
         case .finalGenerated:   return .green
         }
@@ -58,7 +58,7 @@ enum CastingItemType {
     case location
 }
 
-// MARK: - Casting item (used in Cast & Locations phase)
+// MARK: - Casting item
 
 struct CastingItem: Identifiable {
     let id: String
@@ -68,10 +68,11 @@ struct CastingItem: Identifiable {
     var status: GenerationStatus
     var libraryLevel: LibraryLevel
     var variantCount: Int
-    var approvedVariant: Int?       // 1-based index of approved preview variant
+    var approvedVariant: Int?
 }
 
-// MARK: - Library tree mock data
+// MARK: - Library tree structs
+// Property order must match memberwise init order used in MockData below.
 
 struct MockEpisode: Identifiable {
     let id: String
@@ -86,6 +87,8 @@ struct MockCustomer: Identifiable {
     var episodes: [MockEpisode]
 }
 
+/// NOTE: property order here defines the memberwise init order.
+/// customers comes before characters/locations so the init reads naturally.
 struct MockStudio: Identifiable {
     let id: String
     let name: String
@@ -109,7 +112,7 @@ struct MockItem: Identifiable {
 
 enum MockData {
 
-    // MARK: Casting phase items (flat list for center pane)
+    // MARK: Casting phase (flat lists for center pane)
 
     static let castingCharacters: [CastingItem] = [
         CastingItem(id: "ch-01", name: "Alex",   description: "The hero. Determined, mid-30s, athletic build.", type: .character, status: .finalGenerated,   libraryLevel: .customer, variantCount: 3, approvedVariant: 2),
@@ -118,22 +121,16 @@ enum MockData {
     ]
 
     static let castingLocations: [CastingItem] = [
-        CastingItem(id: "lo-01", name: "Rooftop",      description: "Urban rooftop, night skyline, neon reflections.", type: .location, status: .finalGenerated,   libraryLevel: .studio,   variantCount: 4, approvedVariant: 1),
-        CastingItem(id: "lo-02", name: "Office",       description: "Corporate open-plan office, daytime.",             type: .location, status: .notYetGenerated,  libraryLevel: .episode,  variantCount: 0, approvedVariant: nil),
-        CastingItem(id: "lo-03", name: "Underground",  description: "Subway station, flickering lights.",               type: .location, status: .previewGenerated, libraryLevel: .customer, variantCount: 2, approvedVariant: nil),
+        CastingItem(id: "lo-01", name: "Rooftop",     description: "Urban rooftop, night skyline, neon reflections.", type: .location, status: .finalGenerated,   libraryLevel: .studio,   variantCount: 4, approvedVariant: 1),
+        CastingItem(id: "lo-02", name: "Office",      description: "Corporate open-plan office, daytime.",             type: .location, status: .notYetGenerated,  libraryLevel: .episode,  variantCount: 0, approvedVariant: nil),
+        CastingItem(id: "lo-03", name: "Underground", description: "Subway station, flickering lights.",               type: .location, status: .previewGenerated, libraryLevel: .customer, variantCount: 2, approvedVariant: nil),
     ]
 
-    // MARK: Library tree
+    // MARK: Library tree (customers first — matches MockStudio memberwise init)
 
     static let libraryTree = MockStudio(
         id: "studio_main",
         name: "studio_main",
-        characters: [
-            CastingItem(id: "s-ch-01", name: "Narrator",      description: "Neutral, voice-over character.",         type: .character, status: .finalGenerated, libraryLevel: .studio, variantCount: 1, approvedVariant: 1),
-        ],
-        locations: [
-            CastingItem(id: "s-lo-01", name: "Black Void",    description: "Pure black infinite background.",        type: .location,  status: .finalGenerated, libraryLevel: .studio, variantCount: 1, approvedVariant: 1),
-        ],
         customers: [
             MockCustomer(
                 id: "customer_acme",
@@ -157,7 +154,7 @@ enum MockData {
                             CastingItem(id: "ac-e2-ch-01", name: "Jordan", description: "Villain returns.",         type: .character, status: .notYetGenerated,  libraryLevel: .episode, variantCount: 0, approvedVariant: nil),
                         ],
                         locations: [
-                            CastingItem(id: "ac-e2-lo-01", name: "Rooftop","Acme rooftop finale.",                  type: .location,  status: .previewGenerated, libraryLevel: .episode, variantCount: 2, approvedVariant: nil),
+                            CastingItem(id: "ac-e2-lo-01", name: "Rooftop", description: "Acme rooftop finale.",    type: .location,  status: .previewGenerated, libraryLevel: .episode, variantCount: 2, approvedVariant: nil),
                         ]
                     ),
                 ]
@@ -170,17 +167,17 @@ enum MockData {
                         id: "episode_nova_01",
                         name: "episode_nova_01",
                         characters: [
-                            CastingItem(id: "nv-e1-ch-01", name: "Lyra",  description: "Nova's protagonist.",       type: .character, status: .previewGenerated, libraryLevel: .episode, variantCount: 1, approvedVariant: nil),
+                            CastingItem(id: "nv-e1-ch-01", name: "Lyra", description: "Nova's protagonist.",        type: .character, status: .previewGenerated, libraryLevel: .episode, variantCount: 1, approvedVariant: nil),
                         ],
                         locations: [
-                            CastingItem(id: "nv-e1-lo-01", name: "Lab",   description: "High-tech research lab.",   type: .location,  status: .notYetGenerated,  libraryLevel: .episode, variantCount: 0, approvedVariant: nil),
+                            CastingItem(id: "nv-e1-lo-01", name: "Lab",  description: "High-tech research lab.",    type: .location,  status: .notYetGenerated,  libraryLevel: .episode, variantCount: 0, approvedVariant: nil),
                         ]
                     ),
                     MockEpisode(
                         id: "episode_nova_02",
                         name: "episode_nova_02",
                         characters: [
-                            CastingItem(id: "nv-e2-ch-01", name: "Rex",   description: "Nova security chief.",      type: .character, status: .notYetGenerated,  libraryLevel: .episode, variantCount: 0, approvedVariant: nil),
+                            CastingItem(id: "nv-e2-ch-01", name: "Rex",  description: "Nova security chief.",       type: .character, status: .notYetGenerated,  libraryLevel: .episode, variantCount: 0, approvedVariant: nil),
                         ],
                         locations: [
                             CastingItem(id: "nv-e2-lo-01", name: "Server Room", description: "Dim blue light, racks.", type: .location, status: .notYetGenerated, libraryLevel: .episode, variantCount: 0, approvedVariant: nil),
@@ -190,7 +187,7 @@ enum MockData {
                         id: "episode_nova_03",
                         name: "episode_nova_03",
                         characters: [
-                            CastingItem(id: "nv-e3-ch-01", name: "Echo",  description: "AI companion character.",   type: .character, status: .notYetGenerated,  libraryLevel: .episode, variantCount: 0, approvedVariant: nil),
+                            CastingItem(id: "nv-e3-ch-01", name: "Echo", description: "AI companion character.",    type: .character, status: .notYetGenerated,  libraryLevel: .episode, variantCount: 0, approvedVariant: nil),
                         ],
                         locations: [
                             CastingItem(id: "nv-e3-lo-01", name: "Void Station", description: "Derelict space station.", type: .location, status: .notYetGenerated, libraryLevel: .episode, variantCount: 0, approvedVariant: nil),
@@ -198,23 +195,29 @@ enum MockData {
                     ),
                 ]
             ),
+        ],
+        characters: [
+            CastingItem(id: "s-ch-01", name: "Narrator",   description: "Neutral, voice-over character.",  type: .character, status: .finalGenerated, libraryLevel: .studio, variantCount: 1, approvedVariant: 1),
+        ],
+        locations: [
+            CastingItem(id: "s-lo-01", name: "Black Void", description: "Pure black infinite background.", type: .location,  status: .finalGenerated, libraryLevel: .studio, variantCount: 1, approvedVariant: 1),
         ]
     )
 
-    // MARK: Other phases (unchanged)
+    // MARK: Other phases
 
     static func items(for section: AppSection?) -> [MockItem] {
         switch section {
         case .briefing:
             return [
-                MockItem(id: "b-01", name: "Studio Config",      icon: "gearshape",           color: .indigo, status: "Draft", variantCount: 1),
-                MockItem(id: "b-02", name: "Episode Config",      icon: "doc.badge.gearshape", color: .indigo, status: "Draft", variantCount: 1),
+                MockItem(id: "b-01", name: "Studio Config",     icon: "gearshape",           color: .indigo, status: "Draft", variantCount: 1),
+                MockItem(id: "b-02", name: "Episode Config",    icon: "doc.badge.gearshape", color: .indigo, status: "Draft", variantCount: 1),
             ]
         case .writing:
             return [
-                MockItem(id: "w-01", name: "Act 1 — Setup",       icon: "doc.text", color: .green, status: "Draft", variantCount: 1),
-                MockItem(id: "w-02", name: "Act 2 — Conflict",    icon: "doc.text", color: .green, status: "Draft", variantCount: 1),
-                MockItem(id: "w-03", name: "Act 3 — Resolution",  icon: "doc.text", color: .green, status: "Draft", variantCount: 1),
+                MockItem(id: "w-01", name: "Act 1 — Setup",      icon: "doc.text", color: .green, status: "Draft", variantCount: 1),
+                MockItem(id: "w-02", name: "Act 2 — Conflict",   icon: "doc.text", color: .green, status: "Draft", variantCount: 1),
+                MockItem(id: "w-03", name: "Act 3 — Resolution", icon: "doc.text", color: .green, status: "Draft", variantCount: 1),
             ]
         case .production:
             return [
