@@ -1,21 +1,9 @@
 import SwiftUI
 
-/// Routes the selected sidebar section to the correct feature view.
-/// Add new cases here as features are built.
+/// DetailRouter is superseded by the three-pane NavigationSplitView in ContentView.
+/// Kept as a stub to avoid Xcode "missing reference" issues until old ImageGenerationView
+/// scaffolding is cleaned up in a follow-up.
 struct DetailRouter: View {
-
     let selectedSection: AppSection?
-
-    var body: some View {
-        switch selectedSection {
-        case .imageGeneration:
-            ImageGenerationView()
-        case .none:
-            ContentUnavailableView(
-                "Nothing selected",
-                systemImage: "sidebar.left",
-                description: Text("Choose a section from the sidebar.")
-            )
-        }
-    }
+    var body: some View { EmptyView() }
 }
