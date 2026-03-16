@@ -1,11 +1,21 @@
 import SwiftUI
 
 /// Center pane — adapts to the selected phase.
-/// Casting phase: two sub-sections (Cast + Locations) with independent +/- controls.
-/// Other phases: generic single-section grid.
+/// Briefing: Studio → Customer → Episode hierarchy.
+/// Casting:  Cast + Locations sub-sections.
+/// Other:    generic single-section grid.
 struct ItemBrowserView: View {
 
     let section: AppSection?
+
+    // Briefing hierarchy
+    @Binding var studios: [MockStudio]
+    @Binding var selectedStudioID: String?
+    @Binding var selectedCustomerID: String?
+    @Binding var selectedEpisodeID: String?
+    @Binding var selectedBriefingLevel: BriefingLevel
+
+    // Casting
     @Binding var selectedCastingItem: CastingItem?
 
     // Generic phases
@@ -16,9 +26,18 @@ struct ItemBrowserView: View {
             BrowserHeaderView(section: section)
             Divider()
 
-            if section == .casting {
+            switch section {
+            case .briefing:
+                BriefingBrowserView(
+                    studios: $studios,
+                    selectedStudioID: $selectedStudioID,
+                    selectedCustomerID: $selectedCustomerID,
+                    selectedEpisodeID: $selectedEpisodeID,
+                    selectedBriefingLevel: $selectedBriefingLevel
+                )
+            case .casting:
                 CastingBrowserView(selectedItem: $selectedCastingItem)
-            } else {
+            default:
                 GenericBrowserView(section: section, selectedItemID: $selectedItemID)
             }
         }
@@ -99,36 +118,24 @@ private struct CastingSubSectionView: View {
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.secondary)
                 Spacer()
-                // − button
                 Button {
-                    guard let sel = selectedItem,
-                          let idx = items.firstIndex(where: { $0.id == sel.id }) else { return }
-                    items.remove(at: idx)
-                    selectedItem = nil
-                } label: {
-                    Image(systemName: "minus")
-                        .frame(width: 22, height: 22)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
-                .disabled(selectedItem == nil || !items.contains(where: { $0.id == selectedItem?.id }))
-                // + button
-                Button {
+                    let newID = UUID().uuidString
                     let newItem = CastingItem(
-                        id: UUID().uuidString,
+                        id: newID,
                         name: itemType == .character ? "New Character" : "New Location",
                         description: "",
                         type: itemType,
-                        status: .notYetGenerated,
+                        gender: itemType == .character ? .male : nil,
+                        locationSetting: itemType == .location ? .interior : nil,
+                        status: .nothingGenerated,
                         libraryLevel: .episode,
-                        variantCount: 0,
-                        approvedVariant: nil
+                        variants: CastingItem.emptyVariants(prefix: newID)
                     )
                     items.append(newItem)
                     selectedItem = newItem
                 } label: {
-                    Image(systemName: "plus")
-                        .frame(width: 22, height: 22)
+                    Label("Add from Library", systemImage: "plus.rectangle.on.folder")
+                        .font(.caption)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.mini)
@@ -138,7 +145,7 @@ private struct CastingSubSectionView: View {
             .padding(.bottom, 6)
 
             if items.isEmpty {
-                Text("No \(title.lowercased()) yet — tap + to add one.")
+                Text("No \(title.lowercased()) yet — add one from the library.")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                     .padding(.vertical, 20)
@@ -147,7 +154,15 @@ private struct CastingSubSectionView: View {
                     ForEach(items) { item in
                         CastingTileView(
                             item: item,
-                            isSelected: selectedItem?.id == item.id
+                            isSelected: selectedItem?.id == item.id,
+                            onDelete: {
+                                if let idx = items.firstIndex(where: { $0.id == item.id }) {
+                                    items.remove(at: idx)
+                                    if selectedItem?.id == item.id {
+                                        selectedItem = nil
+                                    }
+                                }
+                            }
                         )
                         .onTapGesture { selectedItem = item }
                     }
@@ -165,10 +180,11 @@ private struct CastingTileView: View {
 
     let item: CastingItem
     let isSelected: Bool
+    var onDelete: (() -> Void)?
 
     var body: some View {
         VStack(spacing: 5) {
-            ZStack(alignment: .bottomTrailing) {
+            ZStack {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(tileColor.opacity(0.15))
                     .overlay {
@@ -178,11 +194,35 @@ private struct CastingTileView: View {
                     }
                     .frame(height: 80)
 
-                // Status dot
-                Circle()
-                    .fill(item.status.color)
-                    .frame(width: 8, height: 8)
-                    .padding(5)
+                // Status dot — bottom trailing
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Circle()
+                            .fill(item.status.color)
+                            .frame(width: 8, height: 8)
+                            .padding(5)
+                    }
+                }
+
+                // Delete button — top trailing
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button {
+                            onDelete?()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 14))
+                                .symbolRenderingMode(.palette)
+                                .foregroundStyle(.white, .secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(3)
+                    }
+                    Spacer()
+                }
             }
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
@@ -206,7 +246,11 @@ private struct CastingTileView: View {
     }
 
     private var tileIcon: String {
-        item.type == .character ? "person.fill" : "map"
+        if item.type == .character {
+            return item.gender?.icon ?? "person.fill"
+        } else {
+            return item.locationSetting?.icon ?? "map"
+        }
     }
 }
 
@@ -271,8 +315,23 @@ private struct GenericTileView: View {
 }
 
 #Preview {
+    @Previewable @State var studios = MockData.defaultStudios
+    @Previewable @State var studioID: String? = MockData.defaultStudios[0].id
+    @Previewable @State var customerID: String? = MockData.defaultStudios[0].customers[0].id
+    @Previewable @State var episodeID: String? = MockData.defaultStudios[0].customers[0].episodes[0].id
+    @Previewable @State var briefingLevel: BriefingLevel = .episode
     @Previewable @State var sel: CastingItem? = nil
     @Previewable @State var selID: String? = nil
-    ItemBrowserView(section: .casting, selectedCastingItem: $sel, selectedItemID: $selID)
-        .frame(width: 480, height: 600)
+
+    ItemBrowserView(
+        section: .briefing,
+        studios: $studios,
+        selectedStudioID: $studioID,
+        selectedCustomerID: $customerID,
+        selectedEpisodeID: $episodeID,
+        selectedBriefingLevel: $briefingLevel,
+        selectedCastingItem: $sel,
+        selectedItemID: $selID
+    )
+    .frame(width: 480, height: 600)
 }

@@ -1,5 +1,28 @@
 import Foundation
 
+/// Which level of the briefing hierarchy the user is currently editing.
+enum BriefingLevel: String, Hashable {
+    case studio
+    case customer
+    case episode
+
+    var label: String {
+        switch self {
+        case .studio:   return "Studio"
+        case .customer: return "Customer"
+        case .episode:  return "Episode"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .studio:   return "building.columns"
+        case .customer: return "person.text.rectangle"
+        case .episode:  return "film"
+        }
+    }
+}
+
 /// Top-level navigation sections — one per production phase plus library access.
 enum AppSection: String, CaseIterable, Identifiable, Hashable {
 
@@ -17,8 +40,8 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
     var title: String {
         switch self {
         case .briefing:   return "Briefing"
-        case .casting:    return "Casting"
-        case .writing:    return "Writing"
+        case .casting:    return "Cast & Locations"
+        case .writing:    return "Storyboard"
         case .production: return "Production"
         case .library:    return "Library"
         }

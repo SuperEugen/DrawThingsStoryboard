@@ -52,7 +52,7 @@ struct LibraryView: View {
                 selectedItem: $selectedItem,
                 levelLabel: currentLevelLabel
             )
-            .frame(minWidth: 280)
+            .frame(minWidth: 280, maxHeight: .infinity)
 
             // ── Right: detail ────────────────────────────────────────
             Group {
@@ -69,8 +69,9 @@ struct LibraryView: View {
                     )
                 }
             }
-            .frame(minWidth: 260, idealWidth: 280, maxWidth: 320)
+            .frame(minWidth: 260, idealWidth: 280, maxWidth: 320, maxHeight: .infinity)
         }
+        .frame(maxHeight: .infinity)
         .onChange(of: selectedCustomerID) { _, _ in
             selectedEpisodeID = nil
             selectedItem = nil

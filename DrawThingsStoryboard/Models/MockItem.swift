@@ -2,29 +2,39 @@ import SwiftUI
 
 // MARK: - Enums
 
-/// Generation lifecycle of an asset.
+/// Generation lifecycle of a Cast / Location / Panel item.
 enum GenerationStatus: String, CaseIterable, Identifiable {
-    case notYetGenerated  = "not-yet-generated"
-    case previewGenerated = "preview-generated"
-    case finalGenerated   = "final-generated"
+    case nothingGenerated   = "nothing-generated"
+    case variantsGenerated  = "variants-generated"
+    case variantApproved    = "variant-approved"
+    case finalGenerated     = "final-generated"
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
-        case .notYetGenerated:  return "Not yet generated"
-        case .previewGenerated: return "Preview generated"
-        case .finalGenerated:   return "Final generated"
+        case .nothingGenerated:  return "Nothing generated"
+        case .variantsGenerated: return "Variants generated"
+        case .variantApproved:   return "Variant approved"
+        case .finalGenerated:    return "Final generated"
         }
     }
 
     var color: Color {
         switch self {
-        case .notYetGenerated:  return .gray
-        case .previewGenerated: return .orange
-        case .finalGenerated:   return .green
+        case .nothingGenerated:  return .gray
+        case .variantsGenerated: return .orange
+        case .variantApproved:   return .blue
+        case .finalGenerated:    return .green
         }
     }
+}
+
+/// One of 4 variant slots for a CastingItem.
+struct Variant: Identifiable {
+    let id: String
+    var isGenerated: Bool       // true = has image data, false = empty placeholder
+    var isApproved: Bool        // at most one variant can be approved per item
 }
 
 /// Where in the library hierarchy an asset lives.
@@ -58,6 +68,49 @@ enum CastingItemType {
     case location
 }
 
+/// Gender for cast members.
+enum CharacterGender: String, CaseIterable {
+    case male
+    case female
+    case other
+
+    var icon: String {
+        switch self {
+        case .male:   return "figure.stand"
+        case .female: return "figure.stand.dress"
+        case .other:  return "cat"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .male:   return "Male"
+        case .female: return "Female"
+        case .other:  return "Other"
+        }
+    }
+}
+
+/// Interior / Exterior for locations.
+enum LocationSetting: String, CaseIterable {
+    case interior
+    case exterior
+
+    var icon: String {
+        switch self {
+        case .interior: return "door.left.hand.open"
+        case .exterior: return "mountain.2"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .interior: return "Interior"
+        case .exterior: return "Exterior"
+        }
+    }
+}
+
 // MARK: - Casting item
 
 struct CastingItem: Identifiable {
@@ -65,36 +118,86 @@ struct CastingItem: Identifiable {
     var name: String
     var description: String
     var type: CastingItemType
+    var gender: CharacterGender? = nil           // only for characters
+    var locationSetting: LocationSetting? = nil  // only for locations
     var status: GenerationStatus
     var libraryLevel: LibraryLevel
-    var variantCount: Int
-    var approvedVariant: Int?
+    /// Always exactly 4 variant slots.
+    var variants: [Variant]
+
+    /// Convenience: number of generated (non-empty) variants.
+    var generatedCount: Int { variants.filter(\.isGenerated).count }
+    /// Index of the approved variant, if any.
+    var approvedIndex: Int? { variants.firstIndex(where: { $0.isApproved }) }
+
+    /// Creates 4 default empty variant slots.
+    static func emptyVariants(prefix: String) -> [Variant] {
+        (0..<4).map { Variant(id: "\(prefix)-v\($0)", isGenerated: false, isApproved: false) }
+    }
+
+    /// Creates 4 variant slots with the given number generated and optional approved index.
+    static func mockVariants(prefix: String, generated: Int, approved: Int?) -> [Variant] {
+        (0..<4).map { i in
+            Variant(
+                id: "\(prefix)-v\(i)",
+                isGenerated: i < generated,
+                isApproved: approved == i
+            )
+        }
+    }
 }
 
 // MARK: - Library tree structs
 // Property order must match memberwise init order used in MockData below.
 
-struct MockEpisode: Identifiable {
+struct MockEpisode: Identifiable, Hashable {
     let id: String
-    let name: String
+    var name: String
+    var rules: String = ""
     var characters: [CastingItem]
     var locations: [CastingItem]
+
+    static func == (lhs: MockEpisode, rhs: MockEpisode) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
 }
 
-struct MockCustomer: Identifiable {
+struct MockCustomer: Identifiable, Hashable {
     let id: String
-    let name: String
+    var name: String
+    var rules: String = ""
     var episodes: [MockEpisode]
+
+    static func == (lhs: MockCustomer, rhs: MockCustomer) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
 }
 
 /// NOTE: property order here defines the memberwise init order.
 /// customers comes before characters/locations so the init reads naturally.
-struct MockStudio: Identifiable {
+struct MockStudio: Identifiable, Hashable {
     let id: String
-    let name: String
+    var name: String
+    var rules: String = ""
     var customers: [MockCustomer]
     var characters: [CastingItem]   // studio-level shared characters
     var locations: [CastingItem]    // studio-level shared locations
+
+    static func == (lhs: MockStudio, rhs: MockStudio) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
 }
 
 // MARK: - Generic browser item (non-casting phases)
@@ -115,104 +218,129 @@ enum MockData {
     // MARK: Casting phase (flat lists for center pane)
 
     static let castingCharacters: [CastingItem] = [
-        CastingItem(id: "ch-01", name: "Alex",   description: "The hero. Determined, mid-30s, athletic build.", type: .character, status: .finalGenerated,   libraryLevel: .customer, variantCount: 3, approvedVariant: 2),
-        CastingItem(id: "ch-02", name: "Sam",    description: "The sidekick. Cheerful, early 20s.",             type: .character, status: .previewGenerated, libraryLevel: .episode,  variantCount: 2, approvedVariant: nil),
-        CastingItem(id: "ch-03", name: "Jordan", description: "The antagonist. Cold, late 40s, sharp eyes.",    type: .character, status: .notYetGenerated,  libraryLevel: .episode,  variantCount: 0, approvedVariant: nil),
+        CastingItem(id: "ch-01", name: "Alex",   description: "The hero. Determined, mid-30s, athletic build.", type: .character, gender: .male,   status: .finalGenerated,    libraryLevel: .customer, variants: CastingItem.mockVariants(prefix: "ch-01", generated: 4, approved: 2)),
+        CastingItem(id: "ch-02", name: "Sam",    description: "The sidekick. Cheerful, early 20s.",             type: .character, gender: .female, status: .variantsGenerated, libraryLevel: .episode,  variants: CastingItem.mockVariants(prefix: "ch-02", generated: 4, approved: nil)),
+        CastingItem(id: "ch-03", name: "Jordan", description: "The antagonist. Cold, late 40s, sharp eyes.",    type: .character, gender: .other,  status: .nothingGenerated,  libraryLevel: .episode,  variants: CastingItem.emptyVariants(prefix: "ch-03")),
     ]
 
     static let castingLocations: [CastingItem] = [
-        CastingItem(id: "lo-01", name: "Rooftop",     description: "Urban rooftop, night skyline, neon reflections.", type: .location, status: .finalGenerated,   libraryLevel: .studio,   variantCount: 4, approvedVariant: 1),
-        CastingItem(id: "lo-02", name: "Office",      description: "Corporate open-plan office, daytime.",             type: .location, status: .notYetGenerated,  libraryLevel: .episode,  variantCount: 0, approvedVariant: nil),
-        CastingItem(id: "lo-03", name: "Underground", description: "Subway station, flickering lights.",               type: .location, status: .previewGenerated, libraryLevel: .customer, variantCount: 2, approvedVariant: nil),
+        CastingItem(id: "lo-01", name: "Rooftop",     description: "Urban rooftop, night skyline, neon reflections.", type: .location, locationSetting: .exterior, status: .finalGenerated,    libraryLevel: .studio,   variants: CastingItem.mockVariants(prefix: "lo-01", generated: 4, approved: 1)),
+        CastingItem(id: "lo-02", name: "Office",      description: "Corporate open-plan office, daytime.",             type: .location, locationSetting: .interior, status: .nothingGenerated,  libraryLevel: .episode,  variants: CastingItem.emptyVariants(prefix: "lo-02")),
+        CastingItem(id: "lo-03", name: "Underground", description: "Subway station, flickering lights.",               type: .location, locationSetting: .interior, status: .variantsGenerated, libraryLevel: .customer, variants: CastingItem.mockVariants(prefix: "lo-03", generated: 4, approved: nil)),
     ]
 
-    // MARK: Library tree (customers first — matches MockStudio memberwise init)
+    // MARK: Library tree — initial studios list
 
-    static let libraryTree = MockStudio(
-        id: "studio_main",
-        name: "studio_main",
-        customers: [
-            MockCustomer(
-                id: "customer_acme",
-                name: "customer_acme",
-                episodes: [
-                    MockEpisode(
-                        id: "episode_acme_01",
-                        name: "episode_acme_01",
-                        characters: [
-                            CastingItem(id: "ac-e1-ch-01", name: "Alex",   description: "Hero for Acme episode 1.", type: .character, status: .finalGenerated,   libraryLevel: .episode, variantCount: 3, approvedVariant: 2),
-                            CastingItem(id: "ac-e1-ch-02", name: "Sam",    description: "Sidekick.",                type: .character, status: .previewGenerated, libraryLevel: .episode, variantCount: 2, approvedVariant: nil),
-                        ],
-                        locations: [
-                            CastingItem(id: "ac-e1-lo-01", name: "Office", description: "Acme HQ daytime.",         type: .location,  status: .notYetGenerated,  libraryLevel: .episode, variantCount: 0, approvedVariant: nil),
-                        ]
-                    ),
-                    MockEpisode(
-                        id: "episode_acme_02",
-                        name: "episode_acme_02",
-                        characters: [
-                            CastingItem(id: "ac-e2-ch-01", name: "Jordan", description: "Villain returns.",         type: .character, status: .notYetGenerated,  libraryLevel: .episode, variantCount: 0, approvedVariant: nil),
-                        ],
-                        locations: [
-                            CastingItem(id: "ac-e2-lo-01", name: "Rooftop", description: "Acme rooftop finale.",    type: .location,  status: .previewGenerated, libraryLevel: .episode, variantCount: 2, approvedVariant: nil),
-                        ]
-                    ),
-                ]
-            ),
-            MockCustomer(
-                id: "customer_nova",
-                name: "customer_nova",
-                episodes: [
-                    MockEpisode(
-                        id: "episode_nova_01",
-                        name: "episode_nova_01",
-                        characters: [
-                            CastingItem(id: "nv-e1-ch-01", name: "Lyra", description: "Nova's protagonist.",        type: .character, status: .previewGenerated, libraryLevel: .episode, variantCount: 1, approvedVariant: nil),
-                        ],
-                        locations: [
-                            CastingItem(id: "nv-e1-lo-01", name: "Lab",  description: "High-tech research lab.",    type: .location,  status: .notYetGenerated,  libraryLevel: .episode, variantCount: 0, approvedVariant: nil),
-                        ]
-                    ),
-                    MockEpisode(
-                        id: "episode_nova_02",
-                        name: "episode_nova_02",
-                        characters: [
-                            CastingItem(id: "nv-e2-ch-01", name: "Rex",  description: "Nova security chief.",       type: .character, status: .notYetGenerated,  libraryLevel: .episode, variantCount: 0, approvedVariant: nil),
-                        ],
-                        locations: [
-                            CastingItem(id: "nv-e2-lo-01", name: "Server Room", description: "Dim blue light, racks.", type: .location, status: .notYetGenerated, libraryLevel: .episode, variantCount: 0, approvedVariant: nil),
-                        ]
-                    ),
-                    MockEpisode(
-                        id: "episode_nova_03",
-                        name: "episode_nova_03",
-                        characters: [
-                            CastingItem(id: "nv-e3-ch-01", name: "Echo", description: "AI companion character.",    type: .character, status: .notYetGenerated,  libraryLevel: .episode, variantCount: 0, approvedVariant: nil),
-                        ],
-                        locations: [
-                            CastingItem(id: "nv-e3-lo-01", name: "Void Station", description: "Derelict space station.", type: .location, status: .notYetGenerated, libraryLevel: .episode, variantCount: 0, approvedVariant: nil),
-                        ]
-                    ),
-                ]
-            ),
-        ],
-        characters: [
-            CastingItem(id: "s-ch-01", name: "Narrator",   description: "Neutral, voice-over character.",  type: .character, status: .finalGenerated, libraryLevel: .studio, variantCount: 1, approvedVariant: 1),
-        ],
-        locations: [
-            CastingItem(id: "s-lo-01", name: "Black Void", description: "Pure black infinite background.", type: .location,  status: .finalGenerated, libraryLevel: .studio, variantCount: 1, approvedVariant: 1),
-        ]
-    )
+    static let defaultStudios: [MockStudio] = [
+        MockStudio(
+            id: "studio_pixelforge",
+            name: "PixelForge Studios",
+            rules: "cinematic lighting, photorealistic, 8k resolution, dramatic shadows",
+            customers: [
+                MockCustomer(
+                    id: "cust_globalmedia",
+                    name: "Global Media Corp",
+                    rules: "corporate thriller aesthetic, muted color palette, urban environments",
+                    episodes: [
+                        MockEpisode(
+                            id: "ep_gm_pilot",
+                            name: "The Pilot",
+                            rules: "night scenes, noir atmosphere, rain-soaked streets",
+                            characters: [
+                                CastingItem(id: "gm-p-ch-01", name: "Alex",   description: "The hero. Determined, mid-30s.", type: .character, gender: .male,   status: .finalGenerated,    libraryLevel: .episode, variants: CastingItem.mockVariants(prefix: "gm-p-ch-01", generated: 4, approved: 2)),
+                                CastingItem(id: "gm-p-ch-02", name: "Sam",    description: "Cheerful sidekick, early 20s.", type: .character, gender: .female, status: .variantsGenerated, libraryLevel: .episode, variants: CastingItem.mockVariants(prefix: "gm-p-ch-02", generated: 4, approved: nil)),
+                            ],
+                            locations: [
+                                CastingItem(id: "gm-p-lo-01", name: "Office", description: "Corporate open-plan office.", type: .location, locationSetting: .interior, status: .nothingGenerated, libraryLevel: .episode, variants: CastingItem.emptyVariants(prefix: "gm-p-lo-01")),
+                            ]
+                        ),
+                        MockEpisode(
+                            id: "ep_gm_chase",
+                            name: "The Chase",
+                            characters: [
+                                CastingItem(id: "gm-c-ch-01", name: "Jordan", description: "The antagonist, late 40s.", type: .character, gender: .other, status: .nothingGenerated, libraryLevel: .episode, variants: CastingItem.emptyVariants(prefix: "gm-c-ch-01")),
+                            ],
+                            locations: [
+                                CastingItem(id: "gm-c-lo-01", name: "Rooftop", description: "Urban rooftop, neon night.", type: .location, locationSetting: .exterior, status: .variantsGenerated, libraryLevel: .episode, variants: CastingItem.mockVariants(prefix: "gm-c-lo-01", generated: 4, approved: nil)),
+                            ]
+                        ),
+                        MockEpisode(
+                            id: "ep_gm_finale",
+                            name: "The Finale",
+                            characters: [],
+                            locations: []
+                        ),
+                    ]
+                ),
+                MockCustomer(
+                    id: "cust_novaent",
+                    name: "Nova Entertainment",
+                    episodes: [
+                        MockEpisode(
+                            id: "ep_nv_origins",
+                            name: "Origins",
+                            characters: [
+                                CastingItem(id: "nv-o-ch-01", name: "Lyra", description: "Nova's protagonist.", type: .character, gender: .female, status: .variantApproved, libraryLevel: .episode, variants: CastingItem.mockVariants(prefix: "nv-o-ch-01", generated: 4, approved: 0)),
+                            ],
+                            locations: [
+                                CastingItem(id: "nv-o-lo-01", name: "Lab", description: "High-tech research lab.", type: .location, locationSetting: .interior, status: .nothingGenerated, libraryLevel: .episode, variants: CastingItem.emptyVariants(prefix: "nv-o-lo-01")),
+                            ]
+                        ),
+                        MockEpisode(
+                            id: "ep_nv_breach",
+                            name: "The Breach",
+                            characters: [
+                                CastingItem(id: "nv-b-ch-01", name: "Rex", description: "Security chief.", type: .character, gender: .male, status: .nothingGenerated, libraryLevel: .episode, variants: CastingItem.emptyVariants(prefix: "nv-b-ch-01")),
+                            ],
+                            locations: [
+                                CastingItem(id: "nv-b-lo-01", name: "Server Room", description: "Dim blue light, racks.", type: .location, locationSetting: .interior, status: .nothingGenerated, libraryLevel: .episode, variants: CastingItem.emptyVariants(prefix: "nv-b-lo-01")),
+                            ]
+                        ),
+                    ]
+                ),
+            ],
+            characters: [
+                CastingItem(id: "pf-ch-01", name: "Narrator", description: "Neutral voice-over character.", type: .character, gender: .other, status: .finalGenerated, libraryLevel: .studio, variants: CastingItem.mockVariants(prefix: "pf-ch-01", generated: 4, approved: 0)),
+            ],
+            locations: [
+                CastingItem(id: "pf-lo-01", name: "Black Void", description: "Pure black infinite background.", type: .location, locationSetting: .interior, status: .finalGenerated, libraryLevel: .studio, variants: CastingItem.mockVariants(prefix: "pf-lo-01", generated: 4, approved: 1)),
+            ]
+        ),
+        MockStudio(
+            id: "studio_dreamworks",
+            name: "Dreamline Animation",
+            customers: [
+                MockCustomer(
+                    id: "cust_sunrisemedia",
+                    name: "Sunrise Media",
+                    episodes: [
+                        MockEpisode(
+                            id: "ep_sm_dawn",
+                            name: "Dawn",
+                            characters: [
+                                CastingItem(id: "sm-d-ch-01", name: "Kai", description: "Young explorer.", type: .character, gender: .male, status: .nothingGenerated, libraryLevel: .episode, variants: CastingItem.emptyVariants(prefix: "sm-d-ch-01")),
+                            ],
+                            locations: [
+                                CastingItem(id: "sm-d-lo-01", name: "Mountain Pass", description: "Snowy alpine trail.", type: .location, locationSetting: .exterior, status: .nothingGenerated, libraryLevel: .episode, variants: CastingItem.emptyVariants(prefix: "sm-d-lo-01")),
+                            ]
+                        ),
+                    ]
+                ),
+            ],
+            characters: [],
+            locations: []
+        ),
+    ]
+
+    /// Legacy accessor for library tree — returns first studio for backward compat.
+    static let libraryTree: MockStudio = defaultStudios[0]
 
     // MARK: Other phases
 
     static func items(for section: AppSection?) -> [MockItem] {
         switch section {
         case .briefing:
-            return [
-                MockItem(id: "b-01", name: "Studio Config",     icon: "gearshape",           color: .indigo, status: "Draft", variantCount: 1),
-                MockItem(id: "b-02", name: "Episode Config",    icon: "doc.badge.gearshape", color: .indigo, status: "Draft", variantCount: 1),
-            ]
+            return []   // Briefing has its own dedicated browser
         case .writing:
             return [
                 MockItem(id: "w-01", name: "Act 1 — Setup",      icon: "doc.text", color: .green, status: "Draft", variantCount: 1),

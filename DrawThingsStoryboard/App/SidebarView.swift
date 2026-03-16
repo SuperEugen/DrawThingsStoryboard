@@ -20,7 +20,6 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
-        .navigationTitle("DrawThingsStoryboard")
     }
 }
 
