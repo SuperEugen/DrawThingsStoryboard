@@ -23,37 +23,37 @@ enum BriefingLevel: String, Hashable {
     }
 }
 
-/// Top-level navigation sections — one per production phase plus library access.
+/// Top-level navigation sections shown in the sidebar.
 enum AppSection: String, CaseIterable, Identifiable, Hashable {
 
-    // Production phases
-    case briefing
-    case casting
-    case writing
-    case production
-
-    // Library management
-    case library
+    case projects
+    case assets
+    case looks
+    case storyboard
+    case productionQueue
+    case configuration
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .briefing:   return "Briefing"
-        case .casting:    return "Cast & Locations"
-        case .writing:    return "Storyboard"
-        case .production: return "Production"
-        case .library:    return "Library"
+        case .projects:        return "Projects"
+        case .assets:          return "Assets"
+        case .looks:           return "Looks"
+        case .storyboard:      return "Storyboard"
+        case .productionQueue: return "Production Queue"
+        case .configuration:   return "Configuration"
         }
     }
 
     var icon: String {
         switch self {
-        case .briefing:   return "doc.text"
-        case .casting:    return "person.2"
-        case .writing:    return "pencil.and.list.clipboard"
-        case .production: return "film.stack"
-        case .library:    return "photo.stack"
+        case .projects:        return "folder"
+        case .assets:          return "photo.stack"
+        case .looks:           return "paintpalette"
+        case .storyboard:      return "pencil.and.list.clipboard"
+        case .productionQueue: return "film.stack"
+        case .configuration:   return "gearshape"
         }
     }
 }

@@ -9,8 +9,7 @@ struct ContentView: View {
 
     // MARK: - Navigation state
 
-    @State private var selectedSection: AppSection?      = .briefing
-    @State private var selectedCastingItem: CastingItem? = nil
+    @State private var selectedSection: AppSection?      = .projects
     @State private var selectedItemID: String?           = nil
 
     // MARK: - Hierarchy state (Studio → Customer → Episode)
@@ -20,6 +19,22 @@ struct ContentView: View {
     @State private var selectedCustomerID: String?       = nil
     @State private var selectedEpisodeID: String?        = nil
     @State private var selectedBriefingLevel: BriefingLevel = .episode
+
+    // MARK: - Assets state (formerly Library)
+    @State private var selectedAssetItem: CastingItem? = nil
+    /// Bumped whenever the asset pane mutates studios, so the library view refreshes.
+    @State private var libraryRefreshToken: UUID = UUID()
+
+    // MARK: - Looks state (templates)
+    @State private var templates: [GenerationTemplate] = MockData.defaultTemplates
+    @State private var selectedTemplateID: String? = nil
+
+    // MARK: - Storyboard state
+    @State private var storyboardSelection: StoryboardSelection? = nil
+
+    // MARK: - Production Queue state
+    @State private var generationQueue: [GenerationJob] = MockData.sampleQueue
+    @State private var selectedJobID: String? = nil
 
     // MARK: - Derived selection helpers
 
@@ -42,51 +57,122 @@ struct ContentView: View {
         return studios[si].customers[ci].episodes[ei].name
     }
 
+    /// Binding to the acts array of the currently selected episode.
+    private var currentEpisodeActsBinding: Binding<[MockAct]> {
+        guard let si = selectedStudioIndex,
+              let ci = selectedCustomerIndex,
+              let ei = selectedEpisodeIndex else {
+            return .constant([])
+        }
+        return $studios[si].customers[ci].episodes[ei].acts
+    }
+
     /// Window title: "Draw Things Storyboard - <Episode Name>"
     private var windowTitle: String {
         "Draw Things Storyboard - \(currentEpisodeName)"
     }
 
     var body: some View {
-        Group {
-            if selectedSection == .library {
-                NavigationSplitView {
-                    SidebarView(selectedSection: $selectedSection)
-                } detail: {
-                    LibraryView()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-            } else {
-                NavigationSplitView {
-                    SidebarView(selectedSection: $selectedSection)
-                } content: {
-                    ItemBrowserView(
-                        section: selectedSection,
-                        studios: $studios,
-                        selectedStudioID: $selectedStudioID,
-                        selectedCustomerID: $selectedCustomerID,
-                        selectedEpisodeID: $selectedEpisodeID,
-                        selectedBriefingLevel: $selectedBriefingLevel,
-                        selectedCastingItem: $selectedCastingItem,
-                        selectedItemID: $selectedItemID
-                    )
-                } detail: {
-                    ItemDetailView(
-                        section: selectedSection,
-                        studios: $studios,
-                        selectedStudioID: selectedStudioID,
-                        selectedCustomerID: selectedCustomerID,
-                        selectedEpisodeID: selectedEpisodeID,
-                        selectedBriefingLevel: selectedBriefingLevel,
-                        selectedCastingItem: $selectedCastingItem,
-                        selectedItemID: selectedItemID
-                    )
-                }
-                .onChange(of: selectedSection) { _, _ in
-                    selectedCastingItem = nil
-                    selectedItemID = nil
-                }
+        NavigationSplitView {
+            SidebarView(selectedSection: $selectedSection)
+        } content: {
+            switch selectedSection {
+            case .configuration:
+                ConfigurationView()
+            case .assets:
+                // Assets: center = detail view, right = library browser (swapped)
+                AssetDetailPane(
+                    studios: $studios,
+                    selectedItem: $selectedAssetItem,
+                    libraryRefreshToken: $libraryRefreshToken,
+                    studioIndex: selectedStudioIndex ?? 0,
+                    customerIndex: selectedCustomerIndex ?? 0,
+                    episodeIndex: selectedEpisodeIndex ?? 0
+                )
+            case .productionQueue:
+                ProductionBrowserView(
+                    queue: $generationQueue,
+                    selectedJobID: $selectedJobID
+                )
+            case .looks:
+                LooksBrowserView(
+                    templates: $templates,
+                    selectedTemplateID: $selectedTemplateID
+                )
+            case .storyboard:
+                StoryboardBrowserView(
+                    acts: currentEpisodeActsBinding,
+                    selection: $storyboardSelection
+                )
+            default:
+                ItemBrowserView(
+                    section: selectedSection,
+                    studios: $studios,
+                    selectedStudioID: $selectedStudioID,
+                    selectedCustomerID: $selectedCustomerID,
+                    selectedEpisodeID: $selectedEpisodeID,
+                    selectedBriefingLevel: $selectedBriefingLevel,
+                    selectedItemID: $selectedItemID
+                )
             }
+        } detail: {
+            switch selectedSection {
+            case .configuration:
+                // Configuration is single-pane, so detail is empty
+                EmptyView()
+            case .assets:
+                // Assets: right pane = library browser
+                LibraryBrowserView(
+                    studios: $studios,
+                    selectedItem: $selectedAssetItem
+                )
+                .id(libraryRefreshToken)
+            case .productionQueue:
+                ProductionJobDetailView(
+                    queue: generationQueue,
+                    selectedJobID: selectedJobID
+                )
+            case .looks:
+                LooksDetailView(
+                    templates: $templates,
+                    selectedTemplateID: $selectedTemplateID,
+                    generationQueue: $generationQueue
+                )
+            case .storyboard:
+                StoryboardDetailView(
+                    acts: currentEpisodeActsBinding,
+                    selection: storyboardSelection
+                )
+            case .projects:
+                ItemDetailView(
+                    section: selectedSection,
+                    studios: $studios,
+                    selectedStudioID: selectedStudioID,
+                    selectedCustomerID: selectedCustomerID,
+                    selectedEpisodeID: selectedEpisodeID,
+                    selectedBriefingLevel: selectedBriefingLevel,
+                    selectedItemID: selectedItemID,
+                    templates: templates
+                )
+            default:
+                ItemDetailView(
+                    section: selectedSection,
+                    studios: $studios,
+                    selectedStudioID: selectedStudioID,
+                    selectedCustomerID: selectedCustomerID,
+                    selectedEpisodeID: selectedEpisodeID,
+                    selectedBriefingLevel: selectedBriefingLevel,
+                    selectedItemID: selectedItemID,
+                    templates: templates
+                )
+            }
+        }
+        .onChange(of: selectedSection) { _, _ in
+            selectedItemID = nil
+            selectedAssetItem = nil
+            selectedTemplateID = nil
+            selectedJobID = nil
+            storyboardSelection = nil
         }
         .frame(minWidth: 1100, minHeight: 680)
         .navigationTitle(windowTitle)
@@ -94,6 +180,14 @@ struct ContentView: View {
             // Ensure there is always at least one studio → customer → episode selected.
             ensureSelection()
         }
+    }
+
+    private var emptyDetail: some View {
+        ContentUnavailableView(
+            "Nothing selected",
+            systemImage: "square.dashed",
+            description: Text("Select an item to see its properties.")
+        )
     }
 
     // MARK: - Guarantee at-least-one selection

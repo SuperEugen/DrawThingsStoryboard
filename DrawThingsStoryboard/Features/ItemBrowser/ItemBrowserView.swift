@@ -1,22 +1,18 @@
 import SwiftUI
 
 /// Center pane — adapts to the selected phase.
-/// Briefing: Studio → Customer → Episode hierarchy.
-/// Casting:  Cast + Locations sub-sections.
-/// Other:    generic single-section grid.
+/// Project: Studio → Customer → Episode hierarchy.
+/// Other:   generic single-section grid.
 struct ItemBrowserView: View {
 
     let section: AppSection?
 
-    // Briefing hierarchy
+    // Project hierarchy
     @Binding var studios: [MockStudio]
     @Binding var selectedStudioID: String?
     @Binding var selectedCustomerID: String?
     @Binding var selectedEpisodeID: String?
     @Binding var selectedBriefingLevel: BriefingLevel
-
-    // Casting
-    @Binding var selectedCastingItem: CastingItem?
 
     // Generic phases
     @Binding var selectedItemID: String?
@@ -27,7 +23,7 @@ struct ItemBrowserView: View {
             Divider()
 
             switch section {
-            case .briefing:
+            case .projects:
                 BriefingBrowserView(
                     studios: $studios,
                     selectedStudioID: $selectedStudioID,
@@ -35,15 +31,12 @@ struct ItemBrowserView: View {
                     selectedEpisodeID: $selectedEpisodeID,
                     selectedBriefingLevel: $selectedBriefingLevel
                 )
-            case .casting:
-                CastingBrowserView(selectedItem: $selectedCastingItem)
             default:
                 GenericBrowserView(section: section, selectedItemID: $selectedItemID)
             }
         }
         .background(Color(NSColor.windowBackgroundColor))
         .onChange(of: section) { _, _ in
-            selectedCastingItem = nil
             selectedItemID = nil
         }
     }
@@ -69,188 +62,336 @@ private struct BrowserHeaderView: View {
     }
 }
 
-// MARK: - Casting browser (Cast + Locations split)
+// MARK: - Production browser (generation queue)
 
-struct CastingBrowserView: View {
+struct ProductionBrowserView: View {
 
-    @Binding var selectedItem: CastingItem?
-    @State private var characters: [CastingItem] = MockData.castingCharacters
-    @State private var locations: [CastingItem]  = MockData.castingLocations
+    @Binding var queue: [GenerationJob]
+    @Binding var selectedJobID: String?
+
+    /// Estimated finish time based on the last job in the queue.
+    private var estimatedFinishTime: Date? {
+        guard !queue.isEmpty else { return nil }
+        var totalRemaining: TimeInterval = 0
+        for job in queue {
+            let elapsed = Date().timeIntervalSince(job.queuedAt)
+            let remaining = max(0, job.estimatedDuration - elapsed)
+            totalRemaining += remaining
+        }
+        return Date().addingTimeInterval(totalRemaining)
+    }
+
+    private var finishTimeString: String {
+        guard let time = estimatedFinishTime else { return "—" }
+        let fmt = DateFormatter()
+        fmt.timeStyle = .short
+        return fmt.string(from: time)
+    }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                CastingSubSectionView(
-                    title: "Cast",
-                    items: $characters,
-                    selectedItem: $selectedItem,
-                    itemType: .character
-                )
-                Divider().padding(.vertical, 4)
-                CastingSubSectionView(
-                    title: "Locations",
-                    items: $locations,
-                    selectedItem: $selectedItem,
-                    itemType: .location
-                )
+        VStack(spacing: 0) {
+            // Header
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "film.stack")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                    Text("Production Queue")
+                        .font(.title2.bold())
+                    Spacer()
+                }
+                Text("Queued for Generation with Draw Things")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if !queue.isEmpty {
+                    Text("Finished around \(finishTimeString)")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
             }
-            .padding(.bottom, 16)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+
+            Divider()
+
+            if queue.isEmpty {
+                Spacer()
+                ContentUnavailableView(
+                    "Queue is empty",
+                    systemImage: "tray",
+                    description: Text("Jobs appear here when you click Generate Variants or Generate Final on an item.")
+                )
+                Spacer()
+            } else {
+                List(queue, selection: $selectedJobID) { job in
+                    ProductionJobRow(job: job)
+                        .tag(job.id)
+                }
+                .listStyle(.plain)
+            }
+        }
+        .background(Color(NSColor.windowBackgroundColor))
+        .onAppear {
+            ensureSelection()
+        }
+        .onChange(of: queue.count) { _, _ in
+            ensureSelection()
+        }
+    }
+
+    /// Ensures the first job is selected when nothing is selected.
+    private func ensureSelection() {
+        guard !queue.isEmpty else { return }
+        if selectedJobID == nil || !queue.contains(where: { $0.id == selectedJobID }) {
+            selectedJobID = queue.first?.id
         }
     }
 }
 
-// MARK: - Sub-section (Cast or Locations)
+private struct ProductionJobRow: View {
+    let job: GenerationJob
 
-private struct CastingSubSectionView: View {
+    private var elapsedString: String {
+        let elapsed = Int(Date().timeIntervalSince(job.queuedAt))
+        let mins = elapsed / 60
+        if mins < 1 { return "just now" }
+        return "\(mins)m ago"
+    }
 
-    let title: String
-    @Binding var items: [CastingItem]
-    @Binding var selectedItem: CastingItem?
-    let itemType: CastingItemType
+    private var durationString: String {
+        let mins = Int(job.estimatedDuration) / 60
+        return "~\(mins)m"
+    }
 
-    private let columns = [GridItem(.adaptive(minimum: 110, maximum: 150), spacing: 10)]
+    private var itemTypeLabel: String {
+        job.itemType == .character ? "Character" : "Location"
+    }
+
+    private var itemTypeColor: Color {
+        job.itemType == .character ? .blue : .teal
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // Job Type thumbnail (large)
+            RoundedRectangle(cornerRadius: 8)
+                .fill(job.jobType.color.opacity(0.15))
+                .frame(width: 48, height: 48)
+                .overlay {
+                    VStack(spacing: 2) {
+                        Image(systemName: job.jobType.icon)
+                            .font(.system(size: 18))
+                            .foregroundStyle(job.jobType.color)
+                        Text(job.jobType.rawValue)
+                            .font(.system(size: 7, weight: .medium))
+                            .foregroundStyle(job.jobType.color)
+                            .lineLimit(1)
+                    }
+                }
+
+            // Details stack
+            VStack(alignment: .leading, spacing: 4) {
+                // Item: thumbnail + name
+                HStack(spacing: 6) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(itemTypeColor.opacity(0.15))
+                        .frame(width: 24, height: 24)
+                        .overlay {
+                            Image(systemName: job.itemIcon)
+                                .font(.system(size: 11))
+                                .foregroundStyle(itemTypeColor)
+                        }
+                    Text(job.itemName)
+                        .font(.callout.weight(.medium))
+                        .lineLimit(1)
+                }
+
+                // Item type
+                Text(itemTypeLabel)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
+                // Look: thumbnail + name
+                HStack(spacing: 6) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.purple.opacity(0.15))
+                        .frame(width: 24, height: 24)
+                        .overlay {
+                            Image(systemName: "paintpalette")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.purple)
+                        }
+                    Text(job.lookName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+
+            // Time entries
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(elapsedString)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text(durationString)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.vertical, 6)
+    }
+}
+
+// MARK: - Looks browser (template list)
+
+struct LooksBrowserView: View {
+    @Binding var templates: [GenerationTemplate]
+    @Binding var selectedTemplateID: String?
+
+    /// True when at least two looks exist so the selected one can be removed.
+    private var canRemove: Bool {
+        templates.count > 1 && selectedTemplateID != nil
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            // Section header row
-            HStack {
-                Text(title)
-                    .font(.subheadline.weight(.medium))
+            // Header
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "paintpalette")
+                    .font(.title2)
                     .foregroundStyle(.secondary)
+                Text("Looks")
+                    .font(.title2.bold())
                 Spacer()
-                Button {
-                    let newID = UUID().uuidString
-                    let newItem = CastingItem(
-                        id: newID,
-                        name: itemType == .character ? "New Character" : "New Location",
-                        description: "",
-                        type: itemType,
-                        gender: itemType == .character ? .male : nil,
-                        locationSetting: itemType == .location ? .interior : nil,
-                        status: .nothingGenerated,
-                        libraryLevel: .episode,
-                        variants: CastingItem.emptyVariants(prefix: newID)
-                    )
-                    items.append(newItem)
-                    selectedItem = newItem
-                } label: {
-                    Label("Add from Library", systemImage: "plus.rectangle.on.folder")
-                        .font(.caption)
+                Button(action: removeSelectedLook) {
+                    Image(systemName: "minus")
+                        .frame(width: 22, height: 22)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+                .disabled(!canRemove)
+
+                Button(action: addLook) {
+                    Image(systemName: "plus")
+                        .frame(width: 22, height: 22)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.mini)
             }
             .padding(.horizontal, 14)
-            .padding(.top, 12)
-            .padding(.bottom, 6)
+            .padding(.vertical, 12)
 
-            if items.isEmpty {
-                Text("No \(title.lowercased()) yet — add one from the library.")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .padding(.vertical, 20)
-            } else {
-                LazyVGrid(columns: columns, spacing: 10) {
-                    ForEach(items) { item in
-                        CastingTileView(
-                            item: item,
-                            isSelected: selectedItem?.id == item.id,
-                            onDelete: {
-                                if let idx = items.firstIndex(where: { $0.id == item.id }) {
-                                    items.remove(at: idx)
-                                    if selectedItem?.id == item.id {
-                                        selectedItem = nil
-                                    }
-                                }
-                            }
-                        )
-                        .onTapGesture { selectedItem = item }
+            Divider()
+
+            List(templates, selection: $selectedTemplateID) { template in
+                HStack(spacing: 10) {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(template.jobType.color.opacity(0.15))
+                        .frame(width: 36, height: 36)
+                        .overlay {
+                            Image(systemName: template.jobType.icon)
+                                .font(.system(size: 14))
+                                .foregroundStyle(template.jobType.color)
+                        }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(template.name)
+                            .font(.callout.weight(.medium))
+                            .lineLimit(1)
+                        HStack(spacing: 4) {
+                            Text(template.jobType.rawValue)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Text("·")
+                                .foregroundStyle(.quaternary)
+                            Text(template.itemType == .character ? "Character" : "Location")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
                     }
+                    Spacer()
                 }
-                .padding(.horizontal, 14)
-                .padding(.bottom, 8)
+                .tag(template.id)
             }
+            .listStyle(.plain)
+        }
+        .background(Color(NSColor.windowBackgroundColor))
+        .onAppear {
+            ensureSelection()
+        }
+        .onChange(of: templates.count) { _, _ in
+            ensureSelection()
+        }
+    }
+
+    private func addLook() {
+        let newID = UUID().uuidString
+        templates.append(GenerationTemplate(
+            id: newID,
+            name: "New Look",
+            description: "",
+            jobType: .generateVariants,
+            itemType: .character,
+            averageDuration: 120,
+            generationModel: "SDXL 1.0",
+            generationSteps: 30
+        ))
+        selectedTemplateID = newID
+    }
+
+    private func removeSelectedLook() {
+        guard let id = selectedTemplateID,
+              templates.count > 1,
+              let idx = templates.firstIndex(where: { $0.id == id }) else { return }
+
+        templates.remove(at: idx)
+
+        // Select the previous item, or the first if we removed index 0
+        let newIdx = min(idx, templates.count - 1)
+        selectedTemplateID = templates[newIdx].id
+    }
+
+    /// Ensures there is always one look selected.
+    private func ensureSelection() {
+        if selectedTemplateID == nil || !templates.contains(where: { $0.id == selectedTemplateID }) {
+            selectedTemplateID = templates.first?.id
         }
     }
 }
 
-// MARK: - Tile
+// MARK: - Configuration view (single pane, grouped key-value list)
 
-private struct CastingTileView: View {
-
-    let item: CastingItem
-    let isSelected: Bool
-    var onDelete: (() -> Void)?
+struct ConfigurationView: View {
+    @State private var sharedSecret: String = "ABCD 1234 EFGH"
+    @State private var characterExample: String = "An astronaut riding a horse"
+    @State private var locationExample: String = "big city by day"
 
     var body: some View {
-        VStack(spacing: 5) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(tileColor.opacity(0.15))
-                    .overlay {
-                        Image(systemName: tileIcon)
-                            .font(.system(size: 28))
-                            .foregroundStyle(tileColor)
-                    }
-                    .frame(height: 80)
-
-                // Status dot — bottom trailing
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Circle()
-                            .fill(item.status.color)
-                            .frame(width: 8, height: 8)
-                            .padding(5)
-                    }
-                }
-
-                // Delete button — top trailing
-                VStack {
-                    HStack {
-                        Spacer()
-                        Button {
-                            onDelete?()
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 14))
-                                .symbolRenderingMode(.palette)
-                                .foregroundStyle(.white, .secondary)
-                        }
-                        .buttonStyle(.plain)
-                        .padding(3)
-                    }
-                    Spacer()
+        Form {
+            Section("Draw Things") {
+                LabeledContent("Shared Secret") {
+                    TextField("Shared Secret", text: $sharedSecret)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 260)
                 }
             }
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1.5)
-            )
 
-            Text(item.name)
-                .font(.caption)
-                .lineLimit(1)
-                .foregroundStyle(isSelected ? Color.accentColor : .primary)
+            Section("Looks") {
+                LabeledContent("Character Example") {
+                    TextField("Character Example", text: $characterExample)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 260)
+                }
+                LabeledContent("Location Example") {
+                    TextField("Location Example", text: $locationExample)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 260)
+                }
+            }
         }
-        .padding(5)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(isSelected ? Color.accentColor.opacity(0.07) : Color.clear)
-        )
-    }
-
-    private var tileColor: Color {
-        item.type == .character ? .blue : .teal
-    }
-
-    private var tileIcon: String {
-        if item.type == .character {
-            return item.gender?.icon ?? "person.fill"
-        } else {
-            return item.locationSetting?.icon ?? "map"
-        }
+        .formStyle(.grouped)
+        .navigationTitle("Configuration")
     }
 }
 
@@ -279,6 +420,11 @@ private struct GenericBrowserView: View {
                     }
                 }
                 .padding(16)
+            }
+            .onAppear {
+                if selectedItemID == nil || !items.contains(where: { $0.id == selectedItemID }) {
+                    selectedItemID = items.first?.id
+                }
             }
         }
     }
@@ -320,17 +466,15 @@ private struct GenericTileView: View {
     @Previewable @State var customerID: String? = MockData.defaultStudios[0].customers[0].id
     @Previewable @State var episodeID: String? = MockData.defaultStudios[0].customers[0].episodes[0].id
     @Previewable @State var briefingLevel: BriefingLevel = .episode
-    @Previewable @State var sel: CastingItem? = nil
     @Previewable @State var selID: String? = nil
 
     ItemBrowserView(
-        section: .briefing,
+        section: .projects,
         studios: $studios,
         selectedStudioID: $studioID,
         selectedCustomerID: $customerID,
         selectedEpisodeID: $episodeID,
         selectedBriefingLevel: $briefingLevel,
-        selectedCastingItem: $sel,
         selectedItemID: $selID
     )
     .frame(width: 480, height: 600)

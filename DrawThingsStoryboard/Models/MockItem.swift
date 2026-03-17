@@ -113,7 +113,17 @@ enum LocationSetting: String, CaseIterable {
 
 // MARK: - Casting item
 
-struct CastingItem: Identifiable {
+struct CastingItem: Identifiable, Equatable {
+    static func == (lhs: CastingItem, rhs: CastingItem) -> Bool {
+        lhs.id == rhs.id
+        && lhs.name == rhs.name
+        && lhs.description == rhs.description
+        && lhs.gender == rhs.gender
+        && lhs.locationSetting == rhs.locationSetting
+        && lhs.status == rhs.status
+        && lhs.libraryLevel == rhs.libraryLevel
+    }
+
     let id: String
     var name: String
     var description: String
@@ -124,6 +134,20 @@ struct CastingItem: Identifiable {
     var libraryLevel: LibraryLevel
     /// Always exactly 4 variant slots.
     var variants: [Variant]
+    /// Default items cannot be deleted from the library.
+    var isDefault: Bool = false
+
+    /// Deep equality check comparing all editable fields (not just ID).
+    /// Used for dirty-tracking in the asset editor.
+    func contentEquals(_ other: CastingItem) -> Bool {
+        name == other.name
+        && description == other.description
+        && type == other.type
+        && gender == other.gender
+        && locationSetting == other.locationSetting
+        && status == other.status
+        && libraryLevel == other.libraryLevel
+    }
 
     /// Convenience: number of generated (non-empty) variants.
     var generatedCount: Int { variants.filter(\.isGenerated).count }
@@ -154,8 +178,10 @@ struct MockEpisode: Identifiable, Hashable {
     let id: String
     var name: String
     var rules: String = ""
+    var preferredLookID: String? = nil
     var characters: [CastingItem]
     var locations: [CastingItem]
+    var acts: [MockAct] = []
 
     static func == (lhs: MockEpisode, rhs: MockEpisode) -> Bool {
         lhs.id == rhs.id
@@ -200,6 +226,74 @@ struct MockStudio: Identifiable, Hashable {
     }
 }
 
+// MARK: - Generation queue models
+
+/// What kind of generation job is this?
+enum GenerationJobType: String, CaseIterable, Identifiable {
+    case generateVariants = "Generate Variants"
+    case generateFinal    = "Generate Final"
+    case generateExample  = "Generate Example"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .generateVariants: return "square.grid.2x2"
+        case .generateFinal:    return "checkmark.seal"
+        case .generateExample:  return "eye"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .generateVariants: return .orange
+        case .generateFinal:    return .green
+        case .generateExample:  return .purple
+        }
+    }
+}
+
+/// Status of a Look / template example image.
+enum LookStatus: String, CaseIterable, Identifiable {
+    case noExample       = "No example available"
+    case exampleAvailable = "Example available"
+
+    var id: String { rawValue }
+
+    var color: Color {
+        switch self {
+        case .noExample:        return .gray
+        case .exampleAvailable: return .green
+        }
+    }
+}
+
+/// A generation template defines settings for image generation.
+struct GenerationTemplate: Identifiable {
+    let id: String
+    var name: String
+    var description: String
+    var jobType: GenerationJobType
+    var itemType: CastingItemType
+    var averageDuration: Int              // seconds
+    var generationModel: String
+    var generationSteps: Int
+    var lookStatus: LookStatus = .noExample
+}
+
+/// A job in the generation queue.
+struct GenerationJob: Identifiable {
+    let id: String
+    let itemName: String
+    let itemType: CastingItemType
+    let jobType: GenerationJobType
+    let lookName: String
+    let queuedAt: Date
+    let estimatedDuration: TimeInterval   // seconds
+    /// Icon for the source item (gender/location-specific)
+    let itemIcon: String
+}
+
 // MARK: - Generic browser item (non-casting phases)
 
 struct MockItem: Identifiable {
@@ -214,6 +308,32 @@ struct MockItem: Identifiable {
 // MARK: - Mock data factory
 
 enum MockData {
+
+    // MARK: Default items (always present, cannot be deleted)
+
+    static let defaultHero = CastingItem(
+        id: "default-hero",
+        name: "Hero",
+        description: "Default hero character placeholder.",
+        type: .character,
+        gender: .male,
+        status: .nothingGenerated,
+        libraryLevel: .episode,
+        variants: CastingItem.emptyVariants(prefix: "default-hero"),
+        isDefault: true
+    )
+
+    static let defaultCity = CastingItem(
+        id: "default-city",
+        name: "City",
+        description: "Default city location placeholder.",
+        type: .location,
+        locationSetting: .exterior,
+        status: .nothingGenerated,
+        libraryLevel: .episode,
+        variants: CastingItem.emptyVariants(prefix: "default-city"),
+        isDefault: true
+    )
 
     // MARK: Casting phase (flat lists for center pane)
 
@@ -246,13 +366,15 @@ enum MockData {
                             id: "ep_gm_pilot",
                             name: "The Pilot",
                             rules: "night scenes, noir atmosphere, rain-soaked streets",
+                            preferredLookID: "tpl-01",
                             characters: [
                                 CastingItem(id: "gm-p-ch-01", name: "Alex",   description: "The hero. Determined, mid-30s.", type: .character, gender: .male,   status: .finalGenerated,    libraryLevel: .episode, variants: CastingItem.mockVariants(prefix: "gm-p-ch-01", generated: 4, approved: 2)),
                                 CastingItem(id: "gm-p-ch-02", name: "Sam",    description: "Cheerful sidekick, early 20s.", type: .character, gender: .female, status: .variantsGenerated, libraryLevel: .episode, variants: CastingItem.mockVariants(prefix: "gm-p-ch-02", generated: 4, approved: nil)),
                             ],
                             locations: [
                                 CastingItem(id: "gm-p-lo-01", name: "Office", description: "Corporate open-plan office.", type: .location, locationSetting: .interior, status: .nothingGenerated, libraryLevel: .episode, variants: CastingItem.emptyVariants(prefix: "gm-p-lo-01")),
-                            ]
+                            ],
+                            acts: MockData.sampleActs
                         ),
                         MockEpisode(
                             id: "ep_gm_chase",
@@ -335,25 +457,77 @@ enum MockData {
     /// Legacy accessor for library tree — returns first studio for backward compat.
     static let libraryTree: MockStudio = defaultStudios[0]
 
+    // MARK: Generation templates
+
+    static let defaultTemplates: [GenerationTemplate] = [
+        GenerationTemplate(
+            id: "tpl-01",
+            name: "Standard Character",
+            description: "Full-body character portrait, neutral background, consistent lighting.",
+            jobType: .generateVariants,
+            itemType: .character,
+            averageDuration: 300,
+            generationModel: "SDXL 1.0",
+            generationSteps: 30,
+            lookStatus: .exampleAvailable
+        ),
+        GenerationTemplate(
+            id: "tpl-02",
+            name: "Character Final",
+            description: "High-resolution final render from approved variant.",
+            jobType: .generateFinal,
+            itemType: .character,
+            averageDuration: 180,
+            generationModel: "SDXL 1.0",
+            generationSteps: 50
+        ),
+        GenerationTemplate(
+            id: "tpl-03",
+            name: "Location Establishing",
+            description: "Wide establishing shot, atmospheric mood, high detail.",
+            jobType: .generateVariants,
+            itemType: .location,
+            averageDuration: 360,
+            generationModel: "SDXL 1.0",
+            generationSteps: 30
+        ),
+        GenerationTemplate(
+            id: "tpl-04",
+            name: "Location Final",
+            description: "Final hi-res location render from approved variant.",
+            jobType: .generateFinal,
+            itemType: .location,
+            averageDuration: 240,
+            generationModel: "SDXL 1.0",
+            generationSteps: 50
+        ),
+    ]
+
+    // MARK: Mock generation queue
+
+    static let sampleQueue: [GenerationJob] = [
+        GenerationJob(
+            id: "job-01", itemName: "Alex", itemType: .character,
+            jobType: .generateVariants, lookName: "Standard Character",
+            queuedAt: Date().addingTimeInterval(-120),
+            estimatedDuration: 300, itemIcon: "figure.stand"
+        ),
+        GenerationJob(
+            id: "job-02", itemName: "Rooftop", itemType: .location,
+            jobType: .generateFinal, lookName: "Location Final",
+            queuedAt: Date().addingTimeInterval(-60),
+            estimatedDuration: 180, itemIcon: "mountain.2"
+        ),
+    ]
+
     // MARK: Other phases
 
     static func items(for section: AppSection?) -> [MockItem] {
         switch section {
-        case .briefing:
-            return []   // Briefing has its own dedicated browser
-        case .writing:
-            return [
-                MockItem(id: "w-01", name: "Act 1 — Setup",      icon: "doc.text", color: .green, status: "Draft", variantCount: 1),
-                MockItem(id: "w-02", name: "Act 2 — Conflict",   icon: "doc.text", color: .green, status: "Draft", variantCount: 1),
-                MockItem(id: "w-03", name: "Act 3 — Resolution", icon: "doc.text", color: .green, status: "Draft", variantCount: 1),
-            ]
-        case .production:
-            return [
-                MockItem(id: "p-01", name: "Seq 01 — Sc 01", icon: "photo", color: .yellow, status: "Draft",    variantCount: 2),
-                MockItem(id: "p-02", name: "Seq 01 — Sc 02", icon: "photo", color: .yellow, status: "Approved", variantCount: 1),
-                MockItem(id: "p-03", name: "Seq 01 — Sc 03", icon: "photo", color: .yellow, status: "Draft",    variantCount: 3),
-                MockItem(id: "p-04", name: "Seq 02 — Sc 01", icon: "photo", color: .orange, status: "Draft",    variantCount: 1),
-            ]
+        case .projects:
+            return []   // Projects has its own dedicated browser
+        case .storyboard:
+            return []   // Storyboard has its own dedicated browser
         default:
             return []
         }

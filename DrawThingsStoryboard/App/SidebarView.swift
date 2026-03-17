@@ -6,23 +6,20 @@ struct SidebarView: View {
 
     var body: some View {
         List(selection: $selectedSection) {
-
-            Section("Project") {
-                ForEach([AppSection.briefing, .casting, .writing, .production]) { section in
-                    Label(section.title, systemImage: section.icon)
-                        .tag(section)
-                }
+            ForEach([AppSection.projects, .assets, .looks, .storyboard, .productionQueue]) { section in
+                Label(section.title, systemImage: section.icon)
+                    .tag(section)
             }
 
-            Section("Assets") {
-                Label(AppSection.library.title, systemImage: AppSection.library.icon)
-                    .tag(AppSection.library)
-            }
+            Spacer()
+
+            Label(AppSection.configuration.title, systemImage: AppSection.configuration.icon)
+                .tag(AppSection.configuration)
         }
         .listStyle(.sidebar)
     }
 }
 
 #Preview {
-    SidebarView(selectedSection: .constant(.briefing))
+    SidebarView(selectedSection: .constant(.projects))
 }

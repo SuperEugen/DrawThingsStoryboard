@@ -1,174 +1,40 @@
 import SwiftUI
 
-/// Library view — lets the user navigate the asset hierarchy:
-/// Studio  →  Customer  →  Episode
-/// At each level, Cast and Locations sub-sections are shown.
-struct LibraryView: View {
+/// Center pane for the Library section.
+/// Three vertically stacked areas — Studio, Customer, Episodes —
+/// each showing their characters + locations as thumbnail grids.
+/// Studio and Customer selection uses left/right arrow buttons in the header.
+struct LibraryBrowserView: View {
 
-    // Navigation state
-    @State private var selectedCustomerID: String? = nil
-    @State private var selectedEpisodeID:  String? = nil
-    @State private var selectedItem: CastingItem? = nil
-
-    private var studio: MockStudio { MockData.libraryTree }
-
-    private var selectedCustomer: MockCustomer? {
-        guard let id = selectedCustomerID else { return nil }
-        return studio.customers.first { $0.id == id }
-    }
-
-    private var selectedEpisode: MockEpisode? {
-        guard let id = selectedEpisodeID else { return nil }
-        return selectedCustomer?.episodes.first { $0.id == id }
-    }
-
-    // Derived: which characters/locations to show in center pane
-    private var visibleCharacters: [CastingItem] {
-        if let ep = selectedEpisode  { return ep.characters }
-        if let cu = selectedCustomer { return cu.episodes.flatMap(\.characters) }
-        return studio.customers.flatMap { $0.episodes.flatMap(\.characters) } + studio.characters
-    }
-
-    private var visibleLocations: [CastingItem] {
-        if let ep = selectedEpisode  { return ep.locations }
-        if let cu = selectedCustomer { return cu.episodes.flatMap(\.locations) }
-        return studio.customers.flatMap { $0.episodes.flatMap(\.locations) } + studio.locations
-    }
-
-    var body: some View {
-        HSplitView {
-            // ── Left: level navigator ────────────────────────────────
-            LibraryLevelNavigator(
-                studio: studio,
-                selectedCustomerID: $selectedCustomerID,
-                selectedEpisodeID: $selectedEpisodeID
-            )
-            .frame(minWidth: 180, idealWidth: 210, maxWidth: 240)
-
-            // ── Center: item grid ────────────────────────────────────
-            LibraryItemBrowser(
-                characters: visibleCharacters,
-                locations: visibleLocations,
-                selectedItem: $selectedItem,
-                levelLabel: currentLevelLabel
-            )
-            .frame(minWidth: 280, maxHeight: .infinity)
-
-            // ── Right: detail ────────────────────────────────────────
-            Group {
-                if var item = selectedItem {
-                    CastingItemDetailView(item: Binding(
-                        get: { item },
-                        set: { selectedItem = $0; item = $0 }
-                    ))
-                } else {
-                    ContentUnavailableView(
-                        "Nothing selected",
-                        systemImage: "square.dashed",
-                        description: Text("Select an asset to see its properties.")
-                    )
-                }
-            }
-            .frame(minWidth: 260, idealWidth: 280, maxWidth: 320, maxHeight: .infinity)
-        }
-        .frame(maxHeight: .infinity)
-        .onChange(of: selectedCustomerID) { _, _ in
-            selectedEpisodeID = nil
-            selectedItem = nil
-        }
-        .onChange(of: selectedEpisodeID) { _, _ in
-            selectedItem = nil
-        }
-    }
-
-    private var currentLevelLabel: String {
-        if let ep = selectedEpisode   { return ep.name }
-        if let cu = selectedCustomer  { return cu.name }
-        return studio.name
-    }
-}
-
-// MARK: - Level navigator (left panel inside Library)
-
-private struct LibraryLevelNavigator: View {
-
-    let studio: MockStudio
-    @Binding var selectedCustomerID: String?
-    @Binding var selectedEpisodeID: String?
-
-    var body: some View {
-        List(selection: $selectedCustomerID) {
-
-            // Studio level row
-            HStack(spacing: 6) {
-                Image(systemName: "building.columns")
-                    .foregroundStyle(.purple)
-                    .frame(width: 16)
-                Text(studio.name)
-                    .font(.callout.weight(.medium))
-            }
-            .padding(.vertical, 2)
-            .tag(Optional<String>.none as String?)
-            .onTapGesture {
-                selectedCustomerID = nil
-                selectedEpisodeID = nil
-            }
-
-            Divider()
-
-            // Customers + episodes
-            ForEach(studio.customers) { customer in
-                Section {
-                    ForEach(customer.episodes) { episode in
-                        HStack(spacing: 6) {
-                            Image(systemName: "film")
-                                .foregroundStyle(.blue)
-                                .font(.caption)
-                                .frame(width: 16)
-                            Text(episode.name)
-                                .font(.caption)
-                                .lineLimit(1)
-                        }
-                        .padding(.vertical, 1)
-                        .tag(episode.id)
-                        .onTapGesture {
-                            selectedCustomerID = customer.id
-                            selectedEpisodeID = episode.id
-                        }
-                    }
-                } header: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "person.text.rectangle")
-                            .foregroundStyle(.teal)
-                            .frame(width: 16)
-                        Text(customer.name)
-                            .font(.caption.weight(.medium))
-                            .lineLimit(1)
-                    }
-                    .padding(.vertical, 2)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        selectedCustomerID = customer.id
-                        selectedEpisodeID = nil
-                    }
-                }
-            }
-        }
-        .listStyle(.sidebar)
-        .navigationTitle("Library")
-    }
-}
-
-// MARK: - Item browser inside Library
-
-private struct LibraryItemBrowser: View {
-
-    let characters: [CastingItem]
-    let locations: [CastingItem]
+    @Binding var studios: [MockStudio]
     @Binding var selectedItem: CastingItem?
-    let levelLabel: String
 
-    private let columns = [GridItem(.adaptive(minimum: 100, maximum: 140), spacing: 10)]
+    // MARK: - Local navigation state
+
+    @State private var studioIndex: Int = 0
+    @State private var customerIndex: Int = 0
+
+    // MARK: - Derived data
+
+    private var studio: MockStudio? {
+        guard studios.indices.contains(studioIndex) else { return nil }
+        return studios[studioIndex]
+    }
+
+    private var customers: [MockCustomer] {
+        studio?.customers ?? []
+    }
+
+    private var customer: MockCustomer? {
+        guard customers.indices.contains(customerIndex) else { return nil }
+        return customers[customerIndex]
+    }
+
+    private var episodes: [MockEpisode] {
+        customer?.episodes ?? []
+    }
+
+    // MARK: - Body
 
     var body: some View {
         VStack(spacing: 0) {
@@ -177,13 +43,9 @@ private struct LibraryItemBrowser: View {
                 Image(systemName: "photo.stack")
                     .font(.title2)
                     .foregroundStyle(.secondary)
-                Text(levelLabel)
+                Text("Library")
                     .font(.title2.bold())
-                    .lineLimit(1)
                 Spacer()
-                Text("\(characters.count + locations.count) assets")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
@@ -192,108 +54,287 @@ private struct LibraryItemBrowser: View {
 
             ScrollView {
                 VStack(spacing: 0) {
-                    LibrarySubGrid(
-                        title: "Characters",
-                        items: characters,
-                        selectedItem: $selectedItem,
-                        columns: columns
-                    )
+
+                    // ── Studio section ──────────────────────────
+                    if let studio {
+                        LibraryLevelHeader(
+                            icon: "building.columns",
+                            iconColor: .purple,
+                            name: studio.name,
+                            canGoBack: studioIndex > 0,
+                            canGoForward: studioIndex < studios.count - 1,
+                            onBack: {
+                                studioIndex -= 1
+                                customerIndex = 0
+                                selectedItem = nil
+                            },
+                            onForward: {
+                                studioIndex += 1
+                                customerIndex = 0
+                                selectedItem = nil
+                            }
+                        )
+
+                        LibraryCastGrid(
+                            characters: studio.characters,
+                            locations: studio.locations,
+                            selectedItem: $selectedItem,
+                            emptyText: "No studio-level assets."
+                        )
+                    }
 
                     Divider().padding(.vertical, 6)
 
-                    LibrarySubGrid(
-                        title: "Locations",
-                        items: locations,
-                        selectedItem: $selectedItem,
-                        columns: columns
-                    )
+                    // ── Customer section ────────────────────────
+                    if let customer {
+                        LibraryLevelHeader(
+                            icon: "person.text.rectangle",
+                            iconColor: .teal,
+                            name: customer.name,
+                            canGoBack: customerIndex > 0,
+                            canGoForward: customerIndex < customers.count - 1,
+                            onBack: {
+                                customerIndex -= 1
+                                selectedItem = nil
+                            },
+                            onForward: {
+                                customerIndex += 1
+                                selectedItem = nil
+                            }
+                        )
+
+                        // Customer-level assets: aggregate from all episodes
+                        let custChars = customer.episodes.flatMap(\.characters)
+                            .filter { $0.libraryLevel == .customer }
+                        let custLocs = customer.episodes.flatMap(\.locations)
+                            .filter { $0.libraryLevel == .customer }
+
+                        LibraryCastGrid(
+                            characters: custChars,
+                            locations: custLocs,
+                            selectedItem: $selectedItem,
+                            emptyText: "No customer-level assets."
+                        )
+                    } else {
+                        Text("No customers in this studio.")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .padding(.vertical, 12)
+                    }
+
+                    Divider().padding(.vertical, 6)
+
+                    // ── Episodes section ────────────────────────
+                    if episodes.isEmpty {
+                        HStack {
+                            Label("Episodes", systemImage: "film")
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.top, 10)
+                        Text("No episodes for this customer.")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .padding(.vertical, 12)
+                    } else {
+                        ForEach(Array(episodes.enumerated()), id: \.element.id) { idx, episode in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "film")
+                                        .foregroundStyle(.blue)
+                                        .frame(width: 16)
+                                    Text(episode.name)
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.top, idx == 0 ? 10 : 6)
+
+                                LibraryCastGrid(
+                                    characters: episode.characters.filter { $0.libraryLevel == .episode },
+                                    locations: episode.locations.filter { $0.libraryLevel == .episode },
+                                    selectedItem: $selectedItem,
+                                    emptyText: "No assets in this episode."
+                                )
+                            }
+
+                            if idx < episodes.count - 1 {
+                                Divider().padding(.vertical, 4).padding(.horizontal, 14)
+                            }
+                        }
+                    }
                 }
                 .padding(.bottom, 16)
             }
         }
         .background(Color(NSColor.windowBackgroundColor))
-    }
-}
-
-// MARK: - Sub-grid (Characters or Locations) inside Library
-
-private struct LibrarySubGrid: View {
-
-    let title: String
-    let items: [CastingItem]
-    @Binding var selectedItem: CastingItem?
-    let columns: [GridItem]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text(title)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                // Library level badge legend
-                LibraryLevelBadgeLegend()
-            }
-            .padding(.horizontal, 14)
-            .padding(.top, 12)
-            .padding(.bottom, 6)
-
-            if items.isEmpty {
-                Text("No \(title.lowercased()) at this level.")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 12)
-            } else {
-                LazyVGrid(columns: columns, spacing: 10) {
-                    ForEach(items) { item in
-                        LibraryTileView(item: item, isSelected: selectedItem?.id == item.id)
-                            .onTapGesture { selectedItem = item }
-                    }
-                }
-                .padding(.horizontal, 14)
+        .onChange(of: studioIndex) { _, _ in
+            // Clamp customer index when studio changes
+            if customerIndex >= customers.count {
+                customerIndex = max(0, customers.count - 1)
             }
         }
     }
 }
 
-// MARK: - Library tile (shows library level badge)
+// MARK: - Level header with left/right arrows
+
+private struct LibraryLevelHeader: View {
+    let icon: String
+    let iconColor: Color
+    let name: String
+    let canGoBack: Bool
+    let canGoForward: Bool
+    let onBack: () -> Void
+    let onForward: () -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .foregroundStyle(iconColor)
+                .frame(width: 16)
+            Text(name)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Spacer()
+            Button(action: onBack) {
+                Image(systemName: "chevron.left")
+                    .font(.caption.weight(.medium))
+                    .frame(width: 20, height: 20)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+            .disabled(!canGoBack)
+
+            Button(action: onForward) {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.medium))
+                    .frame(width: 20, height: 20)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+            .disabled(!canGoForward)
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 10)
+        .padding(.bottom, 4)
+    }
+}
+
+// MARK: - Compact cast grid (characters + locations in one section)
+
+private struct LibraryCastGrid: View {
+    let characters: [CastingItem]
+    let locations: [CastingItem]
+    @Binding var selectedItem: CastingItem?
+    let emptyText: String
+    var onDelete: ((String) -> Void)? = nil
+
+    private let columns = [GridItem(.adaptive(minimum: 90, maximum: 120), spacing: 8)]
+
+    var body: some View {
+        if characters.isEmpty && locations.isEmpty {
+            Text(emptyText)
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+        } else {
+            LazyVGrid(columns: columns, spacing: 8) {
+                ForEach(characters) { item in
+                    LibraryTileView(
+                        item: item,
+                        isSelected: selectedItem?.id == item.id,
+                        onDelete: item.isDefault ? nil : { onDelete?(item.id) }
+                    )
+                    .onTapGesture { selectedItem = item }
+                }
+                ForEach(locations) { item in
+                    LibraryTileView(
+                        item: item,
+                        isSelected: selectedItem?.id == item.id,
+                        onDelete: item.isDefault ? nil : { onDelete?(item.id) }
+                    )
+                    .onTapGesture { selectedItem = item }
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 4)
+        }
+    }
+}
+
+// MARK: - Library tile (X-icon top-right, level bottom-left, status bottom-right)
 
 private struct LibraryTileView: View {
 
     let item: CastingItem
     let isSelected: Bool
+    var onDelete: (() -> Void)? = nil
 
     var body: some View {
-        VStack(spacing: 4) {
-            ZStack(alignment: .topTrailing) {
-                RoundedRectangle(cornerRadius: 8)
+        VStack(spacing: 3) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 6)
                     .fill(tileColor.opacity(0.13))
-                    .frame(height: 76)
+                    .frame(height: 56)
                     .overlay {
                         Image(systemName: tileIcon)
-                            .font(.system(size: 26))
+                            .font(.system(size: 20))
                             .foregroundStyle(tileColor.opacity(0.7))
                     }
 
-                // Library level badge
-                Text(item.libraryLevel.rawValue.prefix(2).uppercased())
-                    .font(.system(size: 9, weight: .bold))
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 2)
-                    .background(levelBadgeColor.opacity(0.2), in: RoundedRectangle(cornerRadius: 3))
-                    .foregroundStyle(levelBadgeColor)
-                    .padding(4)
+                // X-icon top-right (only if deletable)
+                if let onDelete {
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Button(action: onDelete) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 12))
+                                    .symbolRenderingMode(.palette)
+                                    .foregroundStyle(.white, .secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .padding(2)
+                        }
+                        Spacer()
+                    }
+                }
 
-                // Status dot bottom-left
-                Circle()
-                    .fill(item.status.color)
-                    .frame(width: 7, height: 7)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                    .padding(5)
+                // Library level badge — bottom-left
+                VStack {
+                    Spacer()
+                    HStack {
+                        Text(item.libraryLevel.rawValue.prefix(2).uppercased())
+                            .font(.system(size: 8, weight: .bold))
+                            .padding(.horizontal, 3)
+                            .padding(.vertical, 1)
+                            .background(levelBadgeColor.opacity(0.2), in: RoundedRectangle(cornerRadius: 3))
+                            .foregroundStyle(levelBadgeColor)
+                            .padding(3)
+                        Spacer()
+                    }
+                }
+
+                // Status dot — bottom-right
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Circle()
+                            .fill(item.status.color)
+                            .frame(width: 6, height: 6)
+                            .padding(4)
+                    }
+                }
             }
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: 6)
                     .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1.5)
             )
 
@@ -302,9 +343,9 @@ private struct LibraryTileView: View {
                 .lineLimit(1)
                 .foregroundStyle(isSelected ? Color.accentColor : .primary)
         }
-        .padding(4)
+        .padding(3)
         .background(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: 8)
                 .fill(isSelected ? Color.accentColor.opacity(0.07) : Color.clear)
         )
     }
@@ -314,7 +355,11 @@ private struct LibraryTileView: View {
     }
 
     private var tileIcon: String {
-        item.type == .character ? "person.fill" : "map"
+        if item.type == .character {
+            return item.gender?.icon ?? "person.fill"
+        } else {
+            return item.locationSetting?.icon ?? "map"
+        }
     }
 
     private var levelBadgeColor: Color {
@@ -326,24 +371,9 @@ private struct LibraryTileView: View {
     }
 }
 
-// MARK: - Badge legend
-
-private struct LibraryLevelBadgeLegend: View {
-    var body: some View {
-        HStack(spacing: 6) {
-            ForEach([("ST", Color.purple), ("CU", .teal), ("EP", .blue)], id: \.0) { abbr, color in
-                Text(abbr)
-                    .font(.system(size: 9, weight: .bold))
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 2)
-                    .background(color.opacity(0.15), in: RoundedRectangle(cornerRadius: 3))
-                    .foregroundStyle(color)
-            }
-        }
-    }
-}
-
 #Preview {
-    LibraryView()
-        .frame(width: 900, height: 600)
+    @Previewable @State var studios = MockData.defaultStudios
+    @Previewable @State var sel: CastingItem? = nil
+    LibraryBrowserView(studios: $studios, selectedItem: $sel)
+        .frame(width: 400, height: 700)
 }
