@@ -1,0 +1,208 @@
+import SwiftUI
+
+// MARK: - Production job detail (read-only view of a queued job)
+
+struct ProductionJobDetailView: View {
+    let queue: [GenerationJob]
+    let selectedJobID: String?
+
+    private var selectedJob: GenerationJob? {
+        guard let id = selectedJobID else { return nil }
+        return queue.first { $0.id == id }
+    }
+
+    var body: some View {
+        if let job = selectedJob {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Header thumbnail
+                    UnifiedThumbnailView(
+                        itemType: jobThumbnailType(job),
+                        name: "",
+                        sizeMode: .header
+                    )
+                    .padding(.bottom, 16)
+
+                    // Item name
+                    VStack(alignment: .leading, spacing: 6) {
+                        sectionLabel("Item")
+                        HStack(spacing: 6) {
+                            Image(systemName: job.itemIcon)
+                                .foregroundStyle(job.jobType.color)
+                            Text(job.itemName)
+                                .font(.callout.weight(.medium))
+                        }
+                    }
+                    .padding(.bottom, 12)
+
+                    Divider().padding(.vertical, 8)
+
+                    // Job type
+                    VStack(alignment: .leading, spacing: 6) {
+                        sectionLabel("Job Type")
+                        HStack(spacing: 6) {
+                            Image(systemName: job.jobType.icon)
+                                .foregroundStyle(job.jobType.color)
+                            Text(job.jobType.rawValue)
+                                .font(.callout)
+                        }
+                    }
+                    .padding(.bottom, 12)
+
+                    // Look
+                    VStack(alignment: .leading, spacing: 6) {
+                        sectionLabel("Look")
+                        Text(job.lookName)
+                            .font(.callout)
+                    }
+                    .padding(.bottom, 12)
+
+                    // Item type
+                    VStack(alignment: .leading, spacing: 6) {
+                        sectionLabel("Item Type")
+                        Text(job.itemType == .character ? "Character" : "Location")
+                            .font(.callout)
+                    }
+                    .padding(.bottom, 12)
+
+                    // Attached assets (panel jobs only)
+                    if !job.attachedAssets.isEmpty {
+                        Divider().padding(.vertical, 8)
+                        VStack(alignment: .leading, spacing: 6) {
+                            sectionLabel("Attached Assets")
+                            VStack(alignment: .leading, spacing: 6) {
+                                ForEach(job.attachedAssets) { asset in
+                                    HStack(spacing: 8) {
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill((asset.type == .character ? Color.blue : Color.teal).opacity(0.15))
+                                            .frame(width: 28, height: 28)
+                                            .overlay {
+                                                Image(systemName: asset.icon)
+                                                    .font(.system(size: 12))
+                                                    .foregroundStyle(asset.type == .character ? .blue : .teal)
+                                            }
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(asset.name)
+                                                .font(.callout.weight(.medium))
+                                            Text(asset.type == .character ? "Character" : "Location")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: 7)
+                                    .fill(Color.accentColor.opacity(0.05))
+                            )
+                        }
+                        .padding(.bottom, 12)
+                    }
+
+                    Divider().padding(.vertical, 8)
+
+                    // Size
+                    VStack(alignment: .leading, spacing: 6) {
+                        sectionLabel("Width")
+                        Text("\(job.width) px")
+                            .font(.callout)
+                    }
+                    .padding(.bottom, 12)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        sectionLabel("Height")
+                        Text("\(job.height) px")
+                            .font(.callout)
+                    }
+                    .padding(.bottom, 12)
+
+                    // Seed
+                    VStack(alignment: .leading, spacing: 6) {
+                        sectionLabel("Seed")
+                        Text("\(job.seed)")
+                            .font(.callout.monospaced())
+                    }
+                    .padding(.bottom, 12)
+
+                    Divider().padding(.vertical, 8)
+
+                    // Combined Prompt
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            sectionLabel("Combined Prompt")
+                            Spacer()
+                            Button {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(job.combinedPrompt, forType: .string)
+                            } label: {
+                                Label("Copy", systemImage: "doc.on.doc")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.mini)
+                        }
+                        Text(job.combinedPrompt)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .padding(8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color.accentColor.opacity(0.05))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(Color.secondary.opacity(0.2), lineWidth: 0.5)
+                            )
+                    }
+                    .padding(.bottom, 12)
+
+                    Divider().padding(.vertical, 8)
+
+                    // Timing
+                    VStack(alignment: .leading, spacing: 6) {
+                        sectionLabel("Queued At")
+                        Text(job.queuedAt, style: .time)
+                            .font(.callout)
+                    }
+                    .padding(.bottom, 12)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        sectionLabel("Estimated Duration")
+                        let mins = Int(job.estimatedDuration) / 60
+                        let secs = Int(job.estimatedDuration) % 60
+                        Text(mins > 0 ? "\(mins)m \(secs)s" : "\(secs)s")
+                            .font(.callout)
+                    }
+                    .padding(.bottom, 12)
+
+                    Spacer(minLength: 20)
+                }
+                .padding(14)
+            }
+            .background(Color(NSColor.windowBackgroundColor))
+        } else {
+            ContentUnavailableView(
+                "No job selected",
+                systemImage: "tray",
+                description: Text("Select a job from the queue to see its details.")
+            )
+        }
+    }
+
+    private func jobThumbnailType(_ job: GenerationJob) -> ThumbnailItemType {
+        switch job.jobType {
+        case .generatePreviewPanel, .generateFinalPanel:
+            return .panel
+        case .generateExample:
+            return .look
+        default:
+            return job.itemType == .character
+                ? .character(gender: job.itemGender)
+                : .location(setting: job.itemLocationSetting)
+        }
+    }
+}

@@ -3,7 +3,7 @@ import SwiftUI
 /// Center pane for the Storyboard section.
 /// Shows a nested outline of Acts > Sequences > Scenes > Panel thumbnails.
 /// Clicking on an Act, Sequence, or Scene header selects it for the detail pane.
-/// Each grouping level is collapsible via a disclosure triangle.
+/// Each grouping level is collapsible via a disclosure triangle and has +/- buttons.
 struct StoryboardBrowserView: View {
 
     @Binding var acts: [MockAct]
@@ -39,11 +39,10 @@ struct StoryboardBrowserView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        ForEach(Array(acts.enumerated()), id: \.element.id) { actIdx, act in
+                        ForEach(Array(acts.enumerated()), id: \.element.id) { actIdx, _ in
                             ActSectionView(
-                                act: act,
+                                acts: $acts,
                                 actIndex: actIdx,
-                                totalActs: acts.count,
                                 selection: $selection,
                                 collapsedIDs: $collapsedIDs
                             )
@@ -72,11 +71,12 @@ struct StoryboardBrowserView: View {
 // MARK: - Act section
 
 private struct ActSectionView: View {
-    let act: MockAct
+    @Binding var acts: [MockAct]
     let actIndex: Int
-    let totalActs: Int
     @Binding var selection: StoryboardSelection?
     @Binding var collapsedIDs: Set<String>
+
+    private var act: MockAct { acts[actIndex] }
 
     private var isSelected: Bool {
         selection == .act(act.id)
@@ -88,22 +88,23 @@ private struct ActSectionView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Act header
             StoryboardOutlineHeader(
                 level: .act,
                 name: act.name,
                 number: actIndex + 1,
                 isSelected: isSelected,
                 isCollapsed: isCollapsed,
+                canRemove: acts.count > 1,
                 onTap: { selection = .act(act.id) },
-                onToggleCollapse: { toggleCollapse(act.id) }
+                onToggleCollapse: { toggleCollapse(act.id) },
+                onAdd: addAct,
+                onRemove: removeAct
             )
 
-            // Sequences inside this act (collapsible)
             if !isCollapsed {
-                ForEach(Array(act.sequences.enumerated()), id: \.element.id) { seqIdx, sequence in
+                ForEach(Array(act.sequences.enumerated()), id: \.element.id) { seqIdx, _ in
                     SequenceSectionView(
-                        sequence: sequence,
+                        sequences: $acts[actIndex].sequences,
                         sequenceIndex: seqIdx,
                         selection: $selection,
                         collapsedIDs: $collapsedIDs
@@ -111,6 +112,38 @@ private struct ActSectionView: View {
                 }
             }
         }
+    }
+
+    private func addAct() {
+        let newAct = MockAct(
+            id: UUID().uuidString,
+            name: "New Act",
+            description: "",
+            sequences: [
+                MockSequence(
+                    id: UUID().uuidString,
+                    name: "New Sequence",
+                    description: "",
+                    scenes: [
+                        MockScene(
+                            id: UUID().uuidString,
+                            name: "New Scene",
+                            description: "",
+                            panels: []
+                        )
+                    ]
+                )
+            ]
+        )
+        acts.insert(newAct, at: actIndex + 1)
+        selection = .act(newAct.id)
+    }
+
+    private func removeAct() {
+        guard acts.count > 1 else { return }
+        acts.remove(at: actIndex)
+        let fallbackIdx = min(actIndex, acts.count - 1)
+        selection = .act(acts[fallbackIdx].id)
     }
 
     private func toggleCollapse(_ id: String) {
@@ -125,10 +158,12 @@ private struct ActSectionView: View {
 // MARK: - Sequence section
 
 private struct SequenceSectionView: View {
-    let sequence: MockSequence
+    @Binding var sequences: [MockSequence]
     let sequenceIndex: Int
     @Binding var selection: StoryboardSelection?
     @Binding var collapsedIDs: Set<String>
+
+    private var sequence: MockSequence { sequences[sequenceIndex] }
 
     private var isSelected: Bool {
         selection == .sequence(sequence.id)
@@ -146,16 +181,18 @@ private struct SequenceSectionView: View {
                 number: sequenceIndex + 1,
                 isSelected: isSelected,
                 isCollapsed: isCollapsed,
+                canRemove: sequences.count > 1,
                 onTap: { selection = .sequence(sequence.id) },
-                onToggleCollapse: { toggleCollapse(sequence.id) }
+                onToggleCollapse: { toggleCollapse(sequence.id) },
+                onAdd: addSequence,
+                onRemove: removeSequence
             )
             .padding(.leading, 16)
 
-            // Scenes inside this sequence (collapsible)
             if !isCollapsed {
-                ForEach(Array(sequence.scenes.enumerated()), id: \.element.id) { scnIdx, scene in
+                ForEach(Array(sequence.scenes.enumerated()), id: \.element.id) { scnIdx, _ in
                     SceneSectionView(
-                        scene: scene,
+                        scenes: $sequences[sequenceIndex].scenes,
                         sceneIndex: scnIdx,
                         selection: $selection,
                         collapsedIDs: $collapsedIDs
@@ -163,6 +200,31 @@ private struct SequenceSectionView: View {
                 }
             }
         }
+    }
+
+    private func addSequence() {
+        let newSeq = MockSequence(
+            id: UUID().uuidString,
+            name: "New Sequence",
+            description: "",
+            scenes: [
+                MockScene(
+                    id: UUID().uuidString,
+                    name: "New Scene",
+                    description: "",
+                    panels: []
+                )
+            ]
+        )
+        sequences.insert(newSeq, at: sequenceIndex + 1)
+        selection = .sequence(newSeq.id)
+    }
+
+    private func removeSequence() {
+        guard sequences.count > 1 else { return }
+        sequences.remove(at: sequenceIndex)
+        let fallbackIdx = min(sequenceIndex, sequences.count - 1)
+        selection = .sequence(sequences[fallbackIdx].id)
     }
 
     private func toggleCollapse(_ id: String) {
@@ -177,12 +239,14 @@ private struct SequenceSectionView: View {
 // MARK: - Scene section (contains panel thumbnails)
 
 private struct SceneSectionView: View {
-    let scene: MockScene
+    @Binding var scenes: [MockScene]
     let sceneIndex: Int
     @Binding var selection: StoryboardSelection?
     @Binding var collapsedIDs: Set<String>
 
     private let columns = [GridItem(.adaptive(minimum: 100, maximum: 140), spacing: 8)]
+
+    private var scene: MockScene { scenes[sceneIndex] }
 
     private var isSelected: Bool {
         selection == .scene(scene.id)
@@ -200,26 +264,98 @@ private struct SceneSectionView: View {
                 number: sceneIndex + 1,
                 isSelected: isSelected,
                 isCollapsed: isCollapsed,
+                canRemove: scenes.count > 1,
                 onTap: { selection = .scene(scene.id) },
-                onToggleCollapse: { toggleCollapse(scene.id) }
+                onToggleCollapse: { toggleCollapse(scene.id) },
+                onAdd: addScene,
+                onRemove: removeScene
             )
             .padding(.leading, 32)
 
-            // Panel thumbnails (collapsible)
-            if !isCollapsed && !scene.panels.isEmpty {
-                LazyVGrid(columns: columns, spacing: 8) {
-                    ForEach(scene.panels) { panel in
-                        StoryboardPanelTileView(
-                            panel: panel,
-                            isSelected: selection == .panel(panel.id),
-                            onTap: { selection = .panel(panel.id) }
-                        )
+            // Panel thumbnails with + / - in a small toolbar
+            if !isCollapsed {
+                if !scene.panels.isEmpty {
+                    LazyVGrid(columns: columns, spacing: 8) {
+                        ForEach(scene.panels) { panel in
+                            StoryboardPanelTileView(
+                                panel: panel,
+                                isSelected: selection == .panel(panel.id),
+                                onTap: { selection = .panel(panel.id) }
+                            )
+                        }
                     }
+                    .padding(.horizontal, 46)
+                    .padding(.vertical, 4)
+                }
+
+                // Panel + / - buttons
+                HStack {
+                    Spacer()
+                    Button(action: removePanel) {
+                        Image(systemName: "minus")
+                            .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
+                    .disabled(!canRemovePanel)
+
+                    Button(action: addPanel) {
+                        Image(systemName: "plus")
+                            .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
                 }
                 .padding(.horizontal, 46)
-                .padding(.vertical, 4)
+                .padding(.bottom, 4)
             }
         }
+    }
+
+    private var canRemovePanel: Bool {
+        guard case .panel(let id) = selection else { return false }
+        return scene.panels.contains { $0.id == id }
+    }
+
+    private func addPanel() {
+        let newPanel = MockPanel(
+            id: UUID().uuidString,
+            name: "New Panel",
+            description: "",
+            status: .nothingGenerated
+        )
+        scenes[sceneIndex].panels.append(newPanel)
+        selection = .panel(newPanel.id)
+    }
+
+    private func removePanel() {
+        guard case .panel(let id) = selection,
+              let idx = scenes[sceneIndex].panels.firstIndex(where: { $0.id == id }) else { return }
+        scenes[sceneIndex].panels.remove(at: idx)
+        if scenes[sceneIndex].panels.isEmpty {
+            selection = .scene(scene.id)
+        } else {
+            let fallbackIdx = min(idx, scenes[sceneIndex].panels.count - 1)
+            selection = .panel(scenes[sceneIndex].panels[fallbackIdx].id)
+        }
+    }
+
+    private func addScene() {
+        let newScene = MockScene(
+            id: UUID().uuidString,
+            name: "New Scene",
+            description: "",
+            panels: []
+        )
+        scenes.insert(newScene, at: sceneIndex + 1)
+        selection = .scene(newScene.id)
+    }
+
+    private func removeScene() {
+        guard scenes.count > 1 else { return }
+        scenes.remove(at: sceneIndex)
+        let fallbackIdx = min(sceneIndex, scenes.count - 1)
+        selection = .scene(scenes[fallbackIdx].id)
     }
 
     private func toggleCollapse(_ id: String) {
@@ -231,7 +367,7 @@ private struct SceneSectionView: View {
     }
 }
 
-// MARK: - Outline header (clickable Act / Sequence / Scene header with disclosure)
+// MARK: - Outline header (clickable Act / Sequence / Scene header with disclosure + / -)
 
 private struct StoryboardOutlineHeader: View {
     let level: StoryboardLevel
@@ -239,8 +375,11 @@ private struct StoryboardOutlineHeader: View {
     let number: Int
     let isSelected: Bool
     let isCollapsed: Bool
+    let canRemove: Bool
     let onTap: () -> Void
     let onToggleCollapse: () -> Void
+    let onAdd: () -> Void
+    let onRemove: () -> Void
 
     var body: some View {
         HStack(spacing: 0) {
@@ -271,6 +410,22 @@ private struct StoryboardOutlineHeader: View {
                 }
             }
             .buttonStyle(.plain)
+
+            // + / - buttons
+            Button(action: onRemove) {
+                Image(systemName: "minus")
+                    .frame(width: 22, height: 22)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+            .disabled(!canRemove)
+
+            Button(action: onAdd) {
+                Image(systemName: "plus")
+                    .frame(width: 22, height: 22)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
         }
         .padding(.vertical, 6)
         .padding(.leading, 6)
