@@ -24,21 +24,18 @@ final class DrawThingsGRPCClient: DrawThingsClientProtocol {
         onProgress: ((GenerationStage) -> Void)? = nil
     ) async throws -> NSImage {
 
-        // 1. Connect first (echo) – ensures model metadata is available
+        // 1. Connect (echo handshake) — fetches model metadata from Draw Things
         await dtClient.connect()
         if let err = dtClient.lastError {
             throw DrawThingsGRPCError.connectionFailed(err.localizedDescription)
         }
         print("[GRPCClient] Connected. isConnected=\(dtClient.isConnected)")
 
-        // 2. Forward progress updates from the @Published property
-        var progressTask: Task<Void, Never>? = nil
-        if let callback = onProgress {
-            progressTask = Task { [weak dtClient] in
-                guard let dtClient else { return }
-                // Poll currentProgress while generating
+        // 2. Progress polling task
+        let progressTask: Task<Void, Never>? = onProgress.map { callback in
+            Task { [weak dtClient] in
                 while !Task.isCancelled {
-                    if let stage = dtClient.currentProgress?.stage {
+                    if let stage = await dtClient?.currentProgress?.stage {
                         callback(stage)
                     }
                     try? await Task.sleep(for: .milliseconds(250))
@@ -48,13 +45,26 @@ final class DrawThingsGRPCClient: DrawThingsClientProtocol {
         defer { progressTask?.cancel() }
 
         // 3. Build moodboard hints
-        let hints: [HintProto] = buildHints(from: moodboardImages)
-        print("[GRPCClient] Sending request — prompt: '\(request.prompt.prefix(60))…', hints: \(hints.count)")
+        let hints = buildHints(from: moodboardImages)
 
-        // 4. Call gRPC
+        // 4. Build configuration — tells Draw Things width/height/steps/guidance.
+        //    We intentionally leave `model` empty so Draw Things uses whatever
+        //    model is currently selected in its UI.
+        let config = DrawThingsConfiguration(
+            width: request.width,
+            height: request.height,
+            steps: request.steps,
+            guidanceScale: Float(request.guidanceScale),
+            seed: request.seed == -1 ? UInt32.random(in: 0 ..< UInt32.max) : UInt32(request.seed)
+        )
+
+        print("[GRPCClient] Sending — prompt: '\(request.prompt.prefix(60))…', \(request.width)×\(request.height), steps: \(request.steps), hints: \(hints.count)")
+
+        // 5. Call gRPC
         let images = try await dtClient.generateImage(
             prompt: request.prompt,
             negativePrompt: request.negativePrompt,
+            configuration: config,
             hints: hints
         )
 
