@@ -2,13 +2,13 @@ import SwiftUI
 
 // MARK: - Casting item types
 
-enum CastingItemType: String, CaseIterable, Identifiable {
+enum CastingItemType: String, CaseIterable, Identifiable, Equatable {
     case character
     case location
     var id: String { rawValue }
 }
 
-enum CharacterGender: String, CaseIterable, Identifiable, Hashable {
+enum CharacterGender: String, CaseIterable, Identifiable, Hashable, Equatable {
     case male
     case female
     case nonBinary = "non-binary"
@@ -29,7 +29,7 @@ enum CharacterGender: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
-enum LocationSetting: String, CaseIterable, Identifiable, Hashable {
+enum LocationSetting: String, CaseIterable, Identifiable, Hashable, Equatable {
     case interior
     case exterior
     var id: String { rawValue }
@@ -47,11 +47,18 @@ enum LocationSetting: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
-enum LibraryLevel: String, CaseIterable, Identifiable {
+enum LibraryLevel: String, CaseIterable, Identifiable, Equatable {
     case studio
     case customer
     case episode
     var id: String { rawValue }
+    var icon: String {
+        switch self {
+        case .studio:   return "building.columns"
+        case .customer: return "person.text.rectangle"
+        case .episode:  return "film"
+        }
+    }
     var badgeText: String {
         switch self {
         case .studio:   return "ST"
@@ -74,6 +81,7 @@ struct Variant: Identifiable, Equatable {
     let id: String
     var label: String
     var isApproved: Bool
+    var isGenerated: Bool = false
 }
 
 // MARK: - Panel status
@@ -85,7 +93,7 @@ struct PanelStatusFlags {
 
 // MARK: - CastingItem
 
-struct CastingItem: Identifiable {
+struct CastingItem: Identifiable, Equatable {
     let id: String
     var name: String
     var description: String
@@ -96,8 +104,12 @@ struct CastingItem: Identifiable {
     var variants: [Variant]
     var smallImageAvailable: Bool = false
     var largeImageAvailable: Bool = false
+    var fileName: String = ""
 
     var variantsAvailable: Bool { variants.contains { $0.isApproved } }
+
+    /// Index of the currently approved variant (first approved one).
+    var approvedIndex: Int? { variants.firstIndex { $0.isApproved } }
 
     static func emptyVariants(prefix: String) -> [Variant] {
         (1...4).map { Variant(id: "\(prefix)-v\($0)", label: "Variant \($0)", isApproved: false) }
@@ -149,6 +161,7 @@ struct MockSequence: Identifiable, Hashable {
 struct MockEpisode: Identifiable {
     let id: String
     var name: String
+    var rules: String = ""
     var preferredLookID: String? = nil
     var characters: [CastingItem]
     var locations: [CastingItem]
@@ -158,6 +171,7 @@ struct MockEpisode: Identifiable {
 struct MockCustomer: Identifiable {
     let id: String
     var name: String
+    var rules: String = ""
     var preferredLookID: String? = nil
     var episodes: [MockEpisode]
     var characters: [CastingItem] = []
@@ -167,6 +181,7 @@ struct MockCustomer: Identifiable {
 struct MockStudio: Identifiable {
     let id: String
     var name: String
+    var rules: String = ""
     var preferredLookID: String? = nil
     var customers: [MockCustomer]
     var characters: [CastingItem]
@@ -237,17 +252,6 @@ struct GenerationTemplate: Identifiable {
     var lookStatus: LookStatus = .noExample
 }
 
-// MARK: - Model configuration
-
-/// A Draw Things image-generation model configuration.
-struct ModelConfig: Identifiable {
-    let id: String
-    var name: String
-    var model: String
-    var steps: Int
-    var guidanceScale: Double
-}
-
 // MARK: - Generation job
 
 struct GenerationJob: Identifiable {
@@ -302,6 +306,8 @@ struct MockItem: Identifiable {
     let name: String
     let icon: String
     let color: Color
+    var status: String = ""
+    var variantCount: Int = 0
 }
 
 // MARK: - Mock data
@@ -406,22 +412,22 @@ struct MockData {
 
     // MARK: - Model configurations
 
-    static let defaultModelConfigs: [ModelConfig] = [
-        ModelConfig(
+    static let defaultModelConfigs: [DTModelConfig] = [
+        DTModelConfig(
             id: "mc-01",
             name: "SDXL Standard",
             model: "sd_xl_base_1.0.safetensors",
             steps: 30,
             guidanceScale: 7.0
         ),
-        ModelConfig(
+        DTModelConfig(
             id: "mc-02",
             name: "SDXL Fast",
             model: "sd_xl_base_1.0.safetensors",
             steps: 15,
             guidanceScale: 5.0
         ),
-        ModelConfig(
+        DTModelConfig(
             id: "mc-03",
             name: "Flux Schnell",
             model: "flux_1_schnell_q5p.ckpt",

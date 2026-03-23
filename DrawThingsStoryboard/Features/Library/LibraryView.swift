@@ -269,7 +269,7 @@ private struct LibraryCastGrid: View {
 
     private func libraryTile(item: CastingItem) -> some View {
         let isSelected = selectedItem?.id == item.id
-        let deleteAction: (() -> Void)? = item.isDefault ? nil : { onDelete?(item.id) }
+        let deleteAction: (() -> Void)? = { onDelete?(item.id) }
         return UnifiedThumbnailView(
             itemType: item.thumbnailType,
             name: item.name,

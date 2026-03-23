@@ -60,6 +60,8 @@ private struct BrowserHeaderView: View {
 struct ProductionBrowserView: View {
     @Binding var queue: [GenerationJob]
     @Binding var selectedJobID: String?
+    @Binding var configs: [DTModelConfig]
+    @Binding var selectedModelConfigID: String?
 
     private var estimatedFinishTime: Date? {
         guard !queue.isEmpty else { return nil }
@@ -81,6 +83,19 @@ struct ProductionBrowserView: View {
                     Image(systemName: "film.stack").font(.title2).foregroundStyle(.secondary)
                     Text("Production Queue").font(.title2.bold())
                     Spacer()
+                    // Model picker — always at least one config guaranteed
+                    Picker("Model", selection: Binding(
+                        get: { selectedModelConfigID ?? configs.first?.id ?? "" },
+                        set: { selectedModelConfigID = $0 }
+                    )) {
+                        ForEach(configs) { config in
+                            Text(config.name).tag(config.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .frame(maxWidth: 160)
+                    .help("Select the Draw Things model configuration for generation")
                 }
                 Text("Queued for Generation with Draw Things").font(.caption).foregroundStyle(.secondary)
                 if !queue.isEmpty {

@@ -494,14 +494,12 @@ private struct VariantsSection: View {
             item.variants[i].isApproved = false
         }
         item.variants[idx].isApproved = true
-        item.variantsAvailable = true
         item.smallImageAvailable = true
     }
 
     private func disapproveVariant(at idx: Int) {
         item.variants[idx].isApproved = false
         if item.approvedIndex == nil {
-            item.variantsAvailable = false
             item.smallImageAvailable = false
         }
     }
@@ -512,7 +510,6 @@ private struct VariantsSection: View {
         item.variants[idx].isApproved = false
 
         if wasApproved || item.approvedIndex == nil {
-            item.variantsAvailable = false
             item.smallImageAvailable = false
         }
     }

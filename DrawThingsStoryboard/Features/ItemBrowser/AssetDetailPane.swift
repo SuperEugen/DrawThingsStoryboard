@@ -39,7 +39,7 @@ struct AssetDetailPane: View {
     /// Accept Changes is enabled only when a field was actually edited (dirty).
     private var canAcceptChanges: Bool {
         guard let item = editingItem, let original = originalItem else { return false }
-        return !item.contentEquals(original)
+        return item != original
     }
 
     var body: some View {
@@ -143,15 +143,11 @@ struct AssetDetailPane: View {
             guard isEditingLibraryItem,
                   let old = oldItem, let new = newItem,
                   old.variants != new.variants
-                    || old.variantsAvailable != new.variantsAvailable
                     || old.smallImageAvailable != new.smallImageAvailable
                     || old.largeImageAvailable != new.largeImageAvailable
             else { return }
             updateItemInStudios(new)
-            // Also update the original's variant state so Accept Changes
-            // only tracks text/metadata edits, not variant operations.
             originalItem?.variants = new.variants
-            originalItem?.variantsAvailable = new.variantsAvailable
             originalItem?.smallImageAvailable = new.smallImageAvailable
             originalItem?.largeImageAvailable = new.largeImageAvailable
             libraryRefreshToken = UUID()

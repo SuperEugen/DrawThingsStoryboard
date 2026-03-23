@@ -103,7 +103,9 @@ struct ContentView: View {
             case .productionQueue:
                 ProductionBrowserView(
                     queue: $generationQueue,
-                    selectedJobID: $selectedJobID
+                    selectedJobID: $selectedJobID,
+                    configs: $modelConfigs,
+                    selectedModelConfigID: $selectedModelConfigID
                 )
             case .looks:
                 LooksBrowserView(
@@ -202,7 +204,13 @@ struct ContentView: View {
         }
         .frame(minWidth: 1100, minHeight: 680)
         .navigationTitle(windowTitle)
-        .onAppear { ensureSelection() }
+        .onAppear {
+            ensureSelection()
+            // Ensure a model config is always selected
+            if selectedModelConfigID == nil {
+                selectedModelConfigID = modelConfigs.first?.id
+            }
+        }
         .onChange(of: selectedEpisodeID) { _, _ in
             guard let si = selectedStudioIndex,
                   let ci = selectedCustomerIndex,
