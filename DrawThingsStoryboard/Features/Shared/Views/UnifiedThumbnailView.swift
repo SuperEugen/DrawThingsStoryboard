@@ -8,13 +8,15 @@ enum ThumbnailItemType {
     case location(setting: LocationSetting?)
     case look
     case panel
+    case modelConfig
 
     var backgroundColor: Color {
         switch self {
-        case .character: return .blue
-        case .location:  return .green
-        case .look:      return .orange
-        case .panel:     return .yellow
+        case .character:   return .blue
+        case .location:    return .green
+        case .look:        return .orange
+        case .panel:       return .yellow
+        case .modelConfig: return Color(red: 0.7, green: 0.5, blue: 0.9) // hell-lila
         }
     }
 
@@ -28,6 +30,7 @@ enum ThumbnailItemType {
         case .location(let setting): return setting?.icon ?? "map"
         case .look:                  return "paintpalette"
         case .panel:                 return "video.fill"
+        case .modelConfig:           return "gearshape"
         }
     }
 
@@ -90,30 +93,16 @@ struct AssetStatusFlags {
 struct ThumbnailBadges {
     var showStatusDot: Bool = false
     var statusColor: Color = .gray
-
-    /// V/S/L status flags for casting items. When set, replaces the status dot.
     var assetStatus: AssetStatusFlags? = nil
-
-    /// S/L status flags for panel thumbnails.
     var panelStatus: PanelStatusFlags? = nil
-
-    /// "E" indicator for looks (Example available). When true, shows an E letter badge.
     var showExampleIndicator: Bool = false
-    /// Whether the example is available (green) or not (gray).
     var exampleAvailable: Bool = false
-
     var showDeleteButton: Bool = false
     var onDelete: (() -> Void)? = nil
-
     var showApprovedBadge: Bool = false
-
-    /// Bottom-left badge text (e.g. "ST", "CU", "EP", "CH", "LO").
     var levelBadgeText: String? = nil
     var levelBadgeColor: Color = .blue
-
-    /// Inheritance arrow shown next to the level badge (for Preferred Look).
     var showInheritanceArrow: Bool = false
-
     var showSelectionStroke: Bool = false
 }
 
@@ -149,8 +138,6 @@ struct UnifiedThumbnailView: View {
         }
     }
 
-    // MARK: - Background
-
     @ViewBuilder
     private var thumbnailBackground: some View {
         if let w = sizeMode.width {
@@ -165,11 +152,8 @@ struct UnifiedThumbnailView: View {
         }
     }
 
-    // MARK: - Badge overlays
-
     @ViewBuilder
     private var badgeOverlays: some View {
-        // Top-left: Approved badge
         if badges.showApprovedBadge {
             VStack {
                 HStack {
@@ -183,7 +167,6 @@ struct UnifiedThumbnailView: View {
             }
         }
 
-        // Top-right: Delete button
         if badges.showDeleteButton, let onDelete = badges.onDelete {
             VStack {
                 HStack {
@@ -201,7 +184,6 @@ struct UnifiedThumbnailView: View {
             }
         }
 
-        // Bottom-left: Level/type badge
         if let text = badges.levelBadgeText {
             VStack {
                 Spacer()
@@ -224,19 +206,15 @@ struct UnifiedThumbnailView: View {
             }
         }
 
-        // Bottom-right: V/S/L indicator, S/L panel indicator, E indicator, or status dot
         if let flags = badges.assetStatus {
             VStack {
                 Spacer()
                 HStack {
                     Spacer()
                     HStack(spacing: sizeMode == .compact ? 1 : 2) {
-                        Text("V")
-                            .foregroundStyle(flags.variantsAvailable ? .green : .gray)
-                        Text("S")
-                            .foregroundStyle(flags.smallImageAvailable ? .green : .gray)
-                        Text("L")
-                            .foregroundStyle(flags.largeImageAvailable ? .green : .gray)
+                        Text("V").foregroundStyle(flags.variantsAvailable ? .green : .gray)
+                        Text("S").foregroundStyle(flags.smallImageAvailable ? .green : .gray)
+                        Text("L").foregroundStyle(flags.largeImageAvailable ? .green : .gray)
                     }
                     .font(.system(size: sizeMode == .compact ? 6 : 8, weight: .bold, design: .monospaced))
                     .padding(.horizontal, sizeMode == .compact ? 2 : 4)
@@ -251,10 +229,8 @@ struct UnifiedThumbnailView: View {
                 HStack {
                     Spacer()
                     HStack(spacing: sizeMode == .compact ? 1 : 2) {
-                        Text("S")
-                            .foregroundStyle(flags.smallPanelAvailable ? .green : .gray)
-                        Text("L")
-                            .foregroundStyle(flags.largePanelAvailable ? .green : .gray)
+                        Text("S").foregroundStyle(flags.smallPanelAvailable ? .green : .gray)
+                        Text("L").foregroundStyle(flags.largePanelAvailable ? .green : .gray)
                     }
                     .font(.system(size: sizeMode == .compact ? 6 : 8, weight: .bold, design: .monospaced))
                     .padding(.horizontal, sizeMode == .compact ? 2 : 4)
@@ -294,8 +270,6 @@ struct UnifiedThumbnailView: View {
         }
     }
 
-    // MARK: - Selection stroke
-
     @ViewBuilder
     private var selectionStroke: some View {
         if badges.showSelectionStroke {
@@ -322,71 +296,4 @@ extension CastingItem {
             largeImageAvailable: largeImageAvailable
         )
     }
-}
-
-#Preview("Standard — All Types") {
-    HStack(spacing: 16) {
-        UnifiedThumbnailView(
-            itemType: .character(gender: .female),
-            name: "Detective Rose",
-            sizeMode: .standard,
-            badges: ThumbnailBadges(
-                assetStatus: AssetStatusFlags(variantsAvailable: true, smallImageAvailable: false, largeImageAvailable: false),
-                levelBadgeText: "EP", levelBadgeColor: .blue
-            )
-        )
-        UnifiedThumbnailView(
-            itemType: .location(setting: .exterior),
-            name: "City Park",
-            sizeMode: .standard,
-            badges: ThumbnailBadges(
-                assetStatus: AssetStatusFlags(variantsAvailable: true, smallImageAvailable: true, largeImageAvailable: true),
-                showApprovedBadge: true,
-                levelBadgeText: "ST", levelBadgeColor: .purple
-            )
-        )
-        UnifiedThumbnailView(
-            itemType: .look,
-            name: "Noir Style",
-            sizeMode: .standard,
-            badges: ThumbnailBadges(
-                showExampleIndicator: true, exampleAvailable: true
-            )
-        )
-        UnifiedThumbnailView(
-            itemType: .panel,
-            name: "Panel 01",
-            sizeMode: .standard,
-            badges: ThumbnailBadges(
-                panelStatus: PanelStatusFlags(smallPanelAvailable: true, largePanelAvailable: false),
-                showSelectionStroke: true
-            )
-        )
-    }
-    .padding()
-}
-
-#Preview("Compact — Queue Row") {
-    HStack(spacing: 8) {
-        UnifiedThumbnailView(
-            itemType: .character(gender: .male),
-            name: "",
-            sizeMode: .compact
-        )
-        UnifiedThumbnailView(
-            itemType: .look,
-            name: "",
-            sizeMode: .compact
-        )
-        UnifiedThumbnailView(
-            itemType: .location(setting: .interior),
-            name: "",
-            sizeMode: .compact
-        )
-        Spacer()
-        Text("2m ago")
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-    }
-    .padding()
 }

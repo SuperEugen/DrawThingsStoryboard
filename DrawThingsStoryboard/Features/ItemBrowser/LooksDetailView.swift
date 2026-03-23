@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - Looks detail (style/prompt editor)
+// MARK: - Looks detail (style prompt editor)
 
 struct LooksDetailView: View {
     @Binding var templates: [GenerationTemplate]
@@ -17,7 +17,6 @@ struct LooksDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
 
-                    // Header
                     UnifiedThumbnailView(
                         itemType: .look,
                         name: "",
@@ -35,16 +34,15 @@ struct LooksDetailView: View {
 
                     Divider().padding(.vertical, 8)
 
-                    // Description / Prompt
+                    // Description = style prompt
                     VStack(alignment: .leading, spacing: 6) {
                         sectionLabel("Description")
-                        Text("Describe the visual style — this text is appended to every prompt.")
+                        Text("Describe the visual style, e.g. \"Photorealistic\" or \"Comic Style\".")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            .padding(.bottom, 2)
                         TextEditor(text: $templates[idx].description)
                             .font(.callout)
-                            .frame(minHeight: 120)
+                            .frame(minHeight: 100)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 6)
                                     .stroke(Color.secondary.opacity(0.25), lineWidth: 0.5)
@@ -61,7 +59,7 @@ struct LooksDetailView: View {
             ContentUnavailableView(
                 "No look selected",
                 systemImage: "paintpalette",
-                description: Text("Select a look from the list to edit its style prompt.")
+                description: Text("Select a look to edit its style prompt.")
             )
         }
     }
