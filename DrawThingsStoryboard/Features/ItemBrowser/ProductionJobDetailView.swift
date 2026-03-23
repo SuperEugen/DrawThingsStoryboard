@@ -33,7 +33,7 @@ struct ProductionJobDetailView: View {
 
                     Divider().padding(.vertical, 8)
 
-                    GenerateTestPanel(job: job, vm: vm, episodeName: episodeName)
+                    GenerateTestPanel(job: job, episodeName: episodeName, vm: vm)
 
                     Spacer(minLength: 20)
                 }
