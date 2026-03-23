@@ -1,40 +1,37 @@
 import SwiftUI
 
 /// Root layout: three-pane NavigationSplitView.
-/// Left   = phase/section navigation (SidebarView)
-/// Center = item browser for the selected phase (ItemBrowserView)
-///          — Library section uses its own full LibraryView instead
-/// Right  = properties of the selected item (ItemDetailView)
 struct ContentView: View {
 
     // MARK: - Navigation state
-
     @State private var selectedSection: AppSection?      = .projects
     @State private var selectedItemID: String?           = nil
 
     // MARK: - Hierarchy state (Studio → Customer → Episode)
-
     @State private var studios: [MockStudio]             = MockData.defaultStudios
     @State private var selectedStudioID: String?         = nil
     @State private var selectedCustomerID: String?       = nil
     @State private var selectedEpisodeID: String?        = nil
     @State private var selectedBriefingLevel: BriefingLevel = .episode
 
-    // MARK: - Assets state (formerly Library)
-    @State private var selectedAssetItem: CastingItem? = nil
-    /// Bumped whenever the asset pane mutates studios, so the library view refreshes.
-    @State private var libraryRefreshToken: UUID = UUID()
+    // MARK: - Assets state
+    @State private var selectedAssetItem: CastingItem?   = nil
+    @State private var libraryRefreshToken: UUID         = UUID()
 
-    // MARK: - Looks state (templates)
-    @State private var templates: [GenerationTemplate] = MockData.defaultTemplates
-    @State private var selectedTemplateID: String? = nil
+    // MARK: - Looks state
+    @State private var templates: [GenerationTemplate]  = MockData.defaultTemplates
+    @State private var selectedTemplateID: String?       = nil
+
+    // MARK: - Model Config state
+    @State private var modelConfigs: [ModelConfig]       = ModelConfig.defaultConfigs
+    @State private var selectedModelConfigID: String?    = nil
 
     // MARK: - Storyboard state
     @State private var storyboardSelection: StoryboardSelection? = nil
 
     // MARK: - Production Queue state
-    @State private var generationQueue: [GenerationJob] = MockData.sampleQueue
-    @State private var selectedJobID: String? = nil
+    @State private var generationQueue: [GenerationJob]  = MockData.sampleQueue
+    @State private var selectedJobID: String?            = nil
 
     // MARK: - Derived selection helpers
 
@@ -57,46 +54,31 @@ struct ContentView: View {
         return studios[si].customers[ci].episodes[ei].name
     }
 
-    /// Binding to the acts array of the currently selected episode.
     private var currentEpisodeActsBinding: Binding<[MockAct]> {
         guard let si = selectedStudioIndex,
               let ci = selectedCustomerIndex,
-              let ei = selectedEpisodeIndex else {
-            return .constant([])
-        }
+              let ei = selectedEpisodeIndex else { return .constant([]) }
         return $studios[si].customers[ci].episodes[ei].acts
     }
 
-    /// Resolved preferred look name for the current episode (own → customer → studio).
     private var resolvedLookName: String? {
         guard let si = selectedStudioIndex else { return nil }
         let studio = studios[si]
-
-        // Episode's own look
         if let ci = selectedCustomerIndex, let ei = selectedEpisodeIndex {
             let episode = studio.customers[ci].episodes[ei]
             if let id = episode.preferredLookID,
-               let t = templates.first(where: { $0.id == id }) {
-                return t.name
-            }
+               let t = templates.first(where: { $0.id == id }) { return t.name }
         }
-        // Customer's look
         if let ci = selectedCustomerIndex {
             let customer = studio.customers[ci]
             if let id = customer.preferredLookID,
-               let t = templates.first(where: { $0.id == id }) {
-                return t.name
-            }
+               let t = templates.first(where: { $0.id == id }) { return t.name }
         }
-        // Studio's look
         if let id = studio.preferredLookID,
-           let t = templates.first(where: { $0.id == id }) {
-            return t.name
-        }
+           let t = templates.first(where: { $0.id == id }) { return t.name }
         return nil
     }
 
-    /// Window title: "Draw Things Storyboard - <Episode Name>"
     private var windowTitle: String {
         "Draw Things Storyboard - \(currentEpisodeName)"
     }
@@ -109,7 +91,6 @@ struct ContentView: View {
             case .configuration:
                 ConfigurationView()
             case .assets:
-                // Assets: center = detail view, right = library browser (swapped)
                 AssetDetailPane(
                     studios: $studios,
                     selectedItem: $selectedAssetItem,
@@ -128,6 +109,11 @@ struct ContentView: View {
                 LooksBrowserView(
                     templates: $templates,
                     selectedTemplateID: $selectedTemplateID
+                )
+            case .modelConfig:
+                ModelConfigBrowserView(
+                    configs: $modelConfigs,
+                    selectedConfigID: $selectedModelConfigID
                 )
             case .storyboard:
                 StoryboardBrowserView(
@@ -149,10 +135,8 @@ struct ContentView: View {
         } detail: {
             switch selectedSection {
             case .configuration:
-                // Configuration is single-pane, so detail is empty
                 EmptyView()
             case .assets:
-                // Assets: right pane = library browser
                 LibraryBrowserView(
                     studios: $studios,
                     selectedItem: $selectedAssetItem
@@ -168,6 +152,11 @@ struct ContentView: View {
                     templates: $templates,
                     selectedTemplateID: $selectedTemplateID,
                     generationQueue: $generationQueue
+                )
+            case .modelConfig:
+                ModelConfigDetailView(
+                    configs: $modelConfigs,
+                    selectedConfigID: $selectedModelConfigID
                 )
             case .storyboard:
                 StoryboardDetailView(
@@ -207,30 +196,19 @@ struct ContentView: View {
             selectedItemID = nil
             selectedAssetItem = nil
             selectedTemplateID = nil
+            selectedModelConfigID = nil
             selectedJobID = nil
             storyboardSelection = nil
         }
         .frame(minWidth: 1100, minHeight: 680)
         .navigationTitle(windowTitle)
-        .onAppear {
-            // Ensure there is always at least one studio → customer → episode selected.
-            ensureSelection()
-        }
+        .onAppear { ensureSelection() }
         .onChange(of: selectedEpisodeID) { _, _ in
-            // Ensure the newly selected episode has a minimal storyboard
             guard let si = selectedStudioIndex,
                   let ci = selectedCustomerIndex,
                   let ei = selectedEpisodeIndex else { return }
             ensureMinimalStoryboard(studioIndex: si, customerIndex: ci, episodeIndex: ei)
         }
-    }
-
-    private var emptyDetail: some View {
-        ContentUnavailableView(
-            "Nothing selected",
-            systemImage: "square.dashed",
-            description: Text("Select an item to see its properties.")
-        )
     }
 
     // MARK: - Guarantee at-least-one selection
@@ -244,7 +222,6 @@ struct ContentView: View {
         }
         let studio = studios[0]
         if selectedStudioID == nil { selectedStudioID = studio.id }
-
         let si = studios.firstIndex { $0.id == selectedStudioID } ?? 0
         if studios[si].customers.isEmpty {
             studios[si].customers.append(MockCustomer(
@@ -252,7 +229,6 @@ struct ContentView: View {
             ))
         }
         if selectedCustomerID == nil { selectedCustomerID = studios[si].customers[0].id }
-
         let ci = studios[si].customers.firstIndex { $0.id == selectedCustomerID } ?? 0
         if studios[si].customers[ci].episodes.isEmpty {
             studios[si].customers[ci].episodes.append(MockEpisode(
@@ -261,55 +237,32 @@ struct ContentView: View {
             ))
         }
         if selectedEpisodeID == nil { selectedEpisodeID = studios[si].customers[ci].episodes[0].id }
-
-        // Ensure the selected episode has a minimal storyboard structure
         let ei = studios[si].customers[ci].episodes.firstIndex { $0.id == selectedEpisodeID } ?? 0
         ensureMinimalStoryboard(studioIndex: si, customerIndex: ci, episodeIndex: ei)
     }
 
-    /// Guarantees the episode at the given indices has at least
-    /// 1 Act > 1 Sequence > 1 Scene > 1 Panel.
     private func ensureMinimalStoryboard(studioIndex si: Int, customerIndex ci: Int, episodeIndex ei: Int) {
         if studios[si].customers[ci].episodes[ei].acts.isEmpty {
             studios[si].customers[ci].episodes[ei].acts.append(
-                MockAct(
-                    id: UUID().uuidString,
-                    name: "Act 1",
-                    description: "",
-                    sequences: []
-                )
+                MockAct(id: UUID().uuidString, name: "Act 1", description: "", sequences: [])
             )
         }
         for ai in studios[si].customers[ci].episodes[ei].acts.indices {
             if studios[si].customers[ci].episodes[ei].acts[ai].sequences.isEmpty {
                 studios[si].customers[ci].episodes[ei].acts[ai].sequences.append(
-                    MockSequence(
-                        id: UUID().uuidString,
-                        name: "Sequence 1",
-                        description: "",
-                        scenes: []
-                    )
+                    MockSequence(id: UUID().uuidString, name: "Sequence 1", description: "", scenes: [])
                 )
             }
             for seqi in studios[si].customers[ci].episodes[ei].acts[ai].sequences.indices {
                 if studios[si].customers[ci].episodes[ei].acts[ai].sequences[seqi].scenes.isEmpty {
                     studios[si].customers[ci].episodes[ei].acts[ai].sequences[seqi].scenes.append(
-                        MockScene(
-                            id: UUID().uuidString,
-                            name: "Scene 1",
-                            description: "",
-                            panels: []
-                        )
+                        MockScene(id: UUID().uuidString, name: "Scene 1", description: "", panels: [])
                     )
                 }
                 for sci in studios[si].customers[ci].episodes[ei].acts[ai].sequences[seqi].scenes.indices {
                     if studios[si].customers[ci].episodes[ei].acts[ai].sequences[seqi].scenes[sci].panels.isEmpty {
                         studios[si].customers[ci].episodes[ei].acts[ai].sequences[seqi].scenes[sci].panels.append(
-                            MockPanel(
-                                id: UUID().uuidString,
-                                name: "Panel 1",
-                                description: ""
-                            )
+                            MockPanel(id: UUID().uuidString, name: "Panel 1", description: "")
                         )
                     }
                 }
