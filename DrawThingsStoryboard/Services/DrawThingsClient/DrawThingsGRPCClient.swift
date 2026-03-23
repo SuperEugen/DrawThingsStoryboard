@@ -5,16 +5,18 @@ import DrawThingsClient
 /// Production client that talks to Draw Things via gRPC.
 /// Supports prompt-based generation AND moodboard reference images (shuffle hints).
 ///
-/// Draw Things must be running with the gRPC API enabled:
-/// Advanced → API Server → Protocol: gRPC, Port: 7860
+/// Draw Things must be running with:
+/// Advanced → API Server → Protocol: gRPC, Port: 7859, TLS: on
 final class DrawThingsGRPCClient: DrawThingsClientProtocol {
 
     private let client: DrawThingsClient
     private var cancellables = Set<AnyCancellable>()
 
-    /// - Parameter address: host:port of the Draw Things gRPC server, e.g. "localhost:7860"
-    init(address: String = "localhost:7860") throws {
-        self.client = try DrawThingsClient(address: address, useTLS: false)
+    /// - Parameters:
+    ///   - address: host:port of the Draw Things gRPC server
+    ///   - useTLS: must match the TLS setting in Draw Things (default: true)
+    init(address: String = "localhost:7859", useTLS: Bool = true) throws {
+        self.client = try DrawThingsClient(address: address, useTLS: useTLS)
     }
 
     func generateImage(
@@ -64,7 +66,7 @@ enum DrawThingsGRPCError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noImageReturned:
-            return "Draw Things returned no image. Is the gRPC API enabled on port 7860?"
+            return "Draw Things returned no image. Is the gRPC API enabled on port 7859?"
         }
     }
 }
