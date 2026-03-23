@@ -20,191 +20,19 @@ struct ProductionJobDetailView: View {
         if let job = selectedJob {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    // Header thumbnail
                     UnifiedThumbnailView(
                         itemType: jobThumbnailType(job),
-                        name: "",
-                        sizeMode: .header
+                        name: "", sizeMode: .header
                     )
                     .padding(.bottom, 16)
 
-                    // Item name
-                    VStack(alignment: .leading, spacing: 6) {
-                        sectionLabel("Item")
-                        HStack(spacing: 6) {
-                            Image(systemName: job.itemIcon)
-                                .foregroundStyle(job.jobType.color)
-                            Text(job.itemName)
-                                .font(.callout.weight(.medium))
-                        }
-                    }
-                    .padding(.bottom, 12)
+                    JobMetaSection(job: job)
+                    JobDimensionsSection(job: job)
+                    JobPromptSection(job: job)
+                    JobTimingSection(job: job)
 
                     Divider().padding(.vertical, 8)
 
-                    // Job type
-                    VStack(alignment: .leading, spacing: 6) {
-                        sectionLabel("Job Type")
-                        HStack(spacing: 6) {
-                            Image(systemName: job.jobType.icon)
-                                .foregroundStyle(job.jobType.color)
-                            Text(job.jobType.rawValue)
-                                .font(.callout)
-                        }
-                    }
-                    .padding(.bottom, 12)
-
-                    // Size
-                    VStack(alignment: .leading, spacing: 6) {
-                        sectionLabel("Size")
-                        Text(job.size.rawValue)
-                            .font(.callout)
-                    }
-                    .padding(.bottom, 12)
-
-                    // Look
-                    VStack(alignment: .leading, spacing: 6) {
-                        sectionLabel("Look")
-                        Text(job.lookName)
-                            .font(.callout)
-                    }
-                    .padding(.bottom, 12)
-
-                    // Item type
-                    VStack(alignment: .leading, spacing: 6) {
-                        sectionLabel("Item Type")
-                        Text(job.itemType == .character ? "Character" : "Location")
-                            .font(.callout)
-                    }
-                    .padding(.bottom, 12)
-
-                    // Attached assets (panel jobs only)
-                    if !job.attachedAssets.isEmpty {
-                        Divider().padding(.vertical, 8)
-                        VStack(alignment: .leading, spacing: 6) {
-                            sectionLabel("Attached Assets")
-                            VStack(alignment: .leading, spacing: 6) {
-                                ForEach(job.attachedAssets) { asset in
-                                    HStack(spacing: 8) {
-                                        RoundedRectangle(cornerRadius: 4)
-                                            .fill((asset.type == .character ? Color.blue : Color.teal).opacity(0.15))
-                                            .frame(width: 28, height: 28)
-                                            .overlay {
-                                                Image(systemName: asset.icon)
-                                                    .font(.system(size: 12))
-                                                    .foregroundStyle(asset.type == .character ? .blue : .teal)
-                                            }
-                                        VStack(alignment: .leading, spacing: 1) {
-                                            Text(asset.name)
-                                                .font(.callout.weight(.medium))
-                                            Text(asset.type == .character ? "Character" : "Location")
-                                                .font(.caption2)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                    }
-                                }
-                            }
-                            .padding(8)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(
-                                RoundedRectangle(cornerRadius: 7)
-                                    .fill(Color.accentColor.opacity(0.05))
-                            )
-                        }
-                        .padding(.bottom, 12)
-                    }
-
-                    Divider().padding(.vertical, 8)
-
-                    // Dimensions
-                    VStack(alignment: .leading, spacing: 6) {
-                        sectionLabel("Width")
-                        Text("\(job.width) px")
-                            .font(.callout)
-                    }
-                    .padding(.bottom, 12)
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        sectionLabel("Height")
-                        Text("\(job.height) px")
-                            .font(.callout)
-                    }
-                    .padding(.bottom, 12)
-
-                    // Variant count (if applicable)
-                    if job.variantCount > 0 {
-                        VStack(alignment: .leading, spacing: 6) {
-                            sectionLabel("Variants")
-                            Text("\(job.variantCount)")
-                                .font(.callout)
-                        }
-                        .padding(.bottom, 12)
-                    }
-
-                    // Seed
-                    VStack(alignment: .leading, spacing: 6) {
-                        sectionLabel("Seed")
-                        Text(job.seed == -1 ? "random" : "\(job.seed)")
-                            .font(.callout.monospaced())
-                    }
-                    .padding(.bottom, 12)
-
-                    Divider().padding(.vertical, 8)
-
-                    // Combined Prompt
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            sectionLabel("Combined Prompt")
-                            Spacer()
-                            Button {
-                                NSPasteboard.general.clearContents()
-                                NSPasteboard.general.setString(job.combinedPrompt, forType: .string)
-                            } label: {
-                                Label("Copy", systemImage: "doc.on.doc")
-                                    .font(.caption)
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.mini)
-                        }
-                        Text(job.combinedPrompt)
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
-                            .padding(8)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color.accentColor.opacity(0.05))
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color.secondary.opacity(0.2), lineWidth: 0.5)
-                            )
-                    }
-                    .padding(.bottom, 12)
-
-                    Divider().padding(.vertical, 8)
-
-                    // Timing
-                    VStack(alignment: .leading, spacing: 6) {
-                        sectionLabel("Queued At")
-                        Text(job.queuedAt, style: .time)
-                            .font(.callout)
-                    }
-                    .padding(.bottom, 12)
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        sectionLabel("Estimated Duration")
-                        let mins = Int(job.estimatedDuration) / 60
-                        let secs = Int(job.estimatedDuration) % 60
-                        Text(mins > 0 ? "\(mins)m \(secs)s" : "\(secs)s")
-                            .font(.callout)
-                    }
-                    .padding(.bottom, 12)
-
-                    Divider().padding(.vertical, 8)
-
-                    // ── Test: Generate via Draw Things ──────────────────────────
                     GenerateTestPanel(job: job, vm: vm, episodeName: episodeName)
 
                     Spacer(minLength: 20)
@@ -212,31 +40,23 @@ struct ProductionJobDetailView: View {
                 .padding(14)
             }
             .background(Color(NSColor.windowBackgroundColor))
-            // Sync job into vm whenever selection changes
             .onChange(of: job.id) { _, _ in syncJob(job) }
             .onChange(of: selectedModelConfigID) { _, _ in syncJob(job) }
             .onAppear { syncJob(job) }
         } else {
             ContentUnavailableView(
-                "No job selected",
-                systemImage: "tray",
+                "No job selected", systemImage: "tray",
                 description: Text("Select a job from the queue to see its details.")
             )
         }
     }
 
-    // MARK: - Helpers
-
     private func syncJob(_ job: GenerationJob) {
-        // Prompt + seed from the job
-        vm.prompt = job.combinedPrompt
-        vm.seed   = Int(job.seed)
-        // Width + height from the job (Small vs Large)
-        vm.width  = job.width
-        vm.height = job.height
-        // Model, steps, guidance from the selected DTModelConfig
-        let config = modelConfigs.first { $0.id == selectedModelConfigID }
-                  ?? modelConfigs.first
+        vm.prompt  = job.combinedPrompt
+        vm.seed    = Int(job.seed)
+        vm.width   = job.width
+        vm.height  = job.height
+        let config = modelConfigs.first { $0.id == selectedModelConfigID } ?? modelConfigs.first
         if let config {
             vm.steps         = config.steps
             vm.guidanceScale = config.guidanceScale
@@ -246,16 +66,155 @@ struct ProductionJobDetailView: View {
 
     private func jobThumbnailType(_ job: GenerationJob) -> ThumbnailItemType {
         switch job.jobType {
-        case .generatePanel:
-            return .panel
-        case .generateExample:
-            return .look
+        case .generatePanel:   return .panel
+        case .generateExample: return .look
         case .generateAsset:
             return job.itemType == .character
                 ? .character(gender: job.itemGender)
                 : .location(setting: job.itemLocationSetting)
         }
     }
+}
+
+// MARK: - Job meta section (item, type, size, look, assets)
+
+private struct JobMetaSection: View {
+    let job: GenerationJob
+    var body: some View {
+        Group {
+            infoRow(label: "Item") {
+                HStack(spacing: 6) {
+                    Image(systemName: job.itemIcon).foregroundStyle(job.jobType.color)
+                    Text(job.itemName).font(.callout.weight(.medium))
+                }
+            }
+            Divider().padding(.vertical, 8)
+            infoRow(label: "Job Type") {
+                HStack(spacing: 6) {
+                    Image(systemName: job.jobType.icon).foregroundStyle(job.jobType.color)
+                    Text(job.jobType.rawValue).font(.callout)
+                }
+            }
+            infoRow(label: "Size")     { Text(job.size.rawValue).font(.callout) }
+            infoRow(label: "Look")     { Text(job.lookName).font(.callout) }
+            infoRow(label: "Item Type") {
+                Text(job.itemType == .character ? "Character" : "Location").font(.callout)
+            }
+            if !job.attachedAssets.isEmpty {
+                Divider().padding(.vertical, 8)
+                AttachedAssetsView(assets: job.attachedAssets)
+            }
+        }
+    }
+}
+
+// MARK: - Attached assets
+
+private struct AttachedAssetsView: View {
+    let assets: [JobAssetInfo]
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionLabel("Attached Assets")
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(assets) { asset in
+                    HStack(spacing: 8) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill((asset.type == .character ? Color.blue : Color.teal).opacity(0.15))
+                            .frame(width: 28, height: 28)
+                            .overlay {
+                                Image(systemName: asset.icon)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(asset.type == .character ? .blue : .teal)
+                            }
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(asset.name).font(.callout.weight(.medium))
+                            Text(asset.type == .character ? "Character" : "Location")
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.05)))
+        }
+        .padding(.bottom, 12)
+    }
+}
+
+// MARK: - Dimensions + seed section
+
+private struct JobDimensionsSection: View {
+    let job: GenerationJob
+    var body: some View {
+        Group {
+            Divider().padding(.vertical, 8)
+            infoRow(label: "Width")  { Text("\(job.width) px").font(.callout) }
+            infoRow(label: "Height") { Text("\(job.height) px").font(.callout) }
+            if job.variantCount > 0 {
+                infoRow(label: "Variants") { Text("\(job.variantCount)").font(.callout) }
+            }
+            infoRow(label: "Seed") {
+                Text(job.seed == -1 ? "random" : "\(job.seed)").font(.callout.monospaced())
+            }
+        }
+    }
+}
+
+// MARK: - Combined prompt section
+
+private struct JobPromptSection: View {
+    let job: GenerationJob
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Divider().padding(.vertical, 8)
+            HStack {
+                sectionLabel("Combined Prompt")
+                Spacer()
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(job.combinedPrompt, forType: .string)
+                } label: {
+                    Label("Copy", systemImage: "doc.on.doc").font(.caption)
+                }
+                .buttonStyle(.bordered).controlSize(.mini)
+            }
+            Text(job.combinedPrompt)
+                .font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
+                .padding(8).frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.05)))
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.2), lineWidth: 0.5))
+        }
+        .padding(.bottom, 12)
+    }
+}
+
+// MARK: - Timing section
+
+private struct JobTimingSection: View {
+    let job: GenerationJob
+    private var durationString: String {
+        let m = Int(job.estimatedDuration) / 60
+        let s = Int(job.estimatedDuration) % 60
+        return m > 0 ? "\(m)m \(s)s" : "\(s)s"
+    }
+    var body: some View {
+        Group {
+            Divider().padding(.vertical, 8)
+            infoRow(label: "Queued At") { Text(job.queuedAt, style: .time).font(.callout) }
+            infoRow(label: "Est. Duration") { Text(durationString).font(.callout) }
+        }
+    }
+}
+
+// MARK: - Shared infoRow helper
+
+private func infoRow<C: View>(label: String, @ViewBuilder content: () -> C) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+        sectionLabel(label)
+        content()
+    }
+    .padding(.bottom, 12)
 }
 
 // MARK: - Generate test panel
@@ -271,101 +230,75 @@ private struct GenerateTestPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionLabel("Generate (Test)")
-
-            // Generate button + progress label
-            HStack(spacing: 10) {
-                Button {
-                    savedURL = nil
-                    saveError = nil
-                    Task {
-                        await vm.generate()
-                        await saveGeneratedImage()
-                    }
-                } label: {
-                    Label(
-                        vm.isGenerating ? "Generating…" : "Generate",
-                        systemImage: vm.isGenerating ? "hourglass" : "wand.and.stars"
-                    )
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(vm.isGenerating || vm.prompt.isEmpty)
-
-                if vm.isGenerating, !vm.generationStage.isEmpty {
-                    Text(vm.generationStage)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-
-            // Result image
-            if let image = vm.generatedImage {
-                Image(nsImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.secondary.opacity(0.2), lineWidth: 0.5)
-                    )
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 4)
-
-                // Saved path indicator
-                if let url = savedURL {
-                    Label(url.path, systemImage: "checkmark.circle.fill")
-                        .font(.caption2)
-                        .foregroundStyle(.green)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-            }
-
-            // Save error
-            if let err = saveError {
-                Label(err, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-            }
-
-            // Error
-            if let error = vm.errorMessage {
-                Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .padding(.top, 2)
-            }
+            generateButtonRow
+            resultImageView
+            errorView
         }
         .padding(.bottom, 12)
     }
 
-    // MARK: - Save
+    private var generateButtonRow: some View {
+        HStack(spacing: 10) {
+            Button {
+                savedURL = nil; saveError = nil
+                Task { await vm.generate(); await saveGeneratedImage() }
+            } label: {
+                Label(
+                    vm.isGenerating ? "Generating…" : "Generate",
+                    systemImage: vm.isGenerating ? "hourglass" : "wand.and.stars"
+                )
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(vm.isGenerating || vm.prompt.isEmpty)
+
+            if vm.isGenerating, !vm.generationStage.isEmpty {
+                Text(vm.generationStage)
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var resultImageView: some View {
+        if let image = vm.generatedImage {
+            Image(nsImage: image)
+                .resizable().scaledToFit()
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.secondary.opacity(0.2), lineWidth: 0.5))
+                .frame(maxWidth: .infinity).padding(.top, 4)
+            if let url = savedURL {
+                Label(url.path, systemImage: "checkmark.circle.fill")
+                    .font(.caption2).foregroundStyle(.green)
+                    .lineLimit(1).truncationMode(.middle)
+            }
+        }
+        if let err = saveError {
+            Label(err, systemImage: "exclamationmark.triangle.fill")
+                .font(.caption).foregroundStyle(.orange)
+        }
+    }
+
+    @ViewBuilder
+    private var errorView: some View {
+        if let error = vm.errorMessage {
+            Label(error, systemImage: "exclamationmark.triangle.fill")
+                .font(.caption).foregroundStyle(.red).padding(.top, 2)
+        }
+    }
 
     @MainActor
     private func saveGeneratedImage() async {
         guard let image = vm.generatedImage else { return }
-        let storage = StorageService.shared
         do {
             switch job.jobType {
             case .generatePanel:
-                savedURL = try storage.savePanelImage(
-                    image,
-                    panelID: job.id,
-                    episodeName: episodeName
-                )
+                savedURL = try StorageService.shared.savePanelImage(image, panelID: job.id, episodeName: episodeName)
             case .generateExample:
-                savedURL = try storage.saveLookExample(
-                    image,
-                    lookName: job.lookName
-                )
+                savedURL = try StorageService.shared.saveLookExample(image, lookName: job.lookName)
             case .generateAsset:
-                // Use job ID as assetID, index 0 for now
-                savedURL = try storage.saveVariantImage(
-                    image,
-                    assetID: job.id,
-                    variantIndex: 0
-                )
+                savedURL = try StorageService.shared.saveVariantImage(image, assetID: job.id, variantIndex: 0)
             }
         } catch {
             saveError = error.localizedDescription
