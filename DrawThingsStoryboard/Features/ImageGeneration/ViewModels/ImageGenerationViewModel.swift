@@ -16,6 +16,7 @@ final class ImageGenerationViewModel: ObservableObject {
     @Published var seed: Int = -1
     @Published var width: Int = 512
     @Published var height: Int = 512
+    @Published var model: String = ""
 
     // MARK: - Moodboard
     /// Reference images forwarded to Draw Things as shuffle hints.
@@ -58,7 +59,8 @@ final class ImageGenerationViewModel: ObservableObject {
             guidanceScale: guidanceScale,
             seed: seed,
             width: width,
-            height: height
+            height: height,
+            model: model
         )
 
         do {

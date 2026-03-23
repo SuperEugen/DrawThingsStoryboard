@@ -53,7 +53,7 @@ final class DrawThingsGRPCClient: DrawThingsClientProtocol {
             width: Int32(request.width),
             height: Int32(request.height),
             steps: Int32(request.steps),
-            model: "",
+            model: request.model,
             guidanceScale: Float(request.guidanceScale),
             seed: seedValue
         )

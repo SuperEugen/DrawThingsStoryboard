@@ -239,6 +239,7 @@ struct ProductionJobDetailView: View {
         if let config {
             vm.steps         = config.steps
             vm.guidanceScale = config.guidanceScale
+            vm.model         = config.model
         }
     }
 
