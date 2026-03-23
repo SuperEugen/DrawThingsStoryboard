@@ -6,6 +6,8 @@ struct ProductionJobDetailView: View {
     let queue: [GenerationJob]
     let selectedJobID: String?
 
+    @StateObject private var vm = ImageGenerationViewModel()
+
     private var selectedJob: GenerationJob? {
         guard let id = selectedJobID else { return nil }
         return queue.first { $0.id == id }
@@ -111,7 +113,7 @@ struct ProductionJobDetailView: View {
 
                     Divider().padding(.vertical, 8)
 
-                    // Size
+                    // Dimensions
                     VStack(alignment: .leading, spacing: 6) {
                         sectionLabel("Width")
                         Text("\(job.width) px")
@@ -197,11 +199,19 @@ struct ProductionJobDetailView: View {
                     }
                     .padding(.bottom, 12)
 
+                    Divider().padding(.vertical, 8)
+
+                    // ── Test: Generate via Draw Things ──────────────────────────
+                    GenerateTestPanel(job: job, vm: vm)
+
                     Spacer(minLength: 20)
                 }
                 .padding(14)
             }
             .background(Color(NSColor.windowBackgroundColor))
+            // Sync job into vm whenever selection changes
+            .onChange(of: job.id) { _, _ in syncJob(job) }
+            .onAppear { syncJob(job) }
         } else {
             ContentUnavailableView(
                 "No job selected",
@@ -209,6 +219,13 @@ struct ProductionJobDetailView: View {
                 description: Text("Select a job from the queue to see its details.")
             )
         }
+    }
+
+    // MARK: - Helpers
+
+    private func syncJob(_ job: GenerationJob) {
+        vm.prompt = job.combinedPrompt
+        vm.seed   = Int(job.seed)
     }
 
     private func jobThumbnailType(_ job: GenerationJob) -> ThumbnailItemType {
@@ -222,5 +239,63 @@ struct ProductionJobDetailView: View {
                 ? .character(gender: job.itemGender)
                 : .location(setting: job.itemLocationSetting)
         }
+    }
+}
+
+// MARK: - Generate test panel
+
+private struct GenerateTestPanel: View {
+    let job: GenerationJob
+    @ObservedObject var vm: ImageGenerationViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionLabel("Generate (Test)")
+
+            // Generate button + progress label
+            HStack(spacing: 10) {
+                Button {
+                    Task { await vm.generate() }
+                } label: {
+                    Label(
+                        vm.isGenerating ? "Generating…" : "Generate",
+                        systemImage: vm.isGenerating ? "hourglass" : "wand.and.stars"
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(vm.isGenerating || vm.prompt.isEmpty)
+
+                if vm.isGenerating, !vm.generationStage.isEmpty {
+                    Text(vm.generationStage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            // Result image
+            if let image = vm.generatedImage {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.secondary.opacity(0.2), lineWidth: 0.5)
+                    )
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 4)
+            }
+
+            // Error
+            if let error = vm.errorMessage {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .padding(.top, 2)
+            }
+        }
+        .padding(.bottom, 12)
     }
 }
