@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Model Config browser (list of model configurations)
 
 struct ModelConfigBrowserView: View {
-    @Binding var configs: [ModelConfig]
+    @Binding var configs: [DTModelConfig]
     @Binding var selectedConfigID: String?
 
     var body: some View {
@@ -58,7 +58,7 @@ struct ModelConfigBrowserView: View {
     }
 
     private func addConfig() {
-        let new = ModelConfig(
+        let new = DTModelConfig(
             id: UUID().uuidString,
             name: "New Config",
             model: "",

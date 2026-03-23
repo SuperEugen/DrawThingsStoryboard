@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Model Config detail editor
 
 struct ModelConfigDetailView: View {
-    @Binding var configs: [ModelConfig]
+    @Binding var configs: [DTModelConfig]
     @Binding var selectedConfigID: String?
 
     private var selectedIndex: Int? {
@@ -16,16 +16,12 @@ struct ModelConfigDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
 
-                    // Header thumbnail — hell-lila mit Zahnrad
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.purple.opacity(0.12))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 90)
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 36))
-                            .foregroundStyle(Color.purple.opacity(0.5))
-                    }
+                    // Header — hell-lila mit Zahnrad via UnifiedThumbnailView
+                    UnifiedThumbnailView(
+                        itemType: .modelConfig,
+                        name: "",
+                        sizeMode: .header
+                    )
                     .padding(.bottom, 16)
 
                     // Name
@@ -41,7 +37,7 @@ struct ModelConfigDetailView: View {
                     // Model
                     VStack(alignment: .leading, spacing: 6) {
                         sectionLabel("Model")
-                        Text("Filename exactly as shown in Draw Things, e.g. \"sd_xl_base_1.0.safetensors\"")
+                        Text("Filename exactly as shown in Draw Things, e.g. \"flux_1_schnell_q5p.ckpt\"")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .padding(.bottom, 2)

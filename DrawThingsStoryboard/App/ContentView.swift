@@ -4,10 +4,10 @@ import SwiftUI
 struct ContentView: View {
 
     // MARK: - Navigation state
-    @State private var selectedSection: AppSection?  = .projects
-    @State private var selectedItemID: String?       = nil
+    @State private var selectedSection: AppSection?      = .projects
+    @State private var selectedItemID: String?           = nil
 
-    // MARK: - Hierarchy state
+    // MARK: - Hierarchy state (Studio → Customer → Episode)
     @State private var studios: [MockStudio]             = MockData.defaultStudios
     @State private var selectedStudioID: String?         = nil
     @State private var selectedCustomerID: String?       = nil
@@ -15,27 +15,29 @@ struct ContentView: View {
     @State private var selectedBriefingLevel: BriefingLevel = .episode
 
     // MARK: - Assets state
-    @State private var selectedAssetItem: CastingItem? = nil
-    @State private var libraryRefreshToken: UUID = UUID()
+    @State private var selectedAssetItem: CastingItem?   = nil
+    @State private var libraryRefreshToken: UUID         = UUID()
 
     // MARK: - Looks state
-    @State private var templates: [GenerationTemplate] = MockData.defaultTemplates
-    @State private var selectedTemplateID: String? = nil
+    @State private var templates: [GenerationTemplate]  = MockData.defaultTemplates
+    @State private var selectedTemplateID: String?       = nil
 
     // MARK: - Model Config state
-    @State private var modelConfigs: [ModelConfig] = MockData.defaultModelConfigs
-    @State private var selectedModelConfigID: String? = nil
+    @State private var modelConfigs: [DTModelConfig]     = DTModelConfig.defaultConfigs
+    @State private var selectedModelConfigID: String?    = nil
 
     // MARK: - Storyboard state
     @State private var storyboardSelection: StoryboardSelection? = nil
 
     // MARK: - Production Queue state
-    @State private var generationQueue: [GenerationJob] = MockData.sampleQueue
-    @State private var selectedJobID: String? = nil
+    @State private var generationQueue: [GenerationJob]  = MockData.sampleQueue
+    @State private var selectedJobID: String?            = nil
 
-    // MARK: - Derived helpers
+    // MARK: - Derived selection helpers
 
-    private var selectedStudioIndex: Int? { studios.firstIndex { $0.id == selectedStudioID } }
+    private var selectedStudioIndex: Int? {
+        studios.firstIndex { $0.id == selectedStudioID }
+    }
     private var selectedCustomerIndex: Int? {
         guard let si = selectedStudioIndex else { return nil }
         return studios[si].customers.firstIndex { $0.id == selectedCustomerID }
@@ -46,13 +48,15 @@ struct ContentView: View {
     }
 
     private var currentEpisodeName: String {
-        guard let si = selectedStudioIndex, let ci = selectedCustomerIndex,
+        guard let si = selectedStudioIndex,
+              let ci = selectedCustomerIndex,
               let ei = selectedEpisodeIndex else { return "First Episode" }
         return studios[si].customers[ci].episodes[ei].name
     }
 
     private var currentEpisodeActsBinding: Binding<[MockAct]> {
-        guard let si = selectedStudioIndex, let ci = selectedCustomerIndex,
+        guard let si = selectedStudioIndex,
+              let ci = selectedCustomerIndex,
               let ei = selectedEpisodeIndex else { return .constant([]) }
         return $studios[si].customers[ci].episodes[ei].acts
     }
@@ -61,18 +65,23 @@ struct ContentView: View {
         guard let si = selectedStudioIndex else { return nil }
         let studio = studios[si]
         if let ci = selectedCustomerIndex, let ei = selectedEpisodeIndex {
-            if let id = studio.customers[ci].episodes[ei].preferredLookID,
+            let episode = studio.customers[ci].episodes[ei]
+            if let id = episode.preferredLookID,
                let t = templates.first(where: { $0.id == id }) { return t.name }
         }
         if let ci = selectedCustomerIndex {
-            if let id = studio.customers[ci].preferredLookID,
+            let customer = studio.customers[ci]
+            if let id = customer.preferredLookID,
                let t = templates.first(where: { $0.id == id }) { return t.name }
         }
-        if let id = studio.preferredLookID, let t = templates.first(where: { $0.id == id }) { return t.name }
+        if let id = studio.preferredLookID,
+           let t = templates.first(where: { $0.id == id }) { return t.name }
         return nil
     }
 
-    // MARK: - Body
+    private var windowTitle: String {
+        "Draw Things Storyboard - \(currentEpisodeName)"
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -92,11 +101,20 @@ struct ContentView: View {
                     episodeIndex: selectedEpisodeIndex ?? 0
                 )
             case .productionQueue:
-                ProductionBrowserView(queue: $generationQueue, selectedJobID: $selectedJobID)
+                ProductionBrowserView(
+                    queue: $generationQueue,
+                    selectedJobID: $selectedJobID
+                )
             case .looks:
-                LooksBrowserView(templates: $templates, selectedTemplateID: $selectedTemplateID)
+                LooksBrowserView(
+                    templates: $templates,
+                    selectedTemplateID: $selectedTemplateID
+                )
             case .modelConfig:
-                ModelConfigBrowserView(configs: $modelConfigs, selectedConfigID: $selectedModelConfigID)
+                ModelConfigBrowserView(
+                    configs: $modelConfigs,
+                    selectedConfigID: $selectedModelConfigID
+                )
             case .storyboard:
                 StoryboardBrowserView(
                     acts: currentEpisodeActsBinding,
@@ -119,10 +137,16 @@ struct ContentView: View {
             case .configuration:
                 EmptyView()
             case .assets:
-                LibraryBrowserView(studios: $studios, selectedItem: $selectedAssetItem)
-                    .id(libraryRefreshToken)
+                LibraryBrowserView(
+                    studios: $studios,
+                    selectedItem: $selectedAssetItem
+                )
+                .id(libraryRefreshToken)
             case .productionQueue:
-                ProductionJobDetailView(queue: generationQueue, selectedJobID: selectedJobID)
+                ProductionJobDetailView(
+                    queue: generationQueue,
+                    selectedJobID: selectedJobID
+                )
             case .looks:
                 LooksDetailView(
                     templates: $templates,
@@ -130,7 +154,10 @@ struct ContentView: View {
                     generationQueue: $generationQueue
                 )
             case .modelConfig:
-                ModelConfigDetailView(configs: $modelConfigs, selectedConfigID: $selectedModelConfigID)
+                ModelConfigDetailView(
+                    configs: $modelConfigs,
+                    selectedConfigID: $selectedModelConfigID
+                )
             case .storyboard:
                 StoryboardDetailView(
                     acts: currentEpisodeActsBinding,
@@ -140,6 +167,17 @@ struct ContentView: View {
                     studioIndex: selectedStudioIndex ?? 0,
                     customerIndex: selectedCustomerIndex ?? 0,
                     episodeIndex: selectedEpisodeIndex ?? 0
+                )
+            case .projects:
+                ItemDetailView(
+                    section: selectedSection,
+                    studios: $studios,
+                    selectedStudioID: selectedStudioID,
+                    selectedCustomerID: selectedCustomerID,
+                    selectedEpisodeID: selectedEpisodeID,
+                    selectedBriefingLevel: selectedBriefingLevel,
+                    selectedItemID: selectedItemID,
+                    templates: templates
                 )
             default:
                 ItemDetailView(
@@ -163,30 +201,40 @@ struct ContentView: View {
             storyboardSelection = nil
         }
         .frame(minWidth: 1100, minHeight: 680)
-        .navigationTitle("Draw Things Storyboard - \(currentEpisodeName)")
+        .navigationTitle(windowTitle)
         .onAppear { ensureSelection() }
         .onChange(of: selectedEpisodeID) { _, _ in
-            guard let si = selectedStudioIndex, let ci = selectedCustomerIndex,
+            guard let si = selectedStudioIndex,
+                  let ci = selectedCustomerIndex,
                   let ei = selectedEpisodeIndex else { return }
             ensureMinimalStoryboard(studioIndex: si, customerIndex: ci, episodeIndex: ei)
         }
     }
 
-    // MARK: - Helpers
+    // MARK: - Guarantee at-least-one selection
 
     private func ensureSelection() {
         if studios.isEmpty {
-            studios.append(MockStudio(id: UUID().uuidString, name: "Your Studio", customers: [], characters: [], locations: []))
+            studios.append(MockStudio(
+                id: UUID().uuidString, name: "Your Studio",
+                customers: [], characters: [], locations: []
+            ))
         }
-        if selectedStudioID == nil { selectedStudioID = studios[0].id }
+        let studio = studios[0]
+        if selectedStudioID == nil { selectedStudioID = studio.id }
         let si = studios.firstIndex { $0.id == selectedStudioID } ?? 0
         if studios[si].customers.isEmpty {
-            studios[si].customers.append(MockCustomer(id: UUID().uuidString, name: "Your Customer", episodes: []))
+            studios[si].customers.append(MockCustomer(
+                id: UUID().uuidString, name: "Your Customer", episodes: []
+            ))
         }
         if selectedCustomerID == nil { selectedCustomerID = studios[si].customers[0].id }
         let ci = studios[si].customers.firstIndex { $0.id == selectedCustomerID } ?? 0
         if studios[si].customers[ci].episodes.isEmpty {
-            studios[si].customers[ci].episodes.append(MockEpisode(id: UUID().uuidString, name: "First Episode", characters: [], locations: []))
+            studios[si].customers[ci].episodes.append(MockEpisode(
+                id: UUID().uuidString, name: "First Episode",
+                characters: [], locations: []
+            ))
         }
         if selectedEpisodeID == nil { selectedEpisodeID = studios[si].customers[ci].episodes[0].id }
         let ei = studios[si].customers[ci].episodes.firstIndex { $0.id == selectedEpisodeID } ?? 0
