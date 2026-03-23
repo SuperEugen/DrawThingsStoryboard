@@ -5,6 +5,8 @@ import SwiftUI
 struct ProductionJobDetailView: View {
     let queue: [GenerationJob]
     let selectedJobID: String?
+    let modelConfigs: [DTModelConfig]
+    let selectedModelConfigID: String?
 
     @StateObject private var vm = ImageGenerationViewModel()
 
@@ -211,6 +213,7 @@ struct ProductionJobDetailView: View {
             .background(Color(NSColor.windowBackgroundColor))
             // Sync job into vm whenever selection changes
             .onChange(of: job.id) { _, _ in syncJob(job) }
+            .onChange(of: selectedModelConfigID) { _, _ in syncJob(job) }
             .onAppear { syncJob(job) }
         } else {
             ContentUnavailableView(
@@ -224,8 +227,19 @@ struct ProductionJobDetailView: View {
     // MARK: - Helpers
 
     private func syncJob(_ job: GenerationJob) {
+        // Prompt + seed from the job
         vm.prompt = job.combinedPrompt
         vm.seed   = Int(job.seed)
+        // Width + height from the job (Small vs Large)
+        vm.width  = job.width
+        vm.height = job.height
+        // Model, steps, guidance from the selected DTModelConfig
+        let config = modelConfigs.first { $0.id == selectedModelConfigID }
+                  ?? modelConfigs.first
+        if let config {
+            vm.steps         = config.steps
+            vm.guidanceScale = config.guidanceScale
+        }
     }
 
     private func jobThumbnailType(_ job: GenerationJob) -> ThumbnailItemType {

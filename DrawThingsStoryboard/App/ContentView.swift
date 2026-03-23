@@ -147,7 +147,9 @@ struct ContentView: View {
             case .productionQueue:
                 ProductionJobDetailView(
                     queue: generationQueue,
-                    selectedJobID: selectedJobID
+                    selectedJobID: selectedJobID,
+                    modelConfigs: modelConfigs,
+                    selectedModelConfigID: selectedModelConfigID
                 )
             case .looks:
                 LooksDetailView(
