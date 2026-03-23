@@ -11,9 +11,6 @@ final class DrawThingsGRPCClient: DrawThingsClientProtocol {
 
     private let dtClient: DrawThingsClient
 
-    /// - Parameters:
-    ///   - address: host:port of the Draw Things gRPC server
-    ///   - useTLS: must match the TLS setting in Draw Things (default: true)
     init(address: String = "localhost:7859", useTLS: Bool = true) throws {
         self.dtClient = try DrawThingsClient(address: address, useTLS: useTLS)
     }
@@ -24,8 +21,9 @@ final class DrawThingsGRPCClient: DrawThingsClientProtocol {
         onProgress: ((GenerationStage) -> Void)? = nil
     ) async throws -> NSImage {
 
-        // 1. Connect (echo handshake) — fetches model metadata from Draw Things
-        await dtClient.connect()
+        // 1. Connect (echo handshake) — fetches model metadata from Draw Things.
+        //    connect() is non-throwing; check lastError afterwards.
+        dtClient.connect()
         if let err = dtClient.lastError {
             throw DrawThingsGRPCError.connectionFailed(err.localizedDescription)
         }
@@ -48,8 +46,8 @@ final class DrawThingsGRPCClient: DrawThingsClientProtocol {
         let hints = buildHints(from: moodboardImages)
 
         // 4. Build configuration.
-        //    model is left empty → Draw Things uses whatever is selected in its UI.
-        //    seed: Int64? — nil means random (Draw Things picks the seed itself).
+        //    model left empty → Draw Things uses whatever model is active in its UI.
+        //    seed nil → Draw Things picks a random seed.
         let seedValue: Int64? = request.seed == -1 ? nil : Int64(request.seed)
         let config = DrawThingsConfiguration(
             width: Int32(request.width),
