@@ -47,15 +47,17 @@ final class DrawThingsGRPCClient: DrawThingsClientProtocol {
         // 3. Build moodboard hints
         let hints = buildHints(from: moodboardImages)
 
-        // 4. Build configuration — tells Draw Things width/height/steps/guidance.
-        //    We intentionally leave `model` empty so Draw Things uses whatever
-        //    model is currently selected in its UI.
+        // 4. Build configuration.
+        //    model is left empty → Draw Things uses whatever is selected in its UI.
+        //    seed: Int64? — nil means random (Draw Things picks the seed itself).
+        let seedValue: Int64? = request.seed == -1 ? nil : Int64(request.seed)
         let config = DrawThingsConfiguration(
-            width: request.width,
-            height: request.height,
-            steps: request.steps,
+            width: Int32(request.width),
+            height: Int32(request.height),
+            steps: Int32(request.steps),
+            model: "",
             guidanceScale: Float(request.guidanceScale),
-            seed: request.seed == -1 ? UInt32.random(in: 0 ..< UInt32.max) : UInt32(request.seed)
+            seed: seedValue
         )
 
         print("[GRPCClient] Sending — prompt: '\(request.prompt.prefix(60))…', \(request.width)×\(request.height), steps: \(request.steps), hints: \(hints.count)")
