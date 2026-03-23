@@ -5,12 +5,12 @@ import DrawThingsClient
 /// Does NOT support moodboard/hints – use DrawThingsGRPCClient for full feature set.
 ///
 /// Draw Things must be running with:
-/// Advanced → API Server → Protocol: HTTP, Port: 7888
+/// Advanced → API Server → Protocol: HTTP, Port: 7859
 final class DrawThingsHTTPClient: DrawThingsClientProtocol {
 
     private let baseURL: URL
 
-    init(baseURL: URL = URL(string: "http://localhost:7888")!) {
+    init(baseURL: URL = URL(string: "http://localhost:7859")!) {
         self.baseURL = baseURL
     }
 
