@@ -28,8 +28,16 @@ final class ImageGenerationViewModel: ObservableObject {
     // MARK: - Dependencies
     private let client: DrawThingsClientProtocol
 
-    init(client: DrawThingsClientProtocol = (try? DrawThingsGRPCClient()) ?? DrawThingsHTTPClient()) {
-        self.client = client
+    /// Default init: tries gRPC first, falls back to HTTP.
+    /// Uses DrawThingsMockClient in SwiftUI Previews.
+    init(client: DrawThingsClientProtocol? = nil) {
+        if let client {
+            self.client = client
+        } else if let grpc = try? DrawThingsGRPCClient() {
+            self.client = grpc
+        } else {
+            self.client = DrawThingsHTTPClient()
+        }
     }
 
     // MARK: - Actions

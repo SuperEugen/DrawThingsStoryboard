@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import DrawThingsClient
 
 /// Production client that talks to Draw Things via gRPC.
@@ -9,6 +10,7 @@ import DrawThingsClient
 final class DrawThingsGRPCClient: DrawThingsClientProtocol {
 
     private let client: DrawThingsClient
+    private var cancellables = Set<AnyCancellable>()
 
     /// - Parameter address: host:port of the Draw Things gRPC server, e.g. "localhost:7860"
     init(address: String = "localhost:7860") throws {
@@ -33,19 +35,21 @@ final class DrawThingsGRPCClient: DrawThingsClientProtocol {
             return builder.build()
         }()
 
-        // Wire up progress forwarding
-        let progressSub = onProgress.map { callback in
+        // Wire up progress forwarding via Combine
+        if let callback = onProgress {
             client.$currentProgress
                 .compactMap { $0?.stage }
                 .sink { callback($0) }
+                .store(in: &cancellables)
         }
-        defer { progressSub?.cancel() }
 
         let images = try await client.generateImage(
             prompt: request.prompt,
             negativePrompt: request.negativePrompt,
             hints: hints
         )
+
+        cancellables.removeAll()
 
         guard let first = images.first else {
             throw DrawThingsGRPCError.noImageReturned
