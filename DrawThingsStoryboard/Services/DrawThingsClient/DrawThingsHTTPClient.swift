@@ -1,7 +1,11 @@
 import AppKit
+import DrawThingsClient
 
-/// Concrete HTTP client for the Draw Things API.
-/// Base URL is configurable via Settings.
+/// Fallback HTTP client for the Draw Things REST API.
+/// Does NOT support moodboard/hints – use DrawThingsGRPCClient for full feature set.
+///
+/// Draw Things must be running with:
+/// Advanced → API Server → Protocol: HTTP, Port: 7888
 final class DrawThingsHTTPClient: DrawThingsClientProtocol {
 
     private let baseURL: URL
@@ -10,7 +14,13 @@ final class DrawThingsHTTPClient: DrawThingsClientProtocol {
         self.baseURL = baseURL
     }
 
-    func generateImage(request: GenerationRequest) async throws -> NSImage {
+    func generateImage(
+        request: GenerationRequest,
+        moodboardImages: [NSImage] = [],
+        onProgress: ((GenerationStage) -> Void)? = nil
+    ) async throws -> NSImage {
+        // Note: moodboardImages and onProgress are not supported by the HTTP API.
+        // Switch to DrawThingsGRPCClient to use reference images.
         let endpoint = baseURL.appendingPathComponent("/sdapi/v1/txt2img")
         var urlRequest = URLRequest(url: endpoint)
         urlRequest.httpMethod = "POST"
@@ -42,8 +52,10 @@ enum DrawThingsError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .serverError:      return "Draw Things returned an error. Is it running with HTTP API enabled?"
-        case .invalidImageData: return "Could not decode the generated image."
+        case .serverError:
+            return "Draw Things returned an error. Is it running with HTTP API enabled?"
+        case .invalidImageData:
+            return "Could not decode the generated image."
         }
     }
 }
