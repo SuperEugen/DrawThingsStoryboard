@@ -23,7 +23,7 @@ final class DrawThingsGRPCClient: DrawThingsClientProtocol {
 
         // 1. Connect (echo handshake) — fetches model metadata from Draw Things.
         //    connect() is non-throwing; check lastError afterwards.
-        dtClient.connect()
+        await dtClient.connect()
         if let err = dtClient.lastError {
             throw DrawThingsGRPCError.connectionFailed(err.localizedDescription)
         }
@@ -33,7 +33,7 @@ final class DrawThingsGRPCClient: DrawThingsClientProtocol {
         let progressTask: Task<Void, Never>? = onProgress.map { callback in
             Task { [weak dtClient] in
                 while !Task.isCancelled {
-                    if let stage = await dtClient?.currentProgress?.stage {
+                    if let stage = dtClient?.currentProgress?.stage {
                         callback(stage)
                     }
                     try? await Task.sleep(for: .milliseconds(250))

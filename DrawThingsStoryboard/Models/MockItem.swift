@@ -110,8 +110,19 @@ struct MockPanel: Identifiable, Hashable {
     let id: String
     var name: String
     var description: String
-    var smallImageAvailable: Bool = false
-    var largeImageAvailable: Bool = false
+    var smallPanelAvailable: Bool = false
+    var largePanelAvailable: Bool = false
+    var attachedAssetIDs: [String] = []
+    var fileName: String = ""
+}
+
+extension MockPanel {
+    var panelStatusFlags: PanelStatusFlags {
+        PanelStatusFlags(
+            smallPanelAvailable: smallPanelAvailable,
+            largePanelAvailable: largePanelAvailable
+        )
+    }
 }
 
 struct MockScene: Identifiable, Hashable {
@@ -135,7 +146,7 @@ struct MockSequence: Identifiable, Hashable {
     var scenes: [MockScene]
 }
 
-struct MockEpisode: Identifiable, Hashable {
+struct MockEpisode: Identifiable {
     let id: String
     var name: String
     var preferredLookID: String? = nil
@@ -144,14 +155,16 @@ struct MockEpisode: Identifiable, Hashable {
     var acts: [MockAct] = []
 }
 
-struct MockCustomer: Identifiable, Hashable {
+struct MockCustomer: Identifiable {
     let id: String
     var name: String
     var preferredLookID: String? = nil
     var episodes: [MockEpisode]
+    var characters: [CastingItem] = []
+    var locations: [CastingItem] = []
 }
 
-struct MockStudio: Identifiable, Hashable {
+struct MockStudio: Identifiable {
     let id: String
     var name: String
     var preferredLookID: String? = nil

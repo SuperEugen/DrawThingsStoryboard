@@ -17,17 +17,10 @@ extension DTModelConfig {
     static let defaultConfigs: [DTModelConfig] = [
         DTModelConfig(
             id: "mc-1",
-            name: "SDXL Standard",
-            model: "sd_xl_base_1.0.safetensors",
-            steps: 20,
-            guidanceScale: 7.0
-        ),
-        DTModelConfig(
-            id: "mc-2",
-            name: "Flux Schnell",
-            model: "flux_1_schnell_q5p.ckpt",
-            steps: 4,
+            name: "FLUX 2 klein KV",
+            model: "flux_2_klein_9b_kv_q8p.ckpt",
+            steps: 6,
             guidanceScale: 1.0
-        ),
+        )
     ]
 }

@@ -47,57 +47,8 @@ enum StoryboardSelection: Hashable {
     case panel(String)
 }
 
-// MARK: - Models
-
-struct MockPanel: Identifiable {
-    let id: String
-    var name: String
-    var description: String
-    var smallPanelAvailable: Bool = false
-    var largePanelAvailable: Bool = false
-    /// IDs of attached CastingItems (0–4 items, max 1 location).
-    var attachedAssetIDs: [String] = []
-    /// Generated file name (read-only display, schema TBD).
-    var fileName: String = ""
-}
-
-/// S/L status flags for panel thumbnails.
-struct PanelStatusFlags {
-    var smallPanelAvailable: Bool
-    var largePanelAvailable: Bool
-}
-
-extension MockPanel {
-    var panelStatusFlags: PanelStatusFlags {
-        PanelStatusFlags(
-            smallPanelAvailable: smallPanelAvailable,
-            largePanelAvailable: largePanelAvailable
-        )
-    }
-}
-
-struct MockScene: Identifiable {
-    let id: String
-    var name: String
-    var description: String
-    var panels: [MockPanel]
-}
-
-struct MockSequence: Identifiable {
-    let id: String
-    var name: String
-    var description: String
-    var scenes: [MockScene]
-}
-
-struct MockAct: Identifiable {
-    let id: String
-    var name: String
-    var description: String
-    var sequences: [MockSequence]
-}
-
 // MARK: - Mock storyboard data
+// MockPanel, MockScene, MockSequence, MockAct are defined in MockItem.swift
 
 extension MockData {
 
@@ -117,8 +68,8 @@ extension MockData {
                             name: "City Establishing",
                             description: "Wide shot of the city at night, rain-soaked streets.",
                             panels: [
-                                MockPanel(id: "pnl-01", name: "Skyline Wide", description: "Wide city skyline.", smallPanelAvailable: true, largePanelAvailable: true, attachedAssetIDs: ["pf-lo-01"]),
-                                MockPanel(id: "pnl-02", name: "Street Level", description: "Rain on the street.", smallPanelAvailable: true, attachedAssetIDs: ["gm-p-ch-01", "pf-lo-01"]),
+                                MockPanel(id: "pnl-01", name: "Skyline Wide", description: "Wide city skyline.", smallPanelAvailable: true, largePanelAvailable: true),
+                                MockPanel(id: "pnl-02", name: "Street Level", description: "Rain on the street.", smallPanelAvailable: true),
                             ]
                         ),
                         MockScene(
@@ -126,7 +77,7 @@ extension MockData {
                             name: "Intro",
                             description: "Alex walks through the rain.",
                             panels: [
-                                MockPanel(id: "pnl-03", name: "Alex Walking", description: "Alex in a trenchcoat.", attachedAssetIDs: ["gm-p-ch-01"]),
+                                MockPanel(id: "pnl-03", name: "Alex Walking", description: "Alex in a trenchcoat."),
                             ]
                         ),
                     ]
@@ -197,8 +148,8 @@ extension MockData {
                             name: "Rooftop",
                             description: "Alex chases Jordan across rooftops.",
                             panels: [
-                                MockPanel(id: "pnl-04", name: "Leap", description: "Alex leaps between buildings.", smallPanelAvailable: true, largePanelAvailable: true, attachedAssetIDs: ["gm-p-ch-01", "gm-p-lo-01"]),
-                                MockPanel(id: "pnl-05", name: "Confrontation", description: "Face to face on the ledge.", attachedAssetIDs: ["gm-p-ch-01", "gm-p-ch-02"]),
+                                MockPanel(id: "pnl-04", name: "Leap", description: "Alex leaps between buildings.", smallPanelAvailable: true, largePanelAvailable: true),
+                                MockPanel(id: "pnl-05", name: "Confrontation", description: "Face to face on the ledge."),
                             ]
                         ),
                         MockScene(
@@ -212,23 +163,6 @@ extension MockData {
                         ),
                     ]
                 ),
-                MockSequence(
-                    id: "seq-05",
-                    name: "Revelation",
-                    description: "Sam reveals the truth about Jordan's plan.",
-                    scenes: [
-                        MockScene(
-                            id: "scn-10",
-                            name: "Safe House",
-                            description: "Alex and Sam meet in a hidden safe house.",
-                            panels: [
-                                MockPanel(id: "pnl-16", name: "Map on Wall", description: "A wall covered with photos and red string.", smallPanelAvailable: true, largePanelAvailable: true),
-                                MockPanel(id: "pnl-17", name: "Sam Explains", description: "Sam points at the conspiracy board.", smallPanelAvailable: true),
-                                MockPanel(id: "pnl-18", name: "Alex Reacts", description: "Close-up of Alex's shocked face."),
-                            ]
-                        ),
-                    ]
-                ),
             ]
         ),
         MockAct(
@@ -236,22 +170,6 @@ extension MockData {
             name: "Resolution",
             description: "The conflict resolves and a new status quo emerges.",
             sequences: [
-                MockSequence(
-                    id: "seq-06",
-                    name: "Preparation",
-                    description: "Alex prepares for the final confrontation.",
-                    scenes: [
-                        MockScene(
-                            id: "scn-11",
-                            name: "Gearing Up",
-                            description: "Alex gathers equipment in a dimly lit garage.",
-                            panels: [
-                                MockPanel(id: "pnl-19", name: "Workbench", description: "Tools and gadgets spread on a workbench."),
-                                MockPanel(id: "pnl-20", name: "Mirror Shot", description: "Alex looks at their reflection, determined."),
-                            ]
-                        ),
-                    ]
-                ),
                 MockSequence(
                     id: "seq-07",
                     name: "Finale",
@@ -262,7 +180,7 @@ extension MockData {
                             name: "Showdown",
                             description: "The climactic showdown in the underground station.",
                             panels: [
-                                MockPanel(id: "pnl-06", name: "Standoff", description: "Tense standoff under flickering lights.", attachedAssetIDs: ["gm-p-ch-01", "gm-p-ch-02", "pf-ch-01", "gm-p-lo-01"]),
+                                MockPanel(id: "pnl-06", name: "Standoff", description: "Tense standoff under flickering lights."),
                                 MockPanel(id: "pnl-21", name: "Final Blow", description: "The decisive moment of the fight."),
                             ]
                         ),

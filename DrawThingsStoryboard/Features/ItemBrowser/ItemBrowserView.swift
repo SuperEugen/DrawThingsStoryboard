@@ -69,7 +69,7 @@ struct ProductionBrowserView: View {
     }
 
     private var finishTimeString: String {
-        guard let t = estimatedFinishTime else { return "\u2014" }
+        guard let t = estimatedFinishTime else { return "\u{2014}" }
         let fmt = DateFormatter(); fmt.timeStyle = .short
         return fmt.string(from: t)
     }
@@ -245,73 +245,6 @@ struct LooksBrowserView: View {
     private func ensureSelection() {
         if selectedTemplateID == nil || !templates.contains(where: { $0.id == selectedTemplateID }) {
             selectedTemplateID = templates.first?.id
-        }
-    }
-}
-
-// MARK: - Model Config browser
-
-struct ModelConfigBrowserView: View {
-    @Binding var configs: [ModelConfig]
-    @Binding var selectedConfigID: String?
-    private let columns = [GridItem(.adaptive(minimum: 288, maximum: 320), spacing: 12)]
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "gearshape").font(.title2).foregroundStyle(.secondary)
-                Text("Model Config").font(.title2.bold())
-                Spacer()
-                Button(action: addConfig) {
-                    Image(systemName: "plus").frame(width: 22, height: 22)
-                }
-                .buttonStyle(.bordered).controlSize(.mini)
-            }
-            .padding(.horizontal, 14).padding(.vertical, 12)
-            Divider()
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(configs) { config in
-                        let isSelected = selectedConfigID == config.id
-                        UnifiedThumbnailView(
-                            itemType: .modelConfig, name: config.name, sizeMode: .standard,
-                            badges: ThumbnailBadges(
-                                showDeleteButton: configs.count > 1,
-                                onDelete: { removeConfig(id: config.id) },
-                                showSelectionStroke: isSelected
-                            )
-                        )
-                        .padding(3)
-                        .background(RoundedRectangle(cornerRadius: 12)
-                            .fill(isSelected ? Color.accentColor.opacity(0.07) : Color.clear))
-                        .onTapGesture { selectedConfigID = config.id }
-                    }
-                }
-                .padding(16)
-            }
-        }
-        .background(Color(NSColor.windowBackgroundColor))
-        .onAppear { ensureSelection() }
-        .onChange(of: configs.count) { _, _ in ensureSelection() }
-    }
-
-    private func addConfig() {
-        let id = UUID().uuidString
-        configs.append(ModelConfig(id: id, name: "New Config", model: "", steps: 20, guidanceScale: 7.0))
-        selectedConfigID = id
-    }
-
-    private func removeConfig(id: String) {
-        guard configs.count > 1, let idx = configs.firstIndex(where: { $0.id == id }) else { return }
-        configs.remove(at: idx)
-        if selectedConfigID == id || !configs.contains(where: { $0.id == selectedConfigID }) {
-            selectedConfigID = configs[min(idx, configs.count - 1)].id
-        }
-    }
-
-    private func ensureSelection() {
-        if selectedConfigID == nil || !configs.contains(where: { $0.id == selectedConfigID }) {
-            selectedConfigID = configs.first?.id
         }
     }
 }
