@@ -30,6 +30,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
     case assets
     case looks
     case storyboard
+    case modelConfig
     case productionQueue
     case configuration
 
@@ -41,6 +42,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .assets:          return "Assets"
         case .looks:           return "Looks"
         case .storyboard:      return "Storyboard"
+        case .modelConfig:     return "Model Config"
         case .productionQueue: return "Production Queue"
         case .configuration:   return "Configuration"
         }
@@ -52,8 +54,9 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .assets:          return "photo.stack"
         case .looks:           return "paintpalette"
         case .storyboard:      return "pencil.and.list.clipboard"
+        case .modelConfig:     return "gearshape"
         case .productionQueue: return "film.stack"
-        case .configuration:   return "gearshape"
+        case .configuration:   return "slider.horizontal.3"
         }
     }
 }
