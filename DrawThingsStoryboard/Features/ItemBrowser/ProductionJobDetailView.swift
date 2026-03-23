@@ -7,6 +7,7 @@ struct ProductionJobDetailView: View {
     let selectedJobID: String?
     let modelConfigs: [DTModelConfig]
     let selectedModelConfigID: String?
+    let episodeName: String
 
     @StateObject private var vm = ImageGenerationViewModel()
 
@@ -204,7 +205,7 @@ struct ProductionJobDetailView: View {
                     Divider().padding(.vertical, 8)
 
                     // ── Test: Generate via Draw Things ──────────────────────────
-                    GenerateTestPanel(job: job, vm: vm)
+                    GenerateTestPanel(job: job, vm: vm, episodeName: episodeName)
 
                     Spacer(minLength: 20)
                 }
@@ -261,7 +262,11 @@ struct ProductionJobDetailView: View {
 
 private struct GenerateTestPanel: View {
     let job: GenerationJob
+    let episodeName: String
     @ObservedObject var vm: ImageGenerationViewModel
+
+    @State private var savedURL: URL? = nil
+    @State private var saveError: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -270,7 +275,12 @@ private struct GenerateTestPanel: View {
             // Generate button + progress label
             HStack(spacing: 10) {
                 Button {
-                    Task { await vm.generate() }
+                    savedURL = nil
+                    saveError = nil
+                    Task {
+                        await vm.generate()
+                        await saveGeneratedImage()
+                    }
                 } label: {
                     Label(
                         vm.isGenerating ? "Generating…" : "Generate",
@@ -301,6 +311,22 @@ private struct GenerateTestPanel: View {
                     )
                     .frame(maxWidth: .infinity)
                     .padding(.top, 4)
+
+                // Saved path indicator
+                if let url = savedURL {
+                    Label(url.path, systemImage: "checkmark.circle.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.green)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+            }
+
+            // Save error
+            if let err = saveError {
+                Label(err, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
             }
 
             // Error
@@ -312,5 +338,37 @@ private struct GenerateTestPanel: View {
             }
         }
         .padding(.bottom, 12)
+    }
+
+    // MARK: - Save
+
+    @MainActor
+    private func saveGeneratedImage() async {
+        guard let image = vm.generatedImage else { return }
+        let storage = StorageService.shared
+        do {
+            switch job.jobType {
+            case .generatePanel:
+                savedURL = try storage.savePanelImage(
+                    image,
+                    panelID: job.id,
+                    episodeName: episodeName
+                )
+            case .generateExample:
+                savedURL = try storage.saveLookExample(
+                    image,
+                    lookName: job.lookName
+                )
+            case .generateAsset:
+                // Use job ID as assetID, index 0 for now
+                savedURL = try storage.saveVariantImage(
+                    image,
+                    assetID: job.id,
+                    variantIndex: 0
+                )
+            }
+        } catch {
+            saveError = error.localizedDescription
+        }
     }
 }
