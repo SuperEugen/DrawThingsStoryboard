@@ -430,7 +430,9 @@ private struct VariantsSection: View {
             }
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 ForEach(0..<4, id: \.self) { idx in
-                    variantTile(index: idx)
+                    if idx < item.variants.count {
+                        variantTile(index: idx)
+                    }
                 }
             }
         }
@@ -438,8 +440,9 @@ private struct VariantsSection: View {
     }
 
     private func variantTile(index idx: Int) -> some View {
+        guard idx < item.variants.count else { return AnyView(EmptyView()) }
         let variant = item.variants[idx]
-        return VStack(spacing: 4) {
+        return AnyView(VStack(spacing: 4) {
             UnifiedThumbnailView(
                 itemType: item.thumbnailType,
                 name: "",
@@ -483,7 +486,7 @@ private struct VariantsSection: View {
                     .font(.caption2)
                     .foregroundStyle(.quaternary)
             }
-        }
+        }) // AnyView / VStack
     }
 
     // MARK: - Actions
