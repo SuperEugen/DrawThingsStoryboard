@@ -28,7 +28,7 @@ struct CastingItemDetailView: View {
                 }
                 DescriptionSection(item: $item)
                 Divider().padding(.vertical, 8)
-                VariantsSection(item: $item)
+                VariantsSection(item: $item, generationQueue: $generationQueue)
                 // File Name (read-only)
                 if !item.fileName.isEmpty {
                     Divider().padding(.vertical, 8)
@@ -107,36 +107,62 @@ private struct ThumbnailSection: View {
     }
 }
 
-// MARK: - StatusSection (compact: single-line + context-dependent action)
+// MARK: - StatusSection (three-row V/S/L status display)
 
 private struct StatusSection: View {
     @Binding var item: CastingItem
     @Binding var generationQueue: [GenerationJob]
 
-    @AppStorage(SizeConfigKeys.previewVariantWidth)  private var previewVariantWidth  = SizeConfigDefaults.previewVariantWidth
-    @AppStorage(SizeConfigKeys.previewVariantHeight) private var previewVariantHeight = SizeConfigDefaults.previewVariantHeight
-    @AppStorage(SizeConfigKeys.finalWidth)           private var finalWidth           = SizeConfigDefaults.finalWidth
-    @AppStorage(SizeConfigKeys.finalHeight)          private var finalHeight          = SizeConfigDefaults.finalHeight
+    @AppStorage(SizeConfigKeys.finalWidth)  private var finalWidth  = SizeConfigDefaults.finalWidth
+    @AppStorage(SizeConfigKeys.finalHeight) private var finalHeight = SizeConfigDefaults.finalHeight
 
-    private var variantsQueued: Bool {
-        generationQueue.contains { $0.itemName == item.name && $0.jobType == .generateVariants }
-    }
-
-    private var finalQueued: Bool {
-        generationQueue.contains { $0.itemName == item.name && $0.jobType == .generateFinal }
+    private var largeImageQueued: Bool {
+        generationQueue.contains { $0.itemName == item.name && $0.jobType == .generateAsset && $0.size == .large }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             sectionLabel("Status")
+
+            statusRow(
+                label: "Variants generated:",
+                value: item.variantsAvailable ? "yes" : "not yet",
+                isActive: item.variantsAvailable
+            )
+
+            statusRow(
+                label: "Small Image available:",
+                value: item.smallImageAvailable ? "yes" : "no Variant approved",
+                isActive: item.smallImageAvailable
+            )
+
             HStack(spacing: 8) {
-                Circle()
-                    .fill(item.status.color)
-                    .frame(width: 8, height: 8)
-                Text(item.status.label)
+                Text("L")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundStyle(item.largeImageAvailable ? .green : .gray)
+                Text("Large Image available:")
                     .font(.callout)
+                Text(item.largeImageAvailable ? "yes" : (item.smallImageAvailable ? "not yet" : "no Variant approved"))
+                    .font(.callout)
+                    .foregroundStyle(item.largeImageAvailable ? .green : .secondary)
                 Spacer()
-                statusAction
+
+                if item.smallImageAvailable && !item.largeImageAvailable {
+                    if largeImageQueued {
+                        Text("queued")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    } else {
+                        Button {
+                            queueLargeImageJob()
+                        } label: {
+                            Label("Generate Large Image", systemImage: "photo.badge.checkmark")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.mini)
+                    }
+                }
             }
             .padding(.vertical, 5)
             .padding(.horizontal, 8)
@@ -149,63 +175,42 @@ private struct StatusSection: View {
     }
 
     @ViewBuilder
-    private var statusAction: some View {
-        switch item.status {
-        case .nothingGenerated:
-            if variantsQueued {
-                Text("Generate Variants queued")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-            } else {
-                Button {
-                    queueJob(type: .generateVariants)
-                } label: {
-                    Label("Generate Variants", systemImage: "play.circle")
-                        .font(.caption)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
-            }
-        case .variantsGenerated:
-            Text("Approve a variant below")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        case .variantApproved:
-            if finalQueued {
-                Text("Generate Final queued")
-                    .font(.caption)
-                    .foregroundStyle(.green)
-            } else {
-                Button {
-                    queueJob(type: .generateFinal)
-                } label: {
-                    Label("Generate Final", systemImage: "checkmark.circle")
-                        .font(.caption)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
-            }
-        case .finalGenerated:
-            EmptyView()
+    private func statusRow(label: String, value: String, isActive: Bool) -> some View {
+        HStack(spacing: 8) {
+            Text(label == "Variants generated:" ? "V" : "S")
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundStyle(isActive ? .green : .gray)
+            Text(label)
+                .font(.callout)
+            Text(value)
+                .font(.callout)
+                .foregroundStyle(isActive ? .green : .secondary)
+            Spacer()
         }
+        .padding(.vertical, 5)
+        .padding(.horizontal, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 7)
+                .fill(Color.accentColor.opacity(0.07))
+        )
     }
 
-    private func queueJob(type: GenerationJobType) {
-        let isPreview = (type == .generateVariants)
+    private func queueLargeImageJob() {
         let job = GenerationJob(
             id: UUID().uuidString,
             itemName: item.name,
             itemType: item.type,
-            jobType: type,
-            lookName: item.type == .character ? "Standard Character" : "Location Establishing",
+            jobType: .generateAsset,
+            size: .large,
+            lookName: item.type == .character ? "Character Final" : "Location Final",
             queuedAt: Date(),
-            estimatedDuration: isPreview ? 300 : 180,
+            estimatedDuration: 180,
             itemIcon: item.type == .character ? (item.gender?.icon ?? "person.fill") : (item.locationSetting?.icon ?? "map"),
             itemGender: item.gender,
             itemLocationSetting: item.locationSetting,
-            seed: Int.random(in: 1...999_999),
-            width: isPreview ? previewVariantWidth : finalWidth,
-            height: isPreview ? previewVariantHeight : finalHeight,
+            seed: Int64.random(in: 1...999_999),
+            width: finalWidth,
+            height: finalHeight,
             combinedPrompt: item.description
         )
         generationQueue.append(job)
@@ -388,10 +393,41 @@ private struct DescriptionSection: View {
 
 private struct VariantsSection: View {
     @Binding var item: CastingItem
+    @Binding var generationQueue: [GenerationJob]
+
+    @AppStorage(SizeConfigKeys.previewVariantWidth)  private var previewVariantWidth  = SizeConfigDefaults.previewVariantWidth
+    @AppStorage(SizeConfigKeys.previewVariantHeight) private var previewVariantHeight = SizeConfigDefaults.previewVariantHeight
+
+    private var variantsQueued: Bool {
+        generationQueue.contains { $0.itemName == item.name && $0.jobType == .generateAsset && $0.size == .small }
+    }
+
+    /// Number of empty variant slots (0–4).
+    private var freeSlotCount: Int {
+        item.variants.filter { !$0.isGenerated }.count
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            sectionLabel("Variants")
+            HStack {
+                sectionLabel("Variants")
+                Spacer()
+                if variantsQueued {
+                    Text("Generate Variants queued")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                } else if freeSlotCount > 0 {
+                    Button {
+                        queueVariantsJob()
+                    } label: {
+                        Label("Generate \(freeSlotCount) Variant\(freeSlotCount == 1 ? "" : "s")", systemImage: "play.circle")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
+                    .disabled(item.name.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 ForEach(0..<4, id: \.self) { idx in
                     variantTile(index: idx)
@@ -458,14 +494,15 @@ private struct VariantsSection: View {
             item.variants[i].isApproved = false
         }
         item.variants[idx].isApproved = true
-        item.status = .variantApproved
+        item.variantsAvailable = true
+        item.smallImageAvailable = true
     }
 
     private func disapproveVariant(at idx: Int) {
         item.variants[idx].isApproved = false
-        // If no variant is approved, drop back to variantsGenerated (if all 4 generated)
         if item.approvedIndex == nil {
-            item.status = item.generatedCount == 4 ? .variantsGenerated : .nothingGenerated
+            item.variantsAvailable = false
+            item.smallImageAvailable = false
         }
     }
 
@@ -474,9 +511,33 @@ private struct VariantsSection: View {
         item.variants[idx].isGenerated = false
         item.variants[idx].isApproved = false
 
-        // Recalculate status
         if wasApproved || item.approvedIndex == nil {
-            item.status = item.generatedCount == 4 ? .variantsGenerated : .nothingGenerated
+            item.variantsAvailable = false
+            item.smallImageAvailable = false
         }
+    }
+
+    private func queueVariantsJob() {
+        let count = freeSlotCount
+        guard count > 0 else { return }
+        let job = GenerationJob(
+            id: UUID().uuidString,
+            itemName: item.name,
+            itemType: item.type,
+            jobType: .generateAsset,
+            size: .small,
+            lookName: item.type == .character ? "Standard Character" : "Location Establishing",
+            queuedAt: Date(),
+            estimatedDuration: TimeInterval(count) * 75,
+            itemIcon: item.type == .character ? (item.gender?.icon ?? "person.fill") : (item.locationSetting?.icon ?? "map"),
+            itemGender: item.gender,
+            itemLocationSetting: item.locationSetting,
+            seed: Int64.random(in: 1...999_999),
+            width: previewVariantWidth,
+            height: previewVariantHeight,
+            combinedPrompt: item.description,
+            variantCount: count
+        )
+        generationQueue.append(job)
     }
 }

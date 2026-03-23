@@ -234,7 +234,7 @@ private struct LibraryCastGrid: View {
     let emptyText: String
     var onDelete: ((String) -> Void)? = nil
 
-    private let columns = [GridItem(.adaptive(minimum: 90, maximum: 120), spacing: 8)]
+    private let columns = [GridItem(.adaptive(minimum: 288, maximum: 320), spacing: 12)]
 
     var body: some View {
         if characters.isEmpty && locations.isEmpty {
@@ -244,130 +244,50 @@ private struct LibraryCastGrid: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
         } else {
-            LazyVGrid(columns: columns, spacing: 8) {
-                ForEach(characters) { item in
-                    LibraryTileView(
-                        item: item,
-                        isSelected: selectedItem?.id == item.id,
-                        onDelete: item.isDefault ? nil : { onDelete?(item.id) }
-                    )
-                    .onTapGesture { selectedItem = item }
-                }
+            LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(locations) { item in
-                    LibraryTileView(
-                        item: item,
-                        isSelected: selectedItem?.id == item.id,
-                        onDelete: item.isDefault ? nil : { onDelete?(item.id) }
-                    )
-                    .onTapGesture { selectedItem = item }
+                    libraryTile(item: item)
+                        .onTapGesture { selectedItem = item }
+                }
+                ForEach(characters) { item in
+                    libraryTile(item: item)
+                        .onTapGesture { selectedItem = item }
                 }
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 4)
         }
     }
-}
 
-// MARK: - Library tile (X-icon top-right, level bottom-left, status bottom-right)
-
-private struct LibraryTileView: View {
-
-    let item: CastingItem
-    let isSelected: Bool
-    var onDelete: (() -> Void)? = nil
-
-    var body: some View {
-        VStack(spacing: 3) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(tileColor.opacity(0.13))
-                    .frame(height: 56)
-                    .overlay {
-                        Image(systemName: tileIcon)
-                            .font(.system(size: 20))
-                            .foregroundStyle(tileColor.opacity(0.7))
-                    }
-
-                // X-icon top-right (only if deletable)
-                if let onDelete {
-                    VStack {
-                        HStack {
-                            Spacer()
-                            Button(action: onDelete) {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 12))
-                                    .symbolRenderingMode(.palette)
-                                    .foregroundStyle(.white, .secondary)
-                            }
-                            .buttonStyle(.plain)
-                            .padding(2)
-                        }
-                        Spacer()
-                    }
-                }
-
-                // Library level badge — bottom-left
-                VStack {
-                    Spacer()
-                    HStack {
-                        Text(item.libraryLevel.rawValue.prefix(2).uppercased())
-                            .font(.system(size: 8, weight: .bold))
-                            .padding(.horizontal, 3)
-                            .padding(.vertical, 1)
-                            .background(levelBadgeColor.opacity(0.2), in: RoundedRectangle(cornerRadius: 3))
-                            .foregroundStyle(levelBadgeColor)
-                            .padding(3)
-                        Spacer()
-                    }
-                }
-
-                // Status dot — bottom-right
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Circle()
-                            .fill(item.status.color)
-                            .frame(width: 6, height: 6)
-                            .padding(4)
-                    }
-                }
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1.5)
-            )
-
-            Text(item.name)
-                .font(.caption2)
-                .lineLimit(1)
-                .foregroundStyle(isSelected ? Color.accentColor : .primary)
-        }
-        .padding(3)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(isSelected ? Color.accentColor.opacity(0.07) : Color.clear)
-        )
-    }
-
-    private var tileColor: Color {
-        item.type == .character ? .blue : .teal
-    }
-
-    private var tileIcon: String {
-        if item.type == .character {
-            return item.gender?.icon ?? "person.fill"
-        } else {
-            return item.locationSetting?.icon ?? "map"
-        }
-    }
-
-    private var levelBadgeColor: Color {
-        switch item.libraryLevel {
+    private func levelBadgeColor(for level: LibraryLevel) -> Color {
+        switch level {
         case .studio:   return .purple
         case .customer: return .teal
         case .episode:  return .blue
         }
+    }
+
+    private func libraryTile(item: CastingItem) -> some View {
+        let isSelected = selectedItem?.id == item.id
+        let deleteAction: (() -> Void)? = item.isDefault ? nil : { onDelete?(item.id) }
+        return UnifiedThumbnailView(
+            itemType: item.thumbnailType,
+            name: item.name,
+            sizeMode: .standard,
+            badges: ThumbnailBadges(
+                assetStatus: item.assetStatusFlags,
+                showDeleteButton: deleteAction != nil,
+                onDelete: deleteAction,
+                levelBadgeText: String(item.libraryLevel.rawValue.prefix(2)).uppercased(),
+                levelBadgeColor: levelBadgeColor(for: item.libraryLevel),
+                showSelectionStroke: isSelected
+            )
+        )
+        .padding(3)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(isSelected ? Color.accentColor.opacity(0.07) : Color.clear)
+        )
     }
 }
 

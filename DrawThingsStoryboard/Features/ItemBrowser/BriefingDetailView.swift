@@ -83,6 +83,8 @@ struct BriefingDetailView: View {
     /// Local copy of the own look ID, synced with the binding.
     @State private var localLookID: String? = nil
     @State private var showLookPicker = false
+    @State private var showCastPicker = false
+    @State private var showLocationPicker = false
 
     /// Write the local look ID back to the studios binding.
     private func syncLookToBinding() {
@@ -192,13 +194,15 @@ struct BriefingDetailView: View {
                     onAdd: { showLookPicker = true }
                 )
 
-                // Cast & Locations (only shown for Episode level)
+                // Assets (only shown for Episode level)
                 if let characters = charactersBinding,
                    let locations = locationsBinding {
                     Divider().padding(.bottom, 12)
-                    EpisodeCastSection(
+                    EpisodeAssetsSection(
                         characters: characters,
-                        locations: locations
+                        locations: locations,
+                        onAddCast: { showCastPicker = true },
+                        onAddLocation: { showLocationPicker = true }
                     )
                 }
 
@@ -222,6 +226,58 @@ struct BriefingDetailView: View {
                 onCancel: { showLookPicker = false }
             )
         }
+        .sheet(isPresented: $showCastPicker) {
+            if let characters = charactersBinding {
+                AssetPickerView(
+                    title: "Add Cast Member",
+                    availableItems: availableCharacters,
+                    onSelect: { item in
+                        characters.wrappedValue.append(item)
+                        showCastPicker = false
+                    },
+                    onCancel: { showCastPicker = false }
+                )
+            }
+        }
+        .sheet(isPresented: $showLocationPicker) {
+            if let locations = locationsBinding {
+                AssetPickerView(
+                    title: "Add Location",
+                    availableItems: availableLocations,
+                    onSelect: { item in
+                        locations.wrappedValue.append(item)
+                        showLocationPicker = false
+                    },
+                    onCancel: { showLocationPicker = false }
+                )
+            }
+        }
+    }
+
+    // MARK: - Available items for pickers (library items not already assigned)
+
+    /// Characters from studio + customer level, minus those already in the episode.
+    private var availableCharacters: [CastingItem] {
+        guard let si = studioIndex else { return [] }
+        let studio = studios[si]
+        var pool = studio.characters.filter { $0.type == .character }
+        if let ci = customerIndex {
+            pool += studio.customers[ci].characters.filter { $0.type == .character }
+        }
+        let assignedIDs = Set(charactersBinding?.wrappedValue.map(\.id) ?? [])
+        return pool.filter { !assignedIDs.contains($0.id) }
+    }
+
+    /// Locations from studio + customer level, minus those already in the episode.
+    private var availableLocations: [CastingItem] {
+        guard let si = studioIndex else { return [] }
+        let studio = studios[si]
+        var pool = studio.locations.filter { $0.type == .location }
+        if let ci = customerIndex {
+            pool += studio.customers[ci].locations.filter { $0.type == .location }
+        }
+        let assignedIDs = Set(locationsBinding?.wrappedValue.map(\.id) ?? [])
+        return pool.filter { !assignedIDs.contains($0.id) }
     }
 }
 
@@ -321,8 +377,8 @@ private struct PreferredLookSection: View {
                         name: resolved.look.name,
                         sizeMode: .standard,
                         badges: ThumbnailBadges(
-                            showStatusDot: true,
-                            statusColor: resolved.look.lookStatus.color,
+                            showExampleIndicator: true,
+                            exampleAvailable: resolved.look.lookStatus == .exampleAvailable,
                             levelBadgeText: isInherited ? sourceBadge : nil,
                             levelBadgeColor: sourceColor,
                             showInheritanceArrow: isInherited
@@ -330,17 +386,7 @@ private struct PreferredLookSection: View {
                     )
                 }
 
-                if isInherited {
-                    Text("Inherited from \(resolved.source.label)")
-                        .font(.caption2)
-                        .foregroundStyle(sourceColor)
-                }
-                if !resolved.look.description.isEmpty {
-                    Text(resolved.look.description)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
+
             } else {
                 Text("No look assigned")
                     .font(.caption)
@@ -393,8 +439,8 @@ private struct LookPickerView: View {
                                 name: template.name,
                                 sizeMode: .standard,
                                 badges: ThumbnailBadges(
-                                    showStatusDot: true,
-                                    statusColor: template.lookStatus.color
+                                    showExampleIndicator: true,
+                                    exampleAvailable: template.lookStatus == .exampleAvailable
                                 )
                             )
                             .contentShape(Rectangle())
@@ -409,67 +455,56 @@ private struct LookPickerView: View {
     }
 }
 
-// MARK: - Episode cast & locations (embedded in briefing detail)
+// MARK: - Unified assets section (locations first, then cast)
 
-private struct EpisodeCastSection: View {
+private struct EpisodeAssetsSection: View {
     @Binding var characters: [CastingItem]
     @Binding var locations: [CastingItem]
+    let onAddCast: () -> Void
+    let onAddLocation: () -> Void
 
     private let columns = [GridItem(.adaptive(minimum: 288, maximum: 320), spacing: 12)]
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Characters
-            EpisodeCastSubSection(
-                title: "Cast",
-                items: $characters,
-                itemType: .character,
-                columns: columns
-            )
-
-            Divider().padding(.vertical, 8)
-
-            // Locations
-            EpisodeCastSubSection(
-                title: "Locations",
-                items: $locations,
-                itemType: .location,
-                columns: columns
-            )
-        }
+    /// Combined list: locations first, then characters.
+    private var allAssets: [CastingItem] {
+        locations + characters
     }
-}
-
-private struct EpisodeCastSubSection: View {
-    let title: String
-    @Binding var items: [CastingItem]
-    let itemType: CastingItemType
-    let columns: [GridItem]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            sectionLabel(title)
+            HStack {
+                sectionLabel("Assets")
+                Spacer()
+                Button(action: onAddLocation) {
+                    Label("Add Location", systemImage: "mappin.and.ellipse")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
 
-            if items.isEmpty {
-                Text("No \(title.lowercased()) yet.")
+                Button(action: onAddCast) {
+                    Label("Add Cast", systemImage: "person.badge.plus")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+            }
+
+            if allAssets.isEmpty {
+                Text("No assets assigned")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                     .padding(.vertical, 12)
             } else {
                 LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(items) { item in
+                    ForEach(allAssets) { item in
                         UnifiedThumbnailView(
                             itemType: item.thumbnailType,
                             name: item.name,
                             sizeMode: .standard,
                             badges: ThumbnailBadges(
-                                showStatusDot: true,
-                                statusColor: item.status.color,
+                                assetStatus: item.assetStatusFlags,
                                 showDeleteButton: true,
                                 onDelete: {
-                                    if let idx = items.firstIndex(where: { $0.id == item.id }) {
-                                        items.remove(at: idx)
-                                    }
+                                    removeAsset(item)
                                 }
                             )
                         )
@@ -478,5 +513,74 @@ private struct EpisodeCastSubSection: View {
             }
         }
         .padding(.bottom, 8)
+    }
+
+    private func removeAsset(_ item: CastingItem) {
+        switch item.type {
+        case .character:
+            if let idx = characters.firstIndex(where: { $0.id == item.id }) {
+                characters.remove(at: idx)
+            }
+        case .location:
+            if let idx = locations.firstIndex(where: { $0.id == item.id }) {
+                locations.remove(at: idx)
+            }
+        }
+    }
+}
+
+// MARK: - Asset picker sheet (reusable for cast & locations)
+
+private struct AssetPickerView: View {
+    let title: String
+    let availableItems: [CastingItem]
+    let onSelect: (CastingItem) -> Void
+    let onCancel: () -> Void
+
+    private let columns = [GridItem(.adaptive(minimum: 288, maximum: 320), spacing: 12)]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(title)
+                    .font(.headline)
+                Spacer()
+                Button("Cancel", action: onCancel)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            }
+            .padding()
+
+            Divider()
+
+            if availableItems.isEmpty {
+                Spacer()
+                ContentUnavailableView(
+                    "No items available",
+                    systemImage: "tray",
+                    description: Text("All library items are already assigned, or none exist at studio/customer level.")
+                )
+                Spacer()
+            } else {
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: 12) {
+                        ForEach(availableItems) { item in
+                            UnifiedThumbnailView(
+                                itemType: item.thumbnailType,
+                                name: item.name,
+                                sizeMode: .standard,
+                                badges: ThumbnailBadges(
+                                    assetStatus: item.assetStatusFlags
+                                )
+                            )
+                            .contentShape(Rectangle())
+                            .onTapGesture { onSelect(item) }
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+        }
+        .frame(minWidth: 400, minHeight: 350)
     }
 }

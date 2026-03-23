@@ -67,6 +67,35 @@ struct ContentView: View {
         return $studios[si].customers[ci].episodes[ei].acts
     }
 
+    /// Resolved preferred look name for the current episode (own → customer → studio).
+    private var resolvedLookName: String? {
+        guard let si = selectedStudioIndex else { return nil }
+        let studio = studios[si]
+
+        // Episode's own look
+        if let ci = selectedCustomerIndex, let ei = selectedEpisodeIndex {
+            let episode = studio.customers[ci].episodes[ei]
+            if let id = episode.preferredLookID,
+               let t = templates.first(where: { $0.id == id }) {
+                return t.name
+            }
+        }
+        // Customer's look
+        if let ci = selectedCustomerIndex {
+            let customer = studio.customers[ci]
+            if let id = customer.preferredLookID,
+               let t = templates.first(where: { $0.id == id }) {
+                return t.name
+            }
+        }
+        // Studio's look
+        if let id = studio.preferredLookID,
+           let t = templates.first(where: { $0.id == id }) {
+            return t.name
+        }
+        return nil
+    }
+
     /// Window title: "Draw Things Storyboard - <Episode Name>"
     private var windowTitle: String {
         "Draw Things Storyboard - \(currentEpisodeName)"
@@ -85,6 +114,7 @@ struct ContentView: View {
                     studios: $studios,
                     selectedItem: $selectedAssetItem,
                     libraryRefreshToken: $libraryRefreshToken,
+                    generationQueue: $generationQueue,
                     studioIndex: selectedStudioIndex ?? 0,
                     customerIndex: selectedCustomerIndex ?? 0,
                     episodeIndex: selectedEpisodeIndex ?? 0
@@ -102,7 +132,8 @@ struct ContentView: View {
             case .storyboard:
                 StoryboardBrowserView(
                     acts: currentEpisodeActsBinding,
-                    selection: $storyboardSelection
+                    selection: $storyboardSelection,
+                    lookName: resolvedLookName
                 )
             default:
                 ItemBrowserView(
@@ -141,7 +172,12 @@ struct ContentView: View {
             case .storyboard:
                 StoryboardDetailView(
                     acts: currentEpisodeActsBinding,
-                    selection: storyboardSelection
+                    selection: storyboardSelection,
+                    generationQueue: $generationQueue,
+                    studios: studios,
+                    studioIndex: selectedStudioIndex ?? 0,
+                    customerIndex: selectedCustomerIndex ?? 0,
+                    episodeIndex: selectedEpisodeIndex ?? 0
                 )
             case .projects:
                 ItemDetailView(
@@ -179,6 +215,13 @@ struct ContentView: View {
         .onAppear {
             // Ensure there is always at least one studio → customer → episode selected.
             ensureSelection()
+        }
+        .onChange(of: selectedEpisodeID) { _, _ in
+            // Ensure the newly selected episode has a minimal storyboard
+            guard let si = selectedStudioIndex,
+                  let ci = selectedCustomerIndex,
+                  let ei = selectedEpisodeIndex else { return }
+            ensureMinimalStoryboard(studioIndex: si, customerIndex: ci, episodeIndex: ei)
         }
     }
 
@@ -218,6 +261,60 @@ struct ContentView: View {
             ))
         }
         if selectedEpisodeID == nil { selectedEpisodeID = studios[si].customers[ci].episodes[0].id }
+
+        // Ensure the selected episode has a minimal storyboard structure
+        let ei = studios[si].customers[ci].episodes.firstIndex { $0.id == selectedEpisodeID } ?? 0
+        ensureMinimalStoryboard(studioIndex: si, customerIndex: ci, episodeIndex: ei)
+    }
+
+    /// Guarantees the episode at the given indices has at least
+    /// 1 Act > 1 Sequence > 1 Scene > 1 Panel.
+    private func ensureMinimalStoryboard(studioIndex si: Int, customerIndex ci: Int, episodeIndex ei: Int) {
+        if studios[si].customers[ci].episodes[ei].acts.isEmpty {
+            studios[si].customers[ci].episodes[ei].acts.append(
+                MockAct(
+                    id: UUID().uuidString,
+                    name: "Act 1",
+                    description: "",
+                    sequences: []
+                )
+            )
+        }
+        for ai in studios[si].customers[ci].episodes[ei].acts.indices {
+            if studios[si].customers[ci].episodes[ei].acts[ai].sequences.isEmpty {
+                studios[si].customers[ci].episodes[ei].acts[ai].sequences.append(
+                    MockSequence(
+                        id: UUID().uuidString,
+                        name: "Sequence 1",
+                        description: "",
+                        scenes: []
+                    )
+                )
+            }
+            for seqi in studios[si].customers[ci].episodes[ei].acts[ai].sequences.indices {
+                if studios[si].customers[ci].episodes[ei].acts[ai].sequences[seqi].scenes.isEmpty {
+                    studios[si].customers[ci].episodes[ei].acts[ai].sequences[seqi].scenes.append(
+                        MockScene(
+                            id: UUID().uuidString,
+                            name: "Scene 1",
+                            description: "",
+                            panels: []
+                        )
+                    )
+                }
+                for sci in studios[si].customers[ci].episodes[ei].acts[ai].sequences[seqi].scenes.indices {
+                    if studios[si].customers[ci].episodes[ei].acts[ai].sequences[seqi].scenes[sci].panels.isEmpty {
+                        studios[si].customers[ci].episodes[ei].acts[ai].sequences[seqi].scenes[sci].panels.append(
+                            MockPanel(
+                                id: UUID().uuidString,
+                                name: "Panel 1",
+                                description: ""
+                            )
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

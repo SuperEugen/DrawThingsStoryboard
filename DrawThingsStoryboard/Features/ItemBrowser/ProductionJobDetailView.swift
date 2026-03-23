@@ -49,6 +49,14 @@ struct ProductionJobDetailView: View {
                     }
                     .padding(.bottom, 12)
 
+                    // Size
+                    VStack(alignment: .leading, spacing: 6) {
+                        sectionLabel("Size")
+                        Text(job.size.rawValue)
+                            .font(.callout)
+                    }
+                    .padding(.bottom, 12)
+
                     // Look
                     VStack(alignment: .leading, spacing: 6) {
                         sectionLabel("Look")
@@ -118,10 +126,20 @@ struct ProductionJobDetailView: View {
                     }
                     .padding(.bottom, 12)
 
+                    // Variant count (if applicable)
+                    if job.variantCount > 0 {
+                        VStack(alignment: .leading, spacing: 6) {
+                            sectionLabel("Variants")
+                            Text("\(job.variantCount)")
+                                .font(.callout)
+                        }
+                        .padding(.bottom, 12)
+                    }
+
                     // Seed
                     VStack(alignment: .leading, spacing: 6) {
                         sectionLabel("Seed")
-                        Text("\(job.seed)")
+                        Text(job.seed == -1 ? "random" : "\(job.seed)")
                             .font(.callout.monospaced())
                     }
                     .padding(.bottom, 12)
@@ -195,11 +213,11 @@ struct ProductionJobDetailView: View {
 
     private func jobThumbnailType(_ job: GenerationJob) -> ThumbnailItemType {
         switch job.jobType {
-        case .generatePreviewPanel, .generateFinalPanel:
+        case .generatePanel:
             return .panel
         case .generateExample:
             return .look
-        default:
+        case .generateAsset:
             return job.itemType == .character
                 ? .character(gender: job.itemGender)
                 : .location(setting: job.itemLocationSetting)

@@ -53,11 +53,27 @@ struct MockPanel: Identifiable {
     let id: String
     var name: String
     var description: String
-    var status: GenerationStatus
-    var variants: [Variant]
+    var smallPanelAvailable: Bool = false
+    var largePanelAvailable: Bool = false
+    /// IDs of attached CastingItems (0–4 items, max 1 location).
+    var attachedAssetIDs: [String] = []
+    /// Generated file name (read-only display, schema TBD).
+    var fileName: String = ""
+}
 
-    /// Convenience: number of generated (non-empty) variants.
-    var generatedCount: Int { variants.filter(\.isGenerated).count }
+/// S/L status flags for panel thumbnails.
+struct PanelStatusFlags {
+    var smallPanelAvailable: Bool
+    var largePanelAvailable: Bool
+}
+
+extension MockPanel {
+    var panelStatusFlags: PanelStatusFlags {
+        PanelStatusFlags(
+            smallPanelAvailable: smallPanelAvailable,
+            largePanelAvailable: largePanelAvailable
+        )
+    }
 }
 
 struct MockScene: Identifiable {
@@ -101,8 +117,8 @@ extension MockData {
                             name: "City Establishing",
                             description: "Wide shot of the city at night, rain-soaked streets.",
                             panels: [
-                                MockPanel(id: "pnl-01", name: "Skyline Wide", description: "Wide city skyline.", status: .finalGenerated, variants: CastingItem.mockVariants(prefix: "pnl-01", generated: 4, approved: 2)),
-                                MockPanel(id: "pnl-02", name: "Street Level", description: "Rain on the street.", status: .variantsGenerated, variants: CastingItem.mockVariants(prefix: "pnl-02", generated: 4, approved: nil)),
+                                MockPanel(id: "pnl-01", name: "Skyline Wide", description: "Wide city skyline.", smallPanelAvailable: true, largePanelAvailable: true, attachedAssetIDs: ["pf-lo-01"]),
+                                MockPanel(id: "pnl-02", name: "Street Level", description: "Rain on the street.", smallPanelAvailable: true, attachedAssetIDs: ["gm-p-ch-01", "pf-lo-01"]),
                             ]
                         ),
                         MockScene(
@@ -110,7 +126,7 @@ extension MockData {
                             name: "Intro",
                             description: "Alex walks through the rain.",
                             panels: [
-                                MockPanel(id: "pnl-03", name: "Alex Walking", description: "Alex in a trenchcoat.", status: .nothingGenerated, variants: CastingItem.emptyVariants(prefix: "pnl-03")),
+                                MockPanel(id: "pnl-03", name: "Alex Walking", description: "Alex in a trenchcoat.", attachedAssetIDs: ["gm-p-ch-01"]),
                             ]
                         ),
                     ]
@@ -125,8 +141,8 @@ extension MockData {
                             name: "Childhood Home",
                             description: "Young Alex in a sunlit living room, family photos on the wall.",
                             panels: [
-                                MockPanel(id: "pnl-07", name: "Family Portrait", description: "Close-up of a framed family photo.", status: .variantApproved, variants: CastingItem.mockVariants(prefix: "pnl-07", generated: 4, approved: 0)),
-                                MockPanel(id: "pnl-08", name: "Window Light", description: "Sunlight streaming through curtains.", status: .variantsGenerated, variants: CastingItem.mockVariants(prefix: "pnl-08", generated: 4, approved: nil)),
+                                MockPanel(id: "pnl-07", name: "Family Portrait", description: "Close-up of a framed family photo.", smallPanelAvailable: true),
+                                MockPanel(id: "pnl-08", name: "Window Light", description: "Sunlight streaming through curtains.", smallPanelAvailable: true),
                             ]
                         ),
                         MockScene(
@@ -134,7 +150,7 @@ extension MockData {
                             name: "The Promise",
                             description: "Alex makes a promise at a graveside.",
                             panels: [
-                                MockPanel(id: "pnl-09", name: "Gravestone", description: "Rain on a gravestone.", status: .nothingGenerated, variants: CastingItem.emptyVariants(prefix: "pnl-09")),
+                                MockPanel(id: "pnl-09", name: "Gravestone", description: "Rain on a gravestone."),
                             ]
                         ),
                     ]
@@ -156,8 +172,8 @@ extension MockData {
                             name: "Office Break-In",
                             description: "Alex sneaks into the corporate office after hours.",
                             panels: [
-                                MockPanel(id: "pnl-10", name: "Hallway Shadows", description: "Alex creeping through a dark hallway.", status: .variantsGenerated, variants: CastingItem.mockVariants(prefix: "pnl-10", generated: 4, approved: nil)),
-                                MockPanel(id: "pnl-11", name: "Computer Screen", description: "Incriminating data on a monitor.", status: .nothingGenerated, variants: CastingItem.emptyVariants(prefix: "pnl-11")),
+                                MockPanel(id: "pnl-10", name: "Hallway Shadows", description: "Alex creeping through a dark hallway.", smallPanelAvailable: true),
+                                MockPanel(id: "pnl-11", name: "Computer Screen", description: "Incriminating data on a monitor."),
                             ]
                         ),
                         MockScene(
@@ -165,8 +181,8 @@ extension MockData {
                             name: "Caught",
                             description: "Security catches Alex red-handed.",
                             panels: [
-                                MockPanel(id: "pnl-12", name: "Flashlight Beam", description: "A flashlight beam sweeps across the room.", status: .nothingGenerated, variants: CastingItem.emptyVariants(prefix: "pnl-12")),
-                                MockPanel(id: "pnl-13", name: "Alarm", description: "Red alarm lights flash.", status: .nothingGenerated, variants: CastingItem.emptyVariants(prefix: "pnl-13")),
+                                MockPanel(id: "pnl-12", name: "Flashlight Beam", description: "A flashlight beam sweeps across the room."),
+                                MockPanel(id: "pnl-13", name: "Alarm", description: "Red alarm lights flash."),
                             ]
                         ),
                     ]
@@ -181,8 +197,8 @@ extension MockData {
                             name: "Rooftop",
                             description: "Alex chases Jordan across rooftops.",
                             panels: [
-                                MockPanel(id: "pnl-04", name: "Leap", description: "Alex leaps between buildings.", status: .variantApproved, variants: CastingItem.mockVariants(prefix: "pnl-04", generated: 4, approved: 1)),
-                                MockPanel(id: "pnl-05", name: "Confrontation", description: "Face to face on the ledge.", status: .nothingGenerated, variants: CastingItem.emptyVariants(prefix: "pnl-05")),
+                                MockPanel(id: "pnl-04", name: "Leap", description: "Alex leaps between buildings.", smallPanelAvailable: true, largePanelAvailable: true, attachedAssetIDs: ["gm-p-ch-01", "gm-p-lo-01"]),
+                                MockPanel(id: "pnl-05", name: "Confrontation", description: "Face to face on the ledge.", attachedAssetIDs: ["gm-p-ch-01", "gm-p-ch-02"]),
                             ]
                         ),
                         MockScene(
@@ -190,8 +206,8 @@ extension MockData {
                             name: "Alley Escape",
                             description: "Alex escapes through narrow alleys.",
                             panels: [
-                                MockPanel(id: "pnl-14", name: "Dumpster Hide", description: "Alex hides behind a dumpster.", status: .nothingGenerated, variants: CastingItem.emptyVariants(prefix: "pnl-14")),
-                                MockPanel(id: "pnl-15", name: "Fence Jump", description: "Alex vaults over a chain-link fence.", status: .variantsGenerated, variants: CastingItem.mockVariants(prefix: "pnl-15", generated: 4, approved: nil)),
+                                MockPanel(id: "pnl-14", name: "Dumpster Hide", description: "Alex hides behind a dumpster."),
+                                MockPanel(id: "pnl-15", name: "Fence Jump", description: "Alex vaults over a chain-link fence.", smallPanelAvailable: true),
                             ]
                         ),
                     ]
@@ -206,9 +222,9 @@ extension MockData {
                             name: "Safe House",
                             description: "Alex and Sam meet in a hidden safe house.",
                             panels: [
-                                MockPanel(id: "pnl-16", name: "Map on Wall", description: "A wall covered with photos and red string.", status: .finalGenerated, variants: CastingItem.mockVariants(prefix: "pnl-16", generated: 4, approved: 3)),
-                                MockPanel(id: "pnl-17", name: "Sam Explains", description: "Sam points at the conspiracy board.", status: .variantApproved, variants: CastingItem.mockVariants(prefix: "pnl-17", generated: 4, approved: 0)),
-                                MockPanel(id: "pnl-18", name: "Alex Reacts", description: "Close-up of Alex's shocked face.", status: .nothingGenerated, variants: CastingItem.emptyVariants(prefix: "pnl-18")),
+                                MockPanel(id: "pnl-16", name: "Map on Wall", description: "A wall covered with photos and red string.", smallPanelAvailable: true, largePanelAvailable: true),
+                                MockPanel(id: "pnl-17", name: "Sam Explains", description: "Sam points at the conspiracy board.", smallPanelAvailable: true),
+                                MockPanel(id: "pnl-18", name: "Alex Reacts", description: "Close-up of Alex's shocked face."),
                             ]
                         ),
                     ]
@@ -230,8 +246,8 @@ extension MockData {
                             name: "Gearing Up",
                             description: "Alex gathers equipment in a dimly lit garage.",
                             panels: [
-                                MockPanel(id: "pnl-19", name: "Workbench", description: "Tools and gadgets spread on a workbench.", status: .nothingGenerated, variants: CastingItem.emptyVariants(prefix: "pnl-19")),
-                                MockPanel(id: "pnl-20", name: "Mirror Shot", description: "Alex looks at their reflection, determined.", status: .nothingGenerated, variants: CastingItem.emptyVariants(prefix: "pnl-20")),
+                                MockPanel(id: "pnl-19", name: "Workbench", description: "Tools and gadgets spread on a workbench."),
+                                MockPanel(id: "pnl-20", name: "Mirror Shot", description: "Alex looks at their reflection, determined."),
                             ]
                         ),
                     ]
@@ -246,8 +262,8 @@ extension MockData {
                             name: "Showdown",
                             description: "The climactic showdown in the underground station.",
                             panels: [
-                                MockPanel(id: "pnl-06", name: "Standoff", description: "Tense standoff under flickering lights.", status: .nothingGenerated, variants: CastingItem.emptyVariants(prefix: "pnl-06")),
-                                MockPanel(id: "pnl-21", name: "Final Blow", description: "The decisive moment of the fight.", status: .nothingGenerated, variants: CastingItem.emptyVariants(prefix: "pnl-21")),
+                                MockPanel(id: "pnl-06", name: "Standoff", description: "Tense standoff under flickering lights.", attachedAssetIDs: ["gm-p-ch-01", "gm-p-ch-02", "pf-ch-01", "gm-p-lo-01"]),
+                                MockPanel(id: "pnl-21", name: "Final Blow", description: "The decisive moment of the fight."),
                             ]
                         ),
                         MockScene(
@@ -255,8 +271,8 @@ extension MockData {
                             name: "Aftermath",
                             description: "The dust settles, dawn breaks over the city.",
                             panels: [
-                                MockPanel(id: "pnl-22", name: "Sunrise", description: "Golden sunrise over the city skyline.", status: .nothingGenerated, variants: CastingItem.emptyVariants(prefix: "pnl-22")),
-                                MockPanel(id: "pnl-23", name: "Alex Walks Away", description: "Alex walks into the morning light.", status: .nothingGenerated, variants: CastingItem.emptyVariants(prefix: "pnl-23")),
+                                MockPanel(id: "pnl-22", name: "Sunrise", description: "Golden sunrise over the city skyline.", smallPanelAvailable: true),
+                                MockPanel(id: "pnl-23", name: "Alex Walks Away", description: "Alex walks into the morning light."),
                             ]
                         ),
                     ]

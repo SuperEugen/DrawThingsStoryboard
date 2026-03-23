@@ -137,6 +137,25 @@ struct AssetDetailPane: View {
                 isEditingLibraryItem = true
             }
         }
+        .onChange(of: editingItem) { oldItem, newItem in
+            // Auto-sync variant/status changes back to studios for library items.
+            // Only sync when variant-related fields changed, not text edits.
+            guard isEditingLibraryItem,
+                  let old = oldItem, let new = newItem,
+                  old.variants != new.variants
+                    || old.variantsAvailable != new.variantsAvailable
+                    || old.smallImageAvailable != new.smallImageAvailable
+                    || old.largeImageAvailable != new.largeImageAvailable
+            else { return }
+            updateItemInStudios(new)
+            // Also update the original's variant state so Accept Changes
+            // only tracks text/metadata edits, not variant operations.
+            originalItem?.variants = new.variants
+            originalItem?.variantsAvailable = new.variantsAvailable
+            originalItem?.smallImageAvailable = new.smallImageAvailable
+            originalItem?.largeImageAvailable = new.largeImageAvailable
+            libraryRefreshToken = UUID()
+        }
     }
 
     private func createNewItem(type: CastingItemType) {
@@ -148,7 +167,6 @@ struct AssetDetailPane: View {
             type: type,
             gender: type == .character ? .male : nil,
             locationSetting: type == .location ? .interior : nil,
-            status: .nothingGenerated,
             libraryLevel: .episode,
             variants: CastingItem.emptyVariants(prefix: newID)
         )

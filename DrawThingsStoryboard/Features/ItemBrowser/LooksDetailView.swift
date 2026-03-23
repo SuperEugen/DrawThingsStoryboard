@@ -36,11 +36,14 @@ struct LooksDetailView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         sectionLabel("Status")
                         HStack(spacing: 8) {
-                            Circle()
-                                .fill(templates[idx].lookStatus.color)
-                                .frame(width: 8, height: 8)
-                            Text(templates[idx].lookStatus.rawValue)
+                            Text("E")
+                                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                .foregroundStyle(templates[idx].lookStatus == .exampleAvailable ? .green : .gray)
+                            Text("Example available:")
                                 .font(.callout)
+                            Text(templates[idx].lookStatus == .exampleAvailable ? "yes" : "not yet")
+                                .font(.callout)
+                                .foregroundStyle(templates[idx].lookStatus == .exampleAvailable ? .green : .secondary)
                             Spacer()
                             if templates[idx].lookStatus == .noExample {
                                 if generationQueue.contains(where: { $0.itemName == templates[idx].name && $0.jobType == .generateExample }) {
@@ -91,22 +94,9 @@ struct LooksDetailView: View {
 
                     Divider().padding(.vertical, 8)
 
-                    // Generation type (exclude generateExample — that's for looks only)
+                    // Average Duration Variant
                     VStack(alignment: .leading, spacing: 6) {
-                        sectionLabel("Generation Type")
-                        Picker("Generation Type", selection: $templates[idx].jobType) {
-                            Text("Generate Variants").tag(GenerationJobType.generateVariants)
-                            Text("Generate Final").tag(GenerationJobType.generateFinal)
-                        }
-                        .pickerStyle(.segmented)
-                    }
-                    .padding(.bottom, 12)
-
-                    Divider().padding(.vertical, 8)
-
-                    // Average Duration
-                    VStack(alignment: .leading, spacing: 6) {
-                        sectionLabel("Average Duration")
+                        sectionLabel("Average Duration Variant")
                         HStack(spacing: 6) {
                             TextField("Seconds", value: $templates[idx].averageDuration, format: .number)
                                 .textFieldStyle(.roundedBorder)
@@ -116,6 +106,24 @@ struct LooksDetailView: View {
                                 .foregroundStyle(.secondary)
                             Spacer()
                             Text(durationString(templates[idx].averageDuration))
+                                .font(.callout)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .padding(.bottom, 12)
+
+                    // Average Duration Large Image
+                    VStack(alignment: .leading, spacing: 6) {
+                        sectionLabel("Average Duration Large Image")
+                        HStack(spacing: 6) {
+                            TextField("Seconds", value: $templates[idx].averageDurationLargeImage, format: .number)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 80)
+                            Text("seconds")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text(durationString(templates[idx].averageDurationLargeImage))
                                 .font(.callout)
                                 .foregroundStyle(.tertiary)
                         }
@@ -168,11 +176,12 @@ struct LooksDetailView: View {
             itemName: template.name,
             itemType: template.itemType,
             jobType: .generateExample,
+            size: .small,
             lookName: template.name,
             queuedAt: Date(),
             estimatedDuration: TimeInterval(template.averageDuration),
             itemIcon: template.itemType == .character ? "person.fill" : "map",
-            seed: Int.random(in: 1...999_999),
+            seed: Int64.random(in: 1...999_999),
             width: previewVariantWidth,
             height: previewVariantHeight,
             combinedPrompt: template.description

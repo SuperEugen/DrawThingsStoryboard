@@ -8,6 +8,8 @@ struct StoryboardBrowserView: View {
 
     @Binding var acts: [MockAct]
     @Binding var selection: StoryboardSelection?
+    /// Name of the resolved preferred look for the current episode.
+    var lookName: String? = nil
 
     /// Tracks which IDs are collapsed (hidden children). Expanded by default.
     @State private var collapsedIDs: Set<String> = []
@@ -21,6 +23,11 @@ struct StoryboardBrowserView: View {
                     .foregroundStyle(.secondary)
                 Text("Storyboard")
                     .font(.title2.bold())
+                if let lookName {
+                    Text("— \(lookName)")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
             }
             .padding(.horizontal, 14)
@@ -28,32 +35,22 @@ struct StoryboardBrowserView: View {
 
             Divider()
 
-            if acts.isEmpty {
-                Spacer()
-                ContentUnavailableView(
-                    "No acts yet",
-                    systemImage: "theatermask.and.paintbrush",
-                    description: Text("Add an act to start building your storyboard.")
-                )
-                Spacer()
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(Array(acts.enumerated()), id: \.element.id) { actIdx, _ in
-                            ActSectionView(
-                                acts: $acts,
-                                actIndex: actIdx,
-                                selection: $selection,
-                                collapsedIDs: $collapsedIDs
-                            )
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(acts.enumerated()), id: \.element.id) { actIdx, _ in
+                        ActSectionView(
+                            acts: $acts,
+                            actIndex: actIdx,
+                            selection: $selection,
+                            collapsedIDs: $collapsedIDs
+                        )
 
-                            if actIdx < acts.count - 1 {
-                                Divider().padding(.vertical, 6).padding(.horizontal, 14)
-                            }
+                        if actIdx < acts.count - 1 {
+                            Divider().padding(.vertical, 6).padding(.horizontal, 14)
                         }
                     }
-                    .padding(.bottom, 16)
                 }
+                .padding(.bottom, 16)
             }
         }
         .background(Color(NSColor.windowBackgroundColor))
@@ -129,7 +126,9 @@ private struct ActSectionView: View {
                             id: UUID().uuidString,
                             name: "New Scene",
                             description: "",
-                            panels: []
+                            panels: [
+                                MockPanel(id: UUID().uuidString, name: "New Panel", description: "")
+                            ]
                         )
                     ]
                 )
@@ -212,7 +211,9 @@ private struct SequenceSectionView: View {
                     id: UUID().uuidString,
                     name: "New Scene",
                     description: "",
-                    panels: []
+                    panels: [
+                        MockPanel(id: UUID().uuidString, name: "New Panel", description: "")
+                    ]
                 )
             ]
         )
@@ -244,7 +245,7 @@ private struct SceneSectionView: View {
     @Binding var selection: StoryboardSelection?
     @Binding var collapsedIDs: Set<String>
 
-    private let columns = [GridItem(.adaptive(minimum: 100, maximum: 140), spacing: 8)]
+    private let columns = [GridItem(.adaptive(minimum: 288, maximum: 320), spacing: 12)]
 
     private var scene: MockScene { scenes[sceneIndex] }
 
@@ -272,7 +273,7 @@ private struct SceneSectionView: View {
             )
             .padding(.leading, 32)
 
-            // Panel thumbnails with + / - in a small toolbar
+            // Panel thumbnails with + button
             if !isCollapsed {
                 if !scene.panels.isEmpty {
                     LazyVGrid(columns: columns, spacing: 8) {
@@ -280,7 +281,9 @@ private struct SceneSectionView: View {
                             StoryboardPanelTileView(
                                 panel: panel,
                                 isSelected: selection == .panel(panel.id),
-                                onTap: { selection = .panel(panel.id) }
+                                canDelete: scene.panels.count > 1,
+                                onTap: { selection = .panel(panel.id) },
+                                onDelete: { removePanel(id: panel.id) }
                             )
                         }
                     }
@@ -288,17 +291,9 @@ private struct SceneSectionView: View {
                     .padding(.vertical, 4)
                 }
 
-                // Panel + / - buttons
+                // Panel + button
                 HStack {
                     Spacer()
-                    Button(action: removePanel) {
-                        Image(systemName: "minus")
-                            .frame(width: 22, height: 22)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
-                    .disabled(!canRemovePanel)
-
                     Button(action: addPanel) {
                         Image(systemName: "plus")
                             .frame(width: 22, height: 22)
@@ -312,32 +307,22 @@ private struct SceneSectionView: View {
         }
     }
 
-    private var canRemovePanel: Bool {
-        guard case .panel(let id) = selection else { return false }
-        return scene.panels.contains { $0.id == id }
-    }
-
     private func addPanel() {
         let newPanel = MockPanel(
             id: UUID().uuidString,
             name: "New Panel",
-            description: "",
-            status: .nothingGenerated
+            description: ""
         )
         scenes[sceneIndex].panels.append(newPanel)
         selection = .panel(newPanel.id)
     }
 
-    private func removePanel() {
-        guard case .panel(let id) = selection,
+    private func removePanel(id: String) {
+        guard scenes[sceneIndex].panels.count > 1,
               let idx = scenes[sceneIndex].panels.firstIndex(where: { $0.id == id }) else { return }
         scenes[sceneIndex].panels.remove(at: idx)
-        if scenes[sceneIndex].panels.isEmpty {
-            selection = .scene(scene.id)
-        } else {
-            let fallbackIdx = min(idx, scenes[sceneIndex].panels.count - 1)
-            selection = .panel(scenes[sceneIndex].panels[fallbackIdx].id)
-        }
+        let fallbackIdx = min(idx, scenes[sceneIndex].panels.count - 1)
+        selection = .panel(scenes[sceneIndex].panels[fallbackIdx].id)
     }
 
     private func addScene() {
@@ -345,7 +330,9 @@ private struct SceneSectionView: View {
             id: UUID().uuidString,
             name: "New Scene",
             description: "",
-            panels: []
+            panels: [
+                MockPanel(id: UUID().uuidString, name: "New Panel", description: "")
+            ]
         )
         scenes.insert(newScene, at: sceneIndex + 1)
         selection = .scene(newScene.id)
@@ -442,45 +429,25 @@ private struct StoryboardOutlineHeader: View {
 private struct StoryboardPanelTileView: View {
     let panel: MockPanel
     let isSelected: Bool
+    let canDelete: Bool
     let onTap: () -> Void
+    let onDelete: () -> Void
 
     var body: some View {
-        VStack(spacing: 3) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(StoryboardLevel.panel.color.opacity(0.13))
-                    .frame(height: 64)
-                    .overlay {
-                        Image(systemName: "photo")
-                            .font(.system(size: 20))
-                            .foregroundStyle(StoryboardLevel.panel.color.opacity(0.7))
-                    }
-
-                // Status dot — bottom-right
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Circle()
-                            .fill(panel.status.color)
-                            .frame(width: 6, height: 6)
-                            .padding(4)
-                    }
-                }
-            }
-            .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1.5)
+        UnifiedThumbnailView(
+            itemType: .panel,
+            name: panel.name,
+            sizeMode: .standard,
+            badges: ThumbnailBadges(
+                panelStatus: panel.panelStatusFlags,
+                showDeleteButton: canDelete,
+                onDelete: onDelete,
+                showSelectionStroke: isSelected
             )
-
-            Text(panel.name)
-                .font(.caption2)
-                .lineLimit(1)
-                .foregroundStyle(isSelected ? Color.accentColor : .primary)
-        }
+        )
         .padding(3)
         .background(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 12)
                 .fill(isSelected ? Color.accentColor.opacity(0.07) : Color.clear)
         )
         .onTapGesture { onTap() }

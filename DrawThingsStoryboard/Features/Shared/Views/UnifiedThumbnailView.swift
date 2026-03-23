@@ -76,11 +76,31 @@ enum ThumbnailSizeMode {
     }
 }
 
+// MARK: - Asset status flags (V/S/L indicator)
+
+/// Three-flag status indicator for CastingItem thumbnails.
+struct AssetStatusFlags {
+    var variantsAvailable: Bool
+    var smallImageAvailable: Bool
+    var largeImageAvailable: Bool
+}
+
 // MARK: - Badge configuration
 
 struct ThumbnailBadges {
     var showStatusDot: Bool = false
     var statusColor: Color = .gray
+
+    /// V/S/L status flags for casting items. When set, replaces the status dot.
+    var assetStatus: AssetStatusFlags? = nil
+
+    /// S/L status flags for panel thumbnails.
+    var panelStatus: PanelStatusFlags? = nil
+
+    /// "E" indicator for looks (Example available). When true, shows an E letter badge.
+    var showExampleIndicator: Bool = false
+    /// Whether the example is available (green) or not (gray).
+    var exampleAvailable: Bool = false
 
     var showDeleteButton: Bool = false
     var onDelete: (() -> Void)? = nil
@@ -116,6 +136,8 @@ struct UnifiedThumbnailView: View {
 
                 badgeOverlays
             }
+            .frame(width: sizeMode.width, height: sizeMode.height)
+            .clipped()
             .overlay(selectionStroke)
 
             if sizeMode != .compact && !name.isEmpty {
@@ -202,8 +224,60 @@ struct UnifiedThumbnailView: View {
             }
         }
 
-        // Bottom-right: Status dot
-        if badges.showStatusDot {
+        // Bottom-right: V/S/L indicator, S/L panel indicator, E indicator, or status dot
+        if let flags = badges.assetStatus {
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    HStack(spacing: sizeMode == .compact ? 1 : 2) {
+                        Text("V")
+                            .foregroundStyle(flags.variantsAvailable ? .green : .gray)
+                        Text("S")
+                            .foregroundStyle(flags.smallImageAvailable ? .green : .gray)
+                        Text("L")
+                            .foregroundStyle(flags.largeImageAvailable ? .green : .gray)
+                    }
+                    .font(.system(size: sizeMode == .compact ? 6 : 8, weight: .bold, design: .monospaced))
+                    .padding(.horizontal, sizeMode == .compact ? 2 : 4)
+                    .padding(.vertical, 1)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 3))
+                    .padding(sizeMode == .compact ? 2 : 4)
+                }
+            }
+        } else if let flags = badges.panelStatus {
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    HStack(spacing: sizeMode == .compact ? 1 : 2) {
+                        Text("S")
+                            .foregroundStyle(flags.smallPanelAvailable ? .green : .gray)
+                        Text("L")
+                            .foregroundStyle(flags.largePanelAvailable ? .green : .gray)
+                    }
+                    .font(.system(size: sizeMode == .compact ? 6 : 8, weight: .bold, design: .monospaced))
+                    .padding(.horizontal, sizeMode == .compact ? 2 : 4)
+                    .padding(.vertical, 1)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 3))
+                    .padding(sizeMode == .compact ? 2 : 4)
+                }
+            }
+        } else if badges.showExampleIndicator {
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Text("E")
+                        .foregroundStyle(badges.exampleAvailable ? .green : .gray)
+                        .font(.system(size: sizeMode == .compact ? 6 : 8, weight: .bold, design: .monospaced))
+                        .padding(.horizontal, sizeMode == .compact ? 2 : 4)
+                        .padding(.vertical, 1)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 3))
+                        .padding(sizeMode == .compact ? 2 : 4)
+                }
+            }
+        } else if badges.showStatusDot {
             VStack {
                 Spacer()
                 HStack {
@@ -240,6 +314,14 @@ extension CastingItem {
         case .location:  return .location(setting: locationSetting)
         }
     }
+
+    var assetStatusFlags: AssetStatusFlags {
+        AssetStatusFlags(
+            variantsAvailable: variantsAvailable,
+            smallImageAvailable: smallImageAvailable,
+            largeImageAvailable: largeImageAvailable
+        )
+    }
 }
 
 #Preview("Standard — All Types") {
@@ -249,7 +331,7 @@ extension CastingItem {
             name: "Detective Rose",
             sizeMode: .standard,
             badges: ThumbnailBadges(
-                showStatusDot: true, statusColor: .orange,
+                assetStatus: AssetStatusFlags(variantsAvailable: true, smallImageAvailable: false, largeImageAvailable: false),
                 levelBadgeText: "EP", levelBadgeColor: .blue
             )
         )
@@ -258,7 +340,7 @@ extension CastingItem {
             name: "City Park",
             sizeMode: .standard,
             badges: ThumbnailBadges(
-                showStatusDot: true, statusColor: .green,
+                assetStatus: AssetStatusFlags(variantsAvailable: true, smallImageAvailable: true, largeImageAvailable: true),
                 showApprovedBadge: true,
                 levelBadgeText: "ST", levelBadgeColor: .purple
             )
@@ -268,7 +350,7 @@ extension CastingItem {
             name: "Noir Style",
             sizeMode: .standard,
             badges: ThumbnailBadges(
-                showStatusDot: true, statusColor: .purple
+                showExampleIndicator: true, exampleAvailable: true
             )
         )
         UnifiedThumbnailView(
@@ -276,7 +358,7 @@ extension CastingItem {
             name: "Panel 01",
             sizeMode: .standard,
             badges: ThumbnailBadges(
-                showStatusDot: true, statusColor: .gray,
+                panelStatus: PanelStatusFlags(smallPanelAvailable: true, largePanelAvailable: false),
                 showSelectionStroke: true
             )
         )

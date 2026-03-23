@@ -124,8 +124,10 @@ struct ProductionBrowserView: View {
                 Spacer()
             } else {
                 List(queue, selection: $selectedJobID) { job in
-                    ProductionJobRow(job: job)
-                        .tag(job.id)
+                    ProductionJobRow(job: job, onDelete: {
+                        queue.removeAll { $0.id == job.id }
+                    })
+                    .tag(job.id)
                 }
                 .listStyle(.plain)
             }
@@ -150,6 +152,7 @@ struct ProductionBrowserView: View {
 
 private struct ProductionJobRow: View {
     let job: GenerationJob
+    let onDelete: () -> Void
 
     private var elapsedString: String {
         let elapsed = Int(Date().timeIntervalSince(job.queuedAt))
@@ -163,69 +166,55 @@ private struct ProductionJobRow: View {
         return "~\(mins)m"
     }
 
-    private var itemTypeLabel: String {
-        job.itemType == .character ? "Character" : "Location"
+    /// Thumbnail type for the main item (Asset or Panel).
+    private var itemThumbnailType: ThumbnailItemType {
+        switch job.jobType {
+        case .generatePanel:
+            return .panel
+        case .generateExample:
+            return .look
+        case .generateAsset:
+            return job.itemType == .character
+                ? .character(gender: job.itemGender)
+                : .location(setting: job.itemLocationSetting)
+        }
     }
 
-    private var itemTypeColor: Color {
-        job.itemType == .character ? .blue : .teal
+    /// Attached assets reordered: location first, then characters.
+    private var orderedAttachedAssets: [JobAssetInfo] {
+        let locations  = job.attachedAssets.filter { $0.type == .location }
+        let characters = job.attachedAssets.filter { $0.type == .character }
+        return locations + characters
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Job Type thumbnail (large)
-            RoundedRectangle(cornerRadius: 8)
-                .fill(job.jobType.color.opacity(0.15))
-                .frame(width: 48, height: 48)
-                .overlay {
-                    VStack(spacing: 2) {
-                        Image(systemName: job.jobType.icon)
-                            .font(.system(size: 18))
-                            .foregroundStyle(job.jobType.color)
-                        Text(job.jobType.rawValue)
-                            .font(.system(size: 7, weight: .medium))
-                            .foregroundStyle(job.jobType.color)
-                            .lineLimit(1)
-                    }
-                }
+        HStack(spacing: 6) {
+            // 1. Type letter (E/A/P)
+            Text(job.jobType.letter)
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(job.jobType.color)
+                .frame(width: 14)
 
-            // Details stack
-            VStack(alignment: .leading, spacing: 4) {
-                // Item: thumbnail + name
-                HStack(spacing: 6) {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(itemTypeColor.opacity(0.15))
-                        .frame(width: 24, height: 24)
-                        .overlay {
-                            Image(systemName: job.itemIcon)
-                                .font(.system(size: 11))
-                                .foregroundStyle(itemTypeColor)
-                        }
-                    Text(job.itemName)
-                        .font(.callout.weight(.medium))
-                        .lineLimit(1)
-                }
+            // 2. Size letter (S/L)
+            Text(job.size.letter)
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(job.size == .large ? .green : .orange)
+                .frame(width: 14)
 
-                // Item type
-                Text(itemTypeLabel)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+            // 3. Look thumbnail (always first among thumbnails)
+            thumbnailWithName(type: .look, name: job.lookName)
 
-                // Look: thumbnail + name
-                HStack(spacing: 6) {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.purple.opacity(0.15))
-                        .frame(width: 24, height: 24)
-                        .overlay {
-                            Image(systemName: "paintpalette")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.purple)
-                        }
-                    Text(job.lookName)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
+            // 4. Item / Panel thumbnail
+            thumbnailWithName(type: itemThumbnailType, name: job.itemName)
+
+            // 5. Attached assets (panel jobs) — location first, then characters
+            ForEach(orderedAttachedAssets) { asset in
+                thumbnailWithName(
+                    type: asset.type == .character
+                        ? .character(gender: asset.gender)
+                        : .location(setting: asset.locationSetting),
+                    name: asset.name
+                )
             }
 
             Spacer()
@@ -239,8 +228,33 @@ private struct ProductionJobRow: View {
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
+
+            // Delete button
+            Button(action: onDelete) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 14))
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(.white, .secondary)
+            }
+            .buttonStyle(.plain)
         }
         .padding(.vertical, 6)
+    }
+
+    @ViewBuilder
+    private func thumbnailWithName(type: ThumbnailItemType, name: String) -> some View {
+        VStack(spacing: 1) {
+            UnifiedThumbnailView(
+                itemType: type,
+                name: "",
+                sizeMode: .compact
+            )
+            Text(name)
+                .font(.system(size: 7))
+                .lineLimit(1)
+                .foregroundStyle(.secondary)
+                .frame(width: 80)
+        }
     }
 }
 
@@ -250,10 +264,7 @@ struct LooksBrowserView: View {
     @Binding var templates: [GenerationTemplate]
     @Binding var selectedTemplateID: String?
 
-    /// True when at least two looks exist so the selected one can be removed.
-    private var canRemove: Bool {
-        templates.count > 1 && selectedTemplateID != nil
-    }
+    private let columns = [GridItem(.adaptive(minimum: 288, maximum: 320), spacing: 12)]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -265,14 +276,6 @@ struct LooksBrowserView: View {
                 Text("Looks")
                     .font(.title2.bold())
                 Spacer()
-                Button(action: removeSelectedLook) {
-                    Image(systemName: "minus")
-                        .frame(width: 22, height: 22)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
-                .disabled(!canRemove)
-
                 Button(action: addLook) {
                     Image(systemName: "plus")
                         .frame(width: 22, height: 22)
@@ -285,36 +288,33 @@ struct LooksBrowserView: View {
 
             Divider()
 
-            List(templates, selection: $selectedTemplateID) { template in
-                HStack(spacing: 10) {
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(template.jobType.color.opacity(0.15))
-                        .frame(width: 36, height: 36)
-                        .overlay {
-                            Image(systemName: template.jobType.icon)
-                                .font(.system(size: 14))
-                                .foregroundStyle(template.jobType.color)
-                        }
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(template.name)
-                            .font(.callout.weight(.medium))
-                            .lineLimit(1)
-                        HStack(spacing: 4) {
-                            Text(template.jobType.rawValue)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                            Text("·")
-                                .foregroundStyle(.quaternary)
-                            Text(template.itemType == .character ? "Character" : "Location")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
-                        }
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(templates) { template in
+                        let isSelected = selectedTemplateID == template.id
+                        let canDelete = templates.count > 1
+                        UnifiedThumbnailView(
+                            itemType: .look,
+                            name: template.name,
+                            sizeMode: .standard,
+                            badges: ThumbnailBadges(
+                                showExampleIndicator: true,
+                                exampleAvailable: template.lookStatus == .exampleAvailable,
+                                showDeleteButton: canDelete,
+                                onDelete: { removeLook(id: template.id) },
+                                showSelectionStroke: isSelected
+                            )
+                        )
+                        .padding(3)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(isSelected ? Color.accentColor.opacity(0.07) : Color.clear)
+                        )
+                        .onTapGesture { selectedTemplateID = template.id }
                     }
-                    Spacer()
                 }
-                .tag(template.id)
+                .padding(16)
             }
-            .listStyle(.plain)
         }
         .background(Color(NSColor.windowBackgroundColor))
         .onAppear {
@@ -331,7 +331,6 @@ struct LooksBrowserView: View {
             id: newID,
             name: "New Look",
             description: "",
-            jobType: .generateVariants,
             itemType: .character,
             averageDuration: 120,
             generationModel: "SDXL 1.0",
@@ -340,16 +339,17 @@ struct LooksBrowserView: View {
         selectedTemplateID = newID
     }
 
-    private func removeSelectedLook() {
-        guard let id = selectedTemplateID,
-              templates.count > 1,
+    private func removeLook(id: String) {
+        guard templates.count > 1,
               let idx = templates.firstIndex(where: { $0.id == id }) else { return }
 
         templates.remove(at: idx)
 
         // Select the previous item, or the first if we removed index 0
-        let newIdx = min(idx, templates.count - 1)
-        selectedTemplateID = templates[newIdx].id
+        if selectedTemplateID == id || !templates.contains(where: { $0.id == selectedTemplateID }) {
+            let newIdx = min(idx, templates.count - 1)
+            selectedTemplateID = templates[newIdx].id
+        }
     }
 
     /// Ensures there is always one look selected.
@@ -366,6 +366,11 @@ struct ConfigurationView: View {
     @State private var sharedSecret: String = "ABCD 1234 EFGH"
     @State private var characterExample: String = "An astronaut riding a horse"
     @State private var locationExample: String = "big city by day"
+
+    @AppStorage(SizeConfigKeys.previewVariantWidth)  private var previewVariantWidth  = SizeConfigDefaults.previewVariantWidth
+    @AppStorage(SizeConfigKeys.previewVariantHeight) private var previewVariantHeight = SizeConfigDefaults.previewVariantHeight
+    @AppStorage(SizeConfigKeys.finalWidth)           private var finalWidth           = SizeConfigDefaults.finalWidth
+    @AppStorage(SizeConfigKeys.finalHeight)          private var finalHeight          = SizeConfigDefaults.finalHeight
 
     var body: some View {
         Form {
@@ -387,6 +392,29 @@ struct ConfigurationView: View {
                     TextField("Location Example", text: $locationExample)
                         .textFieldStyle(.roundedBorder)
                         .frame(maxWidth: 260)
+                }
+            }
+
+            Section("Image Sizes") {
+                LabeledContent("Small Image Width") {
+                    TextField("Width", value: $previewVariantWidth, format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 120)
+                }
+                LabeledContent("Small Image Height") {
+                    TextField("Height", value: $previewVariantHeight, format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 120)
+                }
+                LabeledContent("Large Image Width") {
+                    TextField("Width", value: $finalWidth, format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 120)
+                }
+                LabeledContent("Large Image Height") {
+                    TextField("Height", value: $finalHeight, format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 120)
                 }
             }
         }
