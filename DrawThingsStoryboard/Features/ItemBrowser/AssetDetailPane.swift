@@ -131,10 +131,15 @@ struct AssetDetailPane: View {
             }
         }
         .onChange(of: selectedItem) { _, newItem in
+            // Clear first to avoid stale binding access during transition
+            editingItem = nil
+            originalItem = nil
             if let newItem {
                 editingItem = newItem
                 originalItem = newItem
                 isEditingLibraryItem = true
+            } else {
+                isEditingLibraryItem = false
             }
         }
         .onChange(of: editingItem) { oldItem, newItem in
