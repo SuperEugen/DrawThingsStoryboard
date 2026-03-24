@@ -8,6 +8,7 @@ struct ProductionJobDetailView: View {
     let modelConfigs: [DTModelConfig]
     let selectedModelConfigID: String?
     let episodeName: String
+    var onJobCompleted: ((GenerationJob) -> Void)? = nil
 
     @StateObject private var vm = ImageGenerationViewModel()
 
@@ -33,7 +34,7 @@ struct ProductionJobDetailView: View {
 
                     Divider().padding(.vertical, 8)
 
-                    GenerateTestPanel(job: job, episodeName: episodeName, vm: vm)
+                    GenerateTestPanel(job: job, episodeName: episodeName, vm: vm, onJobCompleted: onJobCompleted)
 
                     Spacer(minLength: 20)
                 }
@@ -223,6 +224,7 @@ private struct GenerateTestPanel: View {
     let job: GenerationJob
     let episodeName: String
     @ObservedObject var vm: ImageGenerationViewModel
+    var onJobCompleted: ((GenerationJob) -> Void)? = nil
 
     @State private var savedURL: URL? = nil
     @State private var saveError: String? = nil
@@ -302,6 +304,9 @@ private struct GenerateTestPanel: View {
             }
         } catch {
             saveError = error.localizedDescription
+            return
         }
+        // Move job to done list on success
+        onJobCompleted?(job)
     }
 }

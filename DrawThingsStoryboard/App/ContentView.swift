@@ -32,6 +32,7 @@ struct ContentView: View {
     // MARK: - Production Queue state
     @State private var generationQueue: [GenerationJob]  = MockData.sampleQueue
     @State private var selectedJobID: String?            = nil
+    @State private var doneQueue: [GenerationJob]        = []
 
     // MARK: - Derived selection helpers
 
@@ -104,6 +105,7 @@ struct ContentView: View {
                 ProductionBrowserView(
                     queue: $generationQueue,
                     selectedJobID: $selectedJobID,
+                    doneQueue: $doneQueue,
                     configs: $modelConfigs,
                     selectedModelConfigID: $selectedModelConfigID
                 )
@@ -150,7 +152,13 @@ struct ContentView: View {
                     selectedJobID: selectedJobID,
                     modelConfigs: modelConfigs,
                     selectedModelConfigID: selectedModelConfigID,
-                    episodeName: currentEpisodeName
+                    episodeName: currentEpisodeName,
+                    onJobCompleted: { completedJob in
+                        var done = completedJob
+                        done.completedAt = Date()
+                        doneQueue.insert(done, at: 0)
+                        generationQueue.removeAll { $0.id == completedJob.id }
+                    }
                 )
             case .looks:
                 LooksDetailView(
