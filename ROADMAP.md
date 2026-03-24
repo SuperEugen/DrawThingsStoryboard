@@ -67,6 +67,15 @@ Essential for a complete storyboard.
 
 - [ ] New fields for each panel for character dialog, action instruction and camera movement and framing are included
 
+## 1.0 - Clean up
+
+The user interface and the code must be checked to have a prober v1.
+
+- [ ]  The complete UI must be checked for consistancy and ease of use
+- [ ]  Create missing visuals
+- [ ]  Update documentation
+- [ ]  Check the code and refactor where necessary
+
 ## Future ideas
 
 - **Draw Things on iPhone** — connect to Draw Things iOS over local network
