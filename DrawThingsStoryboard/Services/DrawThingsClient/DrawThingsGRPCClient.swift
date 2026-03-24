@@ -18,18 +18,16 @@ final class DrawThingsGRPCClient: DrawThingsClientProtocol {
     func generateImage(
         request: GenerationRequest,
         moodboardImages: [NSImage] = [],
+        initImage: NSImage? = nil,
         onProgress: ((GenerationStage) -> Void)? = nil
     ) async throws -> NSImage {
 
-        // 1. Connect (echo handshake) — fetches model metadata from Draw Things.
-        //    connect() is non-throwing; check lastError afterwards.
         await dtClient.connect()
         if let err = dtClient.lastError {
             throw DrawThingsGRPCError.connectionFailed(err.localizedDescription)
         }
         print("[GRPCClient] Connected. isConnected=\(dtClient.isConnected)")
 
-        // 2. Progress polling task
         let progressTask: Task<Void, Never>? = onProgress.map { callback in
             Task { [weak dtClient] in
                 while !Task.isCancelled {
@@ -42,12 +40,8 @@ final class DrawThingsGRPCClient: DrawThingsClientProtocol {
         }
         defer { progressTask?.cancel() }
 
-        // 3. Build moodboard hints
         let hints = buildHints(from: moodboardImages)
 
-        // 4. Build configuration.
-        //    model left empty → Draw Things uses whatever model is active in its UI.
-        //    seed nil → Draw Things picks a random seed.
         let seedValue: Int64? = request.seed == -1 ? nil : Int64(request.seed)
         let config = DrawThingsConfiguration(
             width: Int32(request.width),
@@ -58,13 +52,16 @@ final class DrawThingsGRPCClient: DrawThingsClientProtocol {
             seed: seedValue
         )
 
-        print("[GRPCClient] Sending — prompt: '\(request.prompt.prefix(60))…', \(request.width)×\(request.height), steps: \(request.steps), hints: \(hints.count)")
+        // Convert initImage to NSImage for the gRPC call
+        let canvasImage: NSImage? = initImage
 
-        // 5. Call gRPC
+        print("[GRPCClient] Sending — prompt: '\(request.prompt.prefix(60))…', \(request.width)×\(request.height), steps: \(request.steps), hints: \(hints.count), initImage: \(canvasImage != nil)")
+
         let images = try await dtClient.generateImage(
             prompt: request.prompt,
             negativePrompt: request.negativePrompt,
             configuration: config,
+            image: canvasImage,
             hints: hints
         )
 

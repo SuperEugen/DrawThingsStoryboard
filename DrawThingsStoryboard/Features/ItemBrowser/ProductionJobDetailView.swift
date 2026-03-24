@@ -63,6 +63,18 @@ struct ProductionJobDetailView: View {
             vm.guidanceScale = config.guidanceScale
             vm.model         = config.model
         }
+        // For panel jobs: load attached asset images into moodboard (max 3) + initImage (4th)
+        if job.jobType == .generatePanel {
+            let assetImages: [NSImage] = job.attachedAssets.compactMap { asset in
+                StorageService.shared.loadFirstAvailableVariant(assetID: asset.id)
+            }
+            vm.moodboardImages = Array(assetImages.prefix(3))
+            vm.initImage       = assetImages.count >= 4 ? assetImages[3] : nil
+            print("[syncJob] Panel assets: \(assetImages.count) loaded, moodboard: \(vm.moodboardImages.count), initImage: \(vm.initImage != nil)")
+        } else {
+            vm.moodboardImages = []
+            vm.initImage       = nil
+        }
     }
 
     private func jobThumbnailType(_ job: GenerationJob) -> ThumbnailItemType {

@@ -103,6 +103,16 @@ final class StorageService {
         return NSImage(contentsOf: url)
     }
 
+    /// Loads the first available variant image for an asset (v0..v3).
+    func loadFirstAvailableVariant(assetID: String) -> NSImage? {
+        for idx in 0..<4 {
+            if let img = loadVariantImage(assetID: assetID, variantIndex: idx) {
+                return img
+            }
+        }
+        return nil
+    }
+
     func loadLookExample(lookName: String) -> NSImage? {
         let url = examplesURL.appendingPathComponent("\(sanitize(lookName)).png")
         return NSImage(contentsOf: url)

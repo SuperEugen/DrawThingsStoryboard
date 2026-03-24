@@ -17,9 +17,10 @@ final class DrawThingsHTTPClient: DrawThingsClientProtocol {
     func generateImage(
         request: GenerationRequest,
         moodboardImages: [NSImage] = [],
+        initImage: NSImage? = nil,
         onProgress: ((GenerationStage) -> Void)? = nil
     ) async throws -> NSImage {
-        // Note: moodboardImages and onProgress are not supported by the HTTP API.
+        // Note: moodboardImages, initImage and onProgress are not supported by the HTTP API.
         // Switch to DrawThingsGRPCClient to use reference images.
         let endpoint = baseURL.appendingPathComponent("/sdapi/v1/txt2img")
         var urlRequest = URLRequest(url: endpoint)

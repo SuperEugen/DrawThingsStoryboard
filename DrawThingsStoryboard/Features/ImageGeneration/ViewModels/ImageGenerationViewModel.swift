@@ -18,9 +18,11 @@ final class ImageGenerationViewModel: ObservableObject {
     @Published var height: Int = 512
     @Published var model: String = ""
 
-    // MARK: - Moodboard
-    /// Reference images forwarded to Draw Things as shuffle hints.
+    // MARK: - Moodboard + canvas
+    /// Reference images forwarded to Draw Things as shuffle hints (max 3).
     @Published var moodboardImages: [NSImage] = []
+    /// Optional canvas image for img2img (4th asset for panel jobs).
+    @Published var initImage: NSImage? = nil
 
     // MARK: - State
     @Published var isGenerating: Bool = false
@@ -67,6 +69,7 @@ final class ImageGenerationViewModel: ObservableObject {
             generatedImage = try await client.generateImage(
                 request: request,
                 moodboardImages: moodboardImages,
+                initImage: initImage,
                 onProgress: { [weak self] stage in
                     self?.generationStage = stage.description
                 }

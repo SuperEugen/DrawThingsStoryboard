@@ -8,6 +8,7 @@ final class DrawThingsMockClient: DrawThingsClientProtocol {
     func generateImage(
         request: GenerationRequest,
         moodboardImages: [NSImage] = [],
+        initImage: NSImage? = nil,
         onProgress: ((GenerationStage) -> Void)? = nil
     ) async throws -> NSImage {
         // Simulate generation stages for UI testing
