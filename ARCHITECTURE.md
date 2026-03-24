@@ -96,45 +96,45 @@ Images are loaded back on demand (e.g. `loadFirstAvailableVariant(assetID:)` for
 
 ---
 
-## Persistence — Konzept und offene Fragen
+## Persistence — Concept and Open Questions
 
-> Dieser Abschnitt ist für Ideen und Entwürfe zur künftigen persistenten Datenspeicherung.
+> This section captures ideas and drafts for future persistent data storage.
 
-### Aktueller Stand
+### Current state
 
-Alle Daten (Studios, Episodes, Templates, ModelConfigs) leben ausschließlich als in-memory `@State` in `ContentView`. Sie gehen beim Beenden der App verloren. Nur generierte Bilder werden persistent auf dem Filesystem gespeichert.
+All data (Studios, Episodes, Templates, ModelConfigs) lives exclusively as in-memory `@State` in `ContentView`. It is lost when the app quits. Only generated images are persisted to the filesystem.
 
-### Ziele
+### Goals
 
-- Projektdaten überleben einen App-Neustart
-- Mehrere Projekte / Studios verwaltbar
-- Austauschbares Format (z.B. für Backup oder Versionierung)
-- Möglichst einfache Implementierung ohne externe Datenbank
+- Project data survives an app restart
+- Multiple projects / studios can be managed
+- Exchangeable format (e.g. for backup or versioning)
+- Simplest possible implementation without an external database
 
-### Optionen
+### Options
 
-**Option A — JSON-Dateien pro Projekt**
-- Ein Ordner pro Projekt/Episode in `~/Pictures/DrawThings-Storyboard/<EpisodeName>/`
-- `project.json` enthält Studio, Customer, Episode, CastingItems, Templates, ModelConfigs
-- Einfach, menschenlesbar, versionierbar mit git
-- `Codable` auf allen Modellen genügt
+**Option A — JSON files per project**
+- One folder per project/episode in `~/Pictures/DrawThings-Storyboard/<EpisodeName>/`
+- `project.json` contains Studio, Customer, Episode, CastingItems, Templates, ModelConfigs
+- Simple, human-readable, versionable with git
+- `Codable` conformance on all models is sufficient
 
 **Option B — SwiftData**
-- Automatische Persistenz, CloudKit-Sync möglich
-- Erfordert `@Model`-Umbau aller Structs auf Klassen
-- Mehr Aufwand, dafür native macOS-Integration
+- Automatic persistence, CloudKit sync possible
+- Requires refactoring all structs to classes with `@Model`
+- More effort, but native macOS integration
 
-**Option C — Single JSON-Datei**
+**Option C — Single JSON file**
 - `~/.config/DrawThingsStoryboard/data.json`
-- Alles in einer Datei, einfachstes Encoding
-- Skaliert nicht gut bei großen Projekten
+- Everything in one file, simplest encoding
+- Doesn't scale well for large projects
 
-### Geplante JSON-Strukturen
+### Planned JSON structures
 
-> *Hier werden die konkreten JSON-Formate dokumentiert sobald sie festgelegt sind.*
+> *Concrete JSON formats will be documented here once they are defined.*
 
 ```json
-// Platzhalter — wird mit konkreten Ideen gefüllt
+// Placeholder — will be filled with concrete ideas
 {
   "version": "1",
   "studio": { },
@@ -143,9 +143,9 @@ Alle Daten (Studios, Episodes, Templates, ModelConfigs) leben ausschließlich al
 }
 ```
 
-### Offene Fragen
+### Open questions
 
-- Welche Option (A/B/C) wird bevorzugt?
-- Sollen ModelConfigs global (App-weit) oder pro Projekt gespeichert werden?
-- Sollen CastingItems mit ihren generierten Variant-Pfaden im JSON referenziert werden?
-- Versionierung des JSON-Formats (Migration bei Schema-Änderungen)?
+- Which option (A/B/C) is preferred?
+- Should ModelConfigs be stored globally (app-wide) or per project?
+- Should CastingItems reference their generated variant paths in JSON?
+- JSON format versioning (migration on schema changes)?
