@@ -1,5 +1,7 @@
 # DrawThingsStoryboard — Feature-Stand (März 2026)
 
+**Aktuelles Release: v0.1.0 (Pre-Release)**
+
 ## Implementiert ✅
 
 ### Navigation & Layout
@@ -70,9 +72,9 @@
 - Shared Secret Feld
 
 ### Storage (~/Pictures/DrawThings-Storyboard/)
-- library/assets/<assetID>_v<n>.png — Variant-Bilder
-- library/examples/<lookName>.png — Look-Examples
-- <EpisodeName>/panels/<panelID>.png — Panel-Bilder
+- library/assets/\<assetID\>_v\<n\>.png — Variant-Bilder
+- library/examples/\<lookName\>.png — Look-Examples
+- \<EpisodeName\>/panels/\<panelID\>.png — Panel-Bilder
 
 ## Offen / Nächste Schritte 🔜
 - Variant-Bilder in Asset-Browser anzeigen (approved variant als Thumbnail)
