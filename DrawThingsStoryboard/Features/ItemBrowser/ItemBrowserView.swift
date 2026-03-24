@@ -234,8 +234,9 @@ private struct DoneJobRow: View {
     let job: GenerationJob
 
     private var durationString: String {
-        guard let completed = job.completedAt else { return "" }
-        let secs = Int(completed.timeIntervalSince(job.queuedAt))
+        guard let completed = job.completedAt,
+              let started = job.startedAt else { return "" }
+        let secs = Int(completed.timeIntervalSince(started))
         let m = secs / 60; let s = secs % 60
         return m > 0 ? "\(m)m \(s)s" : "\(s)s"
     }

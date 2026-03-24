@@ -272,6 +272,8 @@ struct GenerationJob: Identifiable {
     let combinedPrompt: String
     var variantCount: Int = 0
     var attachedAssets: [JobAssetInfo] = []
+    /// Set when generation starts (first image of the job).
+    var startedAt: Date? = nil
     /// Set when the job is moved to the done list.
     var completedAt: Date? = nil
 }
