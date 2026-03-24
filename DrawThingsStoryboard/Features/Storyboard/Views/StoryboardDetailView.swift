@@ -8,11 +8,14 @@ struct StoryboardDetailView: View {
     let selection: StoryboardSelection?
     @Binding var generationQueue: [GenerationJob]
 
-    // Read-only access to studios for collecting available assets
     let studios: [MockStudio]
     let studioIndex: Int
     let customerIndex: Int
     let episodeIndex: Int
+    /// Resolved preferred look name for the current episode (own → customer → studio).
+    var resolvedLookName: String? = nil
+    /// All look templates (to look up the description for combinedPrompt).
+    var templates: [GenerationTemplate] = []
 
     /// All assets available to the current episode (studio + customer + episode level).
     private var availableAssets: [CastingItem] {
@@ -80,7 +83,9 @@ struct StoryboardDetailView: View {
                     StoryboardPanelDetailView(
                         panel: $acts[ai].sequences[si].scenes[sci].panels[pi],
                         generationQueue: $generationQueue,
-                        availableAssets: availableAssets
+                        availableAssets: availableAssets,
+                        resolvedLookName: resolvedLookName,
+                        lookDescription: templates.first { $0.name == resolvedLookName }?.description ?? ""
                     )
                 } else {
                     emptyState
@@ -208,11 +213,14 @@ private struct StoryboardPanelDetailView: View {
     @Binding var panel: MockPanel
     @Binding var generationQueue: [GenerationJob]
     let availableAssets: [CastingItem]
+    var resolvedLookName: String? = nil
+    var lookDescription: String = ""
 
     @AppStorage(SizeConfigKeys.previewVariantWidth)  private var previewVariantWidth  = SizeConfigDefaults.previewVariantWidth
     @AppStorage(SizeConfigKeys.previewVariantHeight) private var previewVariantHeight = SizeConfigDefaults.previewVariantHeight
     @AppStorage(SizeConfigKeys.finalWidth)           private var finalWidth           = SizeConfigDefaults.finalWidth
     @AppStorage(SizeConfigKeys.finalHeight)          private var finalHeight          = SizeConfigDefaults.finalHeight
+    @AppStorage(SizeConfigKeys.lookPromptPanel)      private var lookPromptPanel      = SizeConfigDefaults.lookPromptPanel
 
     @State private var showAssetPicker = false
 
@@ -469,43 +477,52 @@ private struct StoryboardPanelDetailView: View {
     }
 
     private func generateSmallPanel() {
+        let combined = buildCombinedPrompt()
         var job = GenerationJob(
             id: UUID().uuidString,
             itemName: panel.name,
-            itemType: .location,
+            itemType: .character,    // panel — no specific casting type
             jobType: .generatePanel,
             size: .small,
-            lookName: "Panel Small",
+            lookName: resolvedLookName ?? "—",
             queuedAt: Date(),
             estimatedDuration: 120,
             itemIcon: "photo",
             seed: Int64.random(in: 1...999_999),
             width: previewVariantWidth,
             height: previewVariantHeight,
-            combinedPrompt: panel.description
+            combinedPrompt: combined
         )
         job.attachedAssets = assetInfos
         generationQueue.append(job)
     }
 
     private func generateLargePanel() {
+        let combined = buildCombinedPrompt()
         var job = GenerationJob(
             id: UUID().uuidString,
             itemName: panel.name,
-            itemType: .location,
+            itemType: .character,    // panel — no specific casting type
             jobType: .generatePanel,
             size: .large,
-            lookName: "Panel Large",
+            lookName: resolvedLookName ?? "—",
             queuedAt: Date(),
             estimatedDuration: 240,
             itemIcon: "photo",
             seed: Int64.random(in: 1...999_999),
             width: finalWidth,
             height: finalHeight,
-            combinedPrompt: panel.description
+            combinedPrompt: combined
         )
         job.attachedAssets = assetInfos
         generationQueue.append(job)
+    }
+
+    /// Assembles: look description + lookPromptPanel + panel description
+    private func buildCombinedPrompt() -> String {
+        [lookDescription, lookPromptPanel, panel.description]
+            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            .joined(separator: ", ")
     }
 }
 

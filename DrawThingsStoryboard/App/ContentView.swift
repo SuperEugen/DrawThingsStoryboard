@@ -182,7 +182,9 @@ struct ContentView: View {
                     studios: studios,
                     studioIndex: selectedStudioIndex ?? 0,
                     customerIndex: selectedCustomerIndex ?? 0,
-                    episodeIndex: selectedEpisodeIndex ?? 0
+                    episodeIndex: selectedEpisodeIndex ?? 0,
+                    resolvedLookName: resolvedLookName,
+                    templates: templates
                 )
             case .projects:
                 ItemDetailView(
