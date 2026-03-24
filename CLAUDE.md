@@ -1,51 +1,78 @@
 # DrawThingsStoryboard — Claude Context
 
-This file gives Claude Code the project context needed to work effectively.
+## Projekt-Überblick
+Native macOS SwiftUI-App (macOS 14.0) zur KI-gestützten Storyboard-Erstellung.
+Integriert Draw Things über gRPC für Bildgenerierung.
+Repo: https://github.com/SuperEugen/DrawThingsStoryboard
+Lokal: /Users/ingo/DocsMacMini/hobbies/programming/xcode/DrawThingsStoryboard
 
-## What this app does
+## Architektur
+- **MVVM**, strict, Dateien unter 300 Zeilen
+- **NavigationSplitView** (3 Panes: Sidebar / Browser / Detail)
+- Kein SwiftData, kein CoreData — alles in-memory State in ContentView
+- macOS Sandbox: Bilder werden in ~/Pictures/DrawThings-Storyboard/ gespeichert
 
-DrawThingsStoryboard is a macOS SwiftUI app that talks to the [Draw Things](https://drawthings.ai)
-HTTP API to generate images locally. Built step by step, starting from image generation
-and growing towards storyboard / scene management features.
+## Sidebar-Sections (AppSection)
+1. projects — Studio → Customer → Episode (BriefingDetailView)
+2. assets — CastingItem Browser + Library
+3. looks — GenerationTemplate (Style-Prompts)
+4. storyboard — Akt/Sequenz/Szene/Panel Hierarchie
+5. modelConfig — DTModelConfig (Draw Things Modell-Parameter)
+6. productionQueue — Queue + Done-Liste
+7. configuration — Einstellungen (Größen, Look-Prompts, Shared Secret)
 
-## Architecture rules
+## Wichtige Modelle (Models/)
+- **MockStudio / MockCustomer / MockEpisode** — Hierarchie mit preferredLookID, rules
+- **CastingItem** — Character oder Location, mit Variants
+- **Variant** — isApproved, isGenerated, label
+- **GenerationTemplate** — Look (name, description=style-prompt, itemType, lookStatus)
+- **DTModelConfig** — name, model (filename), steps, guidanceScale
+- **GenerationJob** — vollständiger Job mit attachedAssets, queuedAt, startedAt, completedAt
+- **MockPanel** — smallPanelAvailable, largePanelAvailable, attachedAssetIDs
+- **MockAct/Scene/Sequence/Panel** — Storyboard-Hierarchie
 
-- **MVVM** strictly — every View has exactly one ViewModel, no logic in Views
-- **Feature folders** under `Features/` — each feature is self-contained with its own `Views/` and `ViewModels/`
-- **Services** are protocol-backed (`DrawThingsClientProtocol`) for testability
-- **SwiftData** models live in `Models/` — one file per model, no monolithic schema files
-- **No file over ~300 lines** — split into smaller focused files instead
-- **`@MainActor`** on all ViewModels
-- **Deployment target**: macOS 14.0
-- **Swift version**: 5.10+
+## Services
+- **DrawThingsGRPCClient** — Production-Client, Port 7859, TLS on
+  - generateImage(request:moodboardImages:initImage:onProgress:)
+  - Moodboard = shuffle ControlNet hints, initImage = Canvas (img2img)
+- **DrawThingsHTTPClient** — Fallback HTTP, Port 7859 (kein Moodboard)
+- **DrawThingsMockClient** — Previews/Tests
+- **StorageService.shared** — ~/Pictures/DrawThings-Storyboard/
+  - library/assets/<assetID>_v<n>.png
+  - library/examples/<lookName>.png
+  - <EpisodeName>/panels/<panelID>.png
 
-## Folder structure
+## Draw Things Verbindung
+- Protocol: gRPC, Port: 7859, TLS: enabled
+- gRPC-Package: https://github.com/euphoriacyberware-ai/DT-gRPC-Swift-Client
+- Package wurde via Xcode → File → Add Package Dependencies hinzugefügt
+- Modell-Dateiname muss exakt wie in Draw Things angegeben werden
 
-```
-DrawThingsStoryboard/
-├── App/                    # Entry point, commands, routing
-├── Features/
-│   ├── ImageGeneration/    # Draw Things API image generation
-│   │   ├── Views/
-│   │   └── ViewModels/
-│   └── Settings/
-│       ├── Views/
-│       └── ViewModels/
-├── Services/
-│   └── DrawThingsClient/   # Protocol + HTTP implementation + Mock
-├── Models/                 # GenerationRequest, GenerationResponse, SwiftData models
-└── Resources/              # Assets.xcassets
-```
+## Workflow: Entwicklung
+- Claude schreibt/committed Swift-Files zu GitHub
+- Ingo pullt via Terminal: `git pull`
+- Baut in Xcode (⌘+B)
+- Bei Xcode-Dialog "Use Version on Disk" wählen
+- Bei Konflikten: `git stash && git pull && git stash drop`
 
-## Key design decisions vs DrawThingsStudio
+## AppStorage Keys (persistent)
+- dts.previewVariantWidth/Height — Small image size (default 576×320)
+- dts.finalWidth/Height — Large image size (default 1920×1080)
+- dts.lookPromptCharacter — Prompt-Suffix für Character-Looks
+- dts.lookPromptLocation — Prompt-Suffix für Location-Looks
+- dts.lookPromptPanel — Prompt-Suffix für Panel-Looks
 
-- Feature-based folder structure instead of flat file list
-- One SwiftData model per file instead of one huge schema
-- Smaller, composable Views (target: no View file over 200 lines)
-- Protocol-backed services for easy mocking in previews
+## Prompt-Zusammensetzung
+- **Asset/Variant**: item.description + item.prompt (aus CastingItem)
+- **Look Example**: look.description + lookPromptCharacter/Location
+- **Panel**: look.description + lookPromptPanel + panel.description
+- **Panel Assets**: bis zu 3 → moodboardImages (shuffle hints), 4. → initImage
 
-## Draw Things HTTP API
-
-Base URL: `http://localhost:7888` (configurable in Settings)
-Key endpoint: `POST /sdapi/v1/txt2img`
-Docs: https://github.com/drawthingsai/draw-things-community
+## bekannte Swift-Patterns & Fallstricke
+- Type-Checker Timeout → body in private structs aufteilen
+- `ModelConfiguration` (SwiftData) vs `DTModelConfig` (unsere Klasse) — deshalb DTModelConfig
+- `Hashable` auf Structs mit CastingItem-Properties schlägt fehl → nur Identifiable
+- `ForEach(0..<4)` mit varianter Array-Länge → immer `if idx < array.count` guarden
+- `let`-Parameter werden von SwiftUI nicht reactive getrackt → `@Binding` verwenden
+- `variantsAvailable` ist computed (aus variants) — kann nicht direkt gesetzt werden
+- Desktop Commander `sudo` ist geblockt → xcode-select nicht via Terminal umstellbar
