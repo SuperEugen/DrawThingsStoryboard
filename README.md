@@ -1,3 +1,5 @@
+![Banner](docs/images/banner.png)
+
 # DrawThingsStoryboard
 
 A native macOS app for AI-assisted storyboard production, powered by [Draw Things](https://drawthings.ai).
@@ -13,6 +15,10 @@ DrawThingsStoryboard organises your visual storytelling workflow around a film p
 - **Model Config** — Named Draw Things model configurations (model filename, steps, guidance scale)
 - **Production Queue** — Queued jobs with model picker, live generation progress, and done list with timing
 - **Local storage** — All generated images saved to `~/Pictures/DrawThings-Storyboard/` with a structured layout
+
+## Screenshot
+
+![Projects view](docs/images/projects.png)
 
 ## Requirements
 
