@@ -10,7 +10,7 @@ struct ItemDetailView: View {
     let selectedStudioID: String?
     let selectedCustomerID: String?
     let selectedEpisodeID: String?
-    let selectedBriefingLevel: BriefingLevel
+    let selectedProjectsLevel: ProjectsLevel
 
     // Generic
     let selectedItemID: String?
@@ -21,12 +21,12 @@ struct ItemDetailView: View {
     var body: some View {
         switch section {
         case .projects:
-            BriefingDetailView(
+            ProjectsDetailView(
                 studios: $studios,
                 selectedStudioID: selectedStudioID,
                 selectedCustomerID: selectedCustomerID,
                 selectedEpisodeID: selectedEpisodeID,
-                level: selectedBriefingLevel,
+                level: selectedProjectsLevel,
                 templates: templates
             )
         default:
@@ -97,7 +97,7 @@ func sectionLabel(_ title: String) -> some View {
         selectedStudioID: MockData.defaultStudios[0].id,
         selectedCustomerID: MockData.defaultStudios[0].customers[0].id,
         selectedEpisodeID: MockData.defaultStudios[0].customers[0].episodes[0].id,
-        selectedBriefingLevel: .episode,
+        selectedProjectsLevel: .episode,
         selectedItemID: nil,
         templates: MockData.defaultTemplates
     )
@@ -111,7 +111,7 @@ func sectionLabel(_ title: String) -> some View {
         selectedStudioID: MockData.defaultStudios[0].id,
         selectedCustomerID: MockData.defaultStudios[0].customers[0].id,
         selectedEpisodeID: MockData.defaultStudios[0].customers[0].episodes[0].id,
-        selectedBriefingLevel: .studio,
+        selectedProjectsLevel: .studio,
         selectedItemID: nil,
         templates: MockData.defaultTemplates
     )

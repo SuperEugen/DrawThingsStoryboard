@@ -1,7 +1,7 @@
 import Foundation
 
-/// Which level of the briefing hierarchy the user is currently editing.
-enum BriefingLevel: String, Hashable {
+/// Which level of the projects hierarchy the user is currently editing.
+enum ProjectsLevel: String, Hashable {
     case studio
     case customer
     case episode

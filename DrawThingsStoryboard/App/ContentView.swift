@@ -12,7 +12,7 @@ struct ContentView: View {
     @State private var selectedStudioID: String?         = nil
     @State private var selectedCustomerID: String?       = nil
     @State private var selectedEpisodeID: String?        = nil
-    @State private var selectedBriefingLevel: BriefingLevel = .episode
+    @State private var selectedProjectsLevel: ProjectsLevel = .episode
 
     // MARK: - Assets state
     @State private var selectedAssetItem: CastingItem?   = nil
@@ -135,7 +135,7 @@ struct ContentView: View {
                     selectedStudioID: $selectedStudioID,
                     selectedCustomerID: $selectedCustomerID,
                     selectedEpisodeID: $selectedEpisodeID,
-                    selectedBriefingLevel: $selectedBriefingLevel,
+                    selectedProjectsLevel: $selectedProjectsLevel,
                     selectedItemID: $selectedItemID
                 )
             }
@@ -193,7 +193,7 @@ struct ContentView: View {
                     selectedStudioID: selectedStudioID,
                     selectedCustomerID: selectedCustomerID,
                     selectedEpisodeID: selectedEpisodeID,
-                    selectedBriefingLevel: selectedBriefingLevel,
+                    selectedProjectsLevel: selectedProjectsLevel,
                     selectedItemID: selectedItemID,
                     templates: templates
                 )
@@ -204,7 +204,7 @@ struct ContentView: View {
                     selectedStudioID: selectedStudioID,
                     selectedCustomerID: selectedCustomerID,
                     selectedEpisodeID: selectedEpisodeID,
-                    selectedBriefingLevel: selectedBriefingLevel,
+                    selectedProjectsLevel: selectedProjectsLevel,
                     selectedItemID: selectedItemID,
                     templates: templates
                 )

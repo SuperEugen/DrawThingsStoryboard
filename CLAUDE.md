@@ -13,7 +13,7 @@ Local: /Users/ingo/DocsMacMini/hobbies/programming/xcode/DrawThingsStoryboard
 - macOS Sandbox: images are stored in ~/Pictures/DrawThings-Storyboard/
 
 ## Sidebar Sections (AppSection)
-1. projects — Studio → Customer → Episode (BriefingDetailView)
+1. projects — Studio → Customer → Episode (ProjectsDetailView)
 2. assets — CastingItem Browser + Library
 3. looks — GenerationTemplate (style prompts)
 4. storyboard — Act / Sequence / Scene / Panel hierarchy

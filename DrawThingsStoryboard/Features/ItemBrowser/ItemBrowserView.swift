@@ -9,7 +9,7 @@ struct ItemBrowserView: View {
     @Binding var selectedStudioID: String?
     @Binding var selectedCustomerID: String?
     @Binding var selectedEpisodeID: String?
-    @Binding var selectedBriefingLevel: BriefingLevel
+    @Binding var selectedProjectsLevel: ProjectsLevel
     @Binding var selectedItemID: String?
 
     var body: some View {
@@ -19,12 +19,12 @@ struct ItemBrowserView: View {
 
             switch section {
             case .projects:
-                BriefingBrowserView(
+                ProjectsBrowserView(
                     studios: $studios,
                     selectedStudioID: $selectedStudioID,
                     selectedCustomerID: $selectedCustomerID,
                     selectedEpisodeID: $selectedEpisodeID,
-                    selectedBriefingLevel: $selectedBriefingLevel
+                    selectedProjectsLevel: $selectedProjectsLevel
                 )
             default:
                 GenericBrowserView(section: section, selectedItemID: $selectedItemID)
