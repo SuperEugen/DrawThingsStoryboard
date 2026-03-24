@@ -81,8 +81,6 @@ The type-specific suffixes (`lookPromptCharacter`, `lookPromptLocation`, `lookPr
 
 ## File storage
 
-> This section captures the plan for future persistent data storage.
-
 `StorageService.shared` writes to the macOS sandbox-safe Pictures directory:
 
 ```
@@ -123,7 +121,7 @@ All *.json files need to have a version to make it possible to migrate to a newe
 
 **JSON files per project**
 - One folder per project/episode in `~/Pictures/DrawThings-Storyboard/<EpisodeName>/`
-- `pa-config.json` contains Studio, Customer, Episode, CharacterItems, LocationItems, ModelConfigs
+- `pa-config.json` contains Studio, Customer, Episode, CharacterItems, LocationItems
 - Simple, human-readable, versionable with git
 - `Codable` conformance on all models is sufficient
 
