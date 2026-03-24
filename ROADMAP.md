@@ -31,24 +31,49 @@ The current "Generate (Test)" button is a proof of concept. The real workflow ne
 - [ ] Proper error handling when Draw Things is not running
 - [ ] gRPC address and port configurable in Settings
 
-## v0.5 — Prompt refinement
+## v0.5 - More Draw Things control
+
+To get consistant images over several panels it is crucial to use the moodboard feature.
+
+- [ ] Generate large image uses the same seed used for generation of variant or small image
+- [ ] Generate panel use reference images attached to the job
+
+## v0.6 — Prompt refinement
+
+Better control of the prompts used to generate each image. A modular system.
 
 - [ ] Prompt assembly for Asset jobs: `item.description` + `item.prompt` + look suffix
-- [ ] Negative prompt support per job type
 - [ ] Prompt preview before queuing
 - [ ] Prompt history per item
 
-## v0.6 — Storyboard export
+## v0.7 — Storyboard export
+
+The goal of the app. Something to hand out.
 
 - [ ] Export storyboard as PDF (panels in sequence with scene descriptions)
 - [ ] Export individual panels as PNG/JPEG
 - [ ] Export asset sheet (all approved variants per character/location)
 
+## 0.8 - Import fountain files
+
+Connect to other apps in the whole production workflow.
+
+- [ ] Import fountain file format used by screenwriting software like Beat to import acts, sequences and scenes
+- [ ] Use fountain import to create character and location assets
+
+## 0.9 - Dialog and actions
+
+Essential for a complete storyboard.
+
+- [ ] New fields for each panel for character dialog, action instruction and camera movement and framing are included
+
 ## Future ideas
 
-- **iCloud sync** — share projects across devices via CloudKit
 - **Draw Things on iPhone** — connect to Draw Things iOS over local network
 - **Prompt templates** — reusable prompt building blocks beyond look suffixes
-- **Scene descriptions** — auto-generate panel descriptions from scene text using Claude
-- **Storyboard timeline view** — horizontal scrolling view across acts and sequences
-- **Version history** — track changes to panels and prompts over time
+- **Export character turn-around sheets** - special prompts create a turn-around sheet for a character
+- **Export characters as parted image** - special prompts create characters with separate elements for 2d character animation
+- **Export vectorized assets** - usable in 2d animation software like Moho
+- **Export Pitch-Book** - export a pitch book to present the story to someone
+- **Export Video** - create a video out of the storyboard
+- **Support LoRAs** - add LoRA support in the generation of images
