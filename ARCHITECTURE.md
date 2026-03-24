@@ -22,7 +22,7 @@ A three-pane `NavigationSplitView` with seven sidebar sections (`AppSection`):
 
 | Section | Content pane | Detail pane |
 |---------|-------------|-------------|
-| projects | BriefingBrowserView | BriefingDetailView |
+| projects | ProjectsBrowserView | ProjectsDetailView |
 | assets | AssetDetailPane | LibraryBrowserView |
 | looks | LooksBrowserView | LooksDetailView |
 | storyboard | StoryboardBrowserView | StoryboardDetailView |
@@ -81,22 +81,24 @@ The type-specific suffixes (`lookPromptCharacter`, `lookPromptLocation`, `lookPr
 
 ## File storage
 
+> This section captures the plan for future persistent data storage.
+
 `StorageService.shared` writes to the macOS sandbox-safe Pictures directory:
 
 ```
-~/Pictures/DrawThings-Storyboard/
+~/Pictures/DrawThings-Storyboard/    dtsb-config.json
 ├── library/
-│   ├── assets/     <assetID>_v<n>.png
-│   └── examples/   <lookName>.png
-└── <EpisodeName>/
-    └── panels/     <panelID>.png
+│   ├── <studioName>/                st-config.json, st-catalog.json, <assetFileName>.png
+│   │   └── <customerName>/          cu-config.json, cu-catalog.json, <assetFileName>.png
+│   │       └── <episodeName>/       ep-config.json, ep-catalog.json, <assetFileName>.png
+│   └── looks/                       lo-catalog.json, <lookFileName>.png
+└── <episodeName>/                   pa-config.json, pa-catalog.json, <panelFileName>.png
 ```
-
 Images are loaded back on demand (e.g. `loadFirstAvailableVariant(assetID:)` for panel moodboards).
 
 ---
 
-## Persistence — Concept and Open Questions
+## Persistence — Concepts
 
 > This section captures ideas and drafts for future persistent data storage.
 
@@ -111,23 +113,24 @@ All data (Studios, Episodes, Templates, ModelConfigs) lives exclusively as in-me
 - Exchangeable format (e.g. for backup or versioning)
 - Simplest possible implementation without an external database
 
-### Options
+### Plan
 
-**Option A — JSON files per project**
+All *.json files need to have a version to make it possible to migrate to a newer version if necessary.
+
+**JSON file for app-wide configs**
+- ModelConfigs are stored in dtsb-config.json.
+- All other Configuration data (app-wide) is also stored in dtsb-config.json.
+
+**JSON files per project**
 - One folder per project/episode in `~/Pictures/DrawThings-Storyboard/<EpisodeName>/`
-- `project.json` contains Studio, Customer, Episode, CastingItems, Templates, ModelConfigs
+- `pa-config.json` contains Studio, Customer, Episode, CharacterItems, LocationItems, ModelConfigs
 - Simple, human-readable, versionable with git
 - `Codable` conformance on all models is sufficient
 
-**Option B — SwiftData**
-- Automatic persistence, CloudKit sync possible
-- Requires refactoring all structs to classes with `@Model`
-- More effort, but native macOS integration
-
-**Option C — Single JSON file**
-- `~/.config/DrawThingsStoryboard/data.json`
-- Everything in one file, simplest encoding
-- Doesn't scale well for large projects
+**Additional JSON files in library**
+- The *-config.json files contain all the configuration data that should persist, i.e. name, rules, preferred look etc.
+- The *-catalog.json files are lists of all *.png files in the respective folders containing all metadata of all generated images in the folder. The entries are found by their filename.
+- When assets are moved from one level to another (e.g. from Studio to Customer) the catalog files have to be updated accordingly (the from and the to catalog).
 
 ### Planned JSON structures
 
@@ -145,7 +148,4 @@ All data (Studios, Episodes, Templates, ModelConfigs) lives exclusively as in-me
 
 ### Open questions
 
-- Which option (A/B/C) is preferred?
-- Should ModelConfigs be stored globally (app-wide) or per project?
 - Should CastingItems reference their generated variant paths in JSON?
-- JSON format versioning (migration on schema changes)?
