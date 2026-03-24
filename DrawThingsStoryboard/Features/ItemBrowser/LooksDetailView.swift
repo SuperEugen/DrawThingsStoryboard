@@ -9,6 +9,9 @@ struct LooksDetailView: View {
 
     @AppStorage(SizeConfigKeys.previewVariantWidth)  private var previewVariantWidth  = SizeConfigDefaults.previewVariantWidth
     @AppStorage(SizeConfigKeys.previewVariantHeight) private var previewVariantHeight = SizeConfigDefaults.previewVariantHeight
+    @AppStorage(SizeConfigKeys.lookPromptCharacter)  private var lookPromptCharacter  = SizeConfigDefaults.lookPromptCharacter
+    @AppStorage(SizeConfigKeys.lookPromptLocation)   private var lookPromptLocation   = SizeConfigDefaults.lookPromptLocation
+    @AppStorage(SizeConfigKeys.lookPromptPanel)      private var lookPromptPanel      = SizeConfigDefaults.lookPromptPanel
 
     private var selectedIndex: Int? {
         guard let id = selectedTemplateID else { return nil }
@@ -108,6 +111,15 @@ struct LooksDetailView: View {
 
     private func generateExample(at idx: Int) {
         let template = templates[idx]
+        // Combined prompt: look description + type-specific config prompt
+        let typePrompt: String
+        switch template.itemType {
+        case .character: typePrompt = lookPromptCharacter
+        case .location:  typePrompt = lookPromptLocation
+        }
+        let combined = [template.description, typePrompt]
+            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            .joined(separator: ", ")
         let job = GenerationJob(
             id: UUID().uuidString,
             itemName: template.name,
@@ -121,7 +133,7 @@ struct LooksDetailView: View {
             seed: Int64.random(in: 1...999_999),
             width: previewVariantWidth,
             height: previewVariantHeight,
-            combinedPrompt: template.description
+            combinedPrompt: combined
         )
         generationQueue.append(job)
     }

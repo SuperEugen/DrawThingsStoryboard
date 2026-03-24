@@ -290,6 +290,10 @@ enum SizeConfigKeys {
     static let previewVariantHeight = "dts.previewVariantHeight"
     static let finalWidth           = "dts.finalWidth"
     static let finalHeight          = "dts.finalHeight"
+    // Look example prompts — appended to the look description per type
+    static let lookPromptCharacter  = "dts.lookPromptCharacter"
+    static let lookPromptLocation   = "dts.lookPromptLocation"
+    static let lookPromptPanel      = "dts.lookPromptPanel"
 }
 
 enum SizeConfigDefaults {
@@ -297,6 +301,9 @@ enum SizeConfigDefaults {
     static let previewVariantHeight = 320
     static let finalWidth           = 1920
     static let finalHeight          = 1080
+    static let lookPromptCharacter  = "Full-body character portrait, neutral background, consistent lighting."
+    static let lookPromptLocation   = "Wide establishing shot, detailed environment, consistent lighting."
+    static let lookPromptPanel      = "Cinematic composition, detailed scene, consistent lighting."
 }
 
 // MARK: - Generic browser item

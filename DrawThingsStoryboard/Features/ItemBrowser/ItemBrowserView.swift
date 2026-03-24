@@ -218,21 +218,13 @@ struct LooksBrowserView: View {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(templates) { template in
-                        let isSelected = selectedTemplateID == template.id
-                        UnifiedThumbnailView(
-                            itemType: .look, name: template.name, sizeMode: .standard,
-                            badges: ThumbnailBadges(
-                                showExampleIndicator: true,
-                                exampleAvailable: template.lookStatus == .exampleAvailable,
-                                showDeleteButton: templates.count > 1,
-                                onDelete: { removeLook(id: template.id) },
-                                showSelectionStroke: isSelected
-                            )
+                        LookTile(
+                            template: template,
+                            isSelected: selectedTemplateID == template.id,
+                            canDelete: templates.count > 1,
+                            onDelete: { removeLook(id: template.id) },
+                            onTap: { selectedTemplateID = template.id }
                         )
-                        .padding(3)
-                        .background(RoundedRectangle(cornerRadius: 12)
-                            .fill(isSelected ? Color.accentColor.opacity(0.07) : Color.clear))
-                        .onTapGesture { selectedTemplateID = template.id }
                     }
                 }
                 .padding(16)
@@ -264,17 +256,110 @@ struct LooksBrowserView: View {
     }
 }
 
+// MARK: - Look tile with optional example image
+
+private struct LookTile: View {
+    let template: GenerationTemplate
+    let isSelected: Bool
+    let canDelete: Bool
+    let onDelete: () -> Void
+    let onTap: () -> Void
+
+    @State private var exampleImage: NSImage? = nil
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            VStack(spacing: 0) {
+                // Image area
+                ZStack {
+                    if let img = exampleImage {
+                        Image(nsImage: img)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(height: 140)
+                            .clipped()
+                    } else {
+                        UnifiedThumbnailView(
+                            itemType: .look, name: template.name, sizeMode: .standard,
+                            badges: ThumbnailBadges(
+                                showExampleIndicator: true,
+                                exampleAvailable: template.lookStatus == .exampleAvailable,
+                                showDeleteButton: false,
+                                onDelete: {},
+                                showSelectionStroke: false
+                            )
+                        )
+                    }
+                }
+                .frame(height: 140)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                // Name label
+                Text(template.name)
+                    .font(.callout.weight(.medium))
+                    .lineLimit(1)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .background(Color(NSColor.windowBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(isSelected ? Color.accentColor : Color.secondary.opacity(0.2), lineWidth: isSelected ? 2 : 0.5)
+            )
+
+            // Delete button
+            if canDelete {
+                Button(action: onDelete) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                        .font(.system(size: 16))
+                }
+                .buttonStyle(.plain)
+                .padding(6)
+            }
+
+            // E badge
+            VStack {
+                Spacer()
+                HStack {
+                    Text("E")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(template.lookStatus == .exampleAvailable ? .green : .gray)
+                        .padding(4)
+                        .background(Circle().fill(Color(NSColor.windowBackgroundColor).opacity(0.8)))
+                        .padding(6)
+                    Spacer()
+                }
+            }
+            .frame(height: 140)
+        }
+        .padding(3)
+        .background(RoundedRectangle(cornerRadius: 12)
+            .fill(isSelected ? Color.accentColor.opacity(0.07) : Color.clear))
+        .onTapGesture { onTap() }
+        .onAppear { loadExampleImage() }
+        .onChange(of: template.lookStatus) { _, _ in loadExampleImage() }
+    }
+
+    private func loadExampleImage() {
+        exampleImage = StorageService.shared.loadLookExample(lookName: template.name)
+    }
+}
+
 // MARK: - Configuration view
 
 struct ConfigurationView: View {
     @State private var sharedSecret: String = "ABCD 1234 EFGH"
-    @State private var characterExample: String = "An astronaut riding a horse"
-    @State private var locationExample: String = "big city by day"
 
     @AppStorage(SizeConfigKeys.previewVariantWidth)  private var previewVariantWidth  = SizeConfigDefaults.previewVariantWidth
     @AppStorage(SizeConfigKeys.previewVariantHeight) private var previewVariantHeight = SizeConfigDefaults.previewVariantHeight
     @AppStorage(SizeConfigKeys.finalWidth)           private var finalWidth           = SizeConfigDefaults.finalWidth
     @AppStorage(SizeConfigKeys.finalHeight)          private var finalHeight          = SizeConfigDefaults.finalHeight
+    @AppStorage(SizeConfigKeys.lookPromptCharacter)  private var lookPromptCharacter  = SizeConfigDefaults.lookPromptCharacter
+    @AppStorage(SizeConfigKeys.lookPromptLocation)   private var lookPromptLocation   = SizeConfigDefaults.lookPromptLocation
+    @AppStorage(SizeConfigKeys.lookPromptPanel)      private var lookPromptPanel      = SizeConfigDefaults.lookPromptPanel
 
     var body: some View {
         Form {
@@ -289,6 +374,22 @@ struct ConfigurationView: View {
                 LabeledContent("Small Height") { TextField("Height", value: $previewVariantHeight, format: .number).textFieldStyle(.roundedBorder).frame(maxWidth: 120) }
                 LabeledContent("Large Width")  { TextField("Width",  value: $finalWidth,           format: .number).textFieldStyle(.roundedBorder).frame(maxWidth: 120) }
                 LabeledContent("Large Height") { TextField("Height", value: $finalHeight,          format: .number).textFieldStyle(.roundedBorder).frame(maxWidth: 120) }
+            }
+            Section("Look Example Prompts") {
+                Text("These prompts are appended to the Look description when generating an example image.")
+                    .font(.caption).foregroundStyle(.secondary)
+                LabeledContent("Character") {
+                    TextField("Character prompt", text: $lookPromptCharacter)
+                        .textFieldStyle(.roundedBorder)
+                }
+                LabeledContent("Location") {
+                    TextField("Location prompt", text: $lookPromptLocation)
+                        .textFieldStyle(.roundedBorder)
+                }
+                LabeledContent("Panel") {
+                    TextField("Panel prompt", text: $lookPromptPanel)
+                        .textFieldStyle(.roundedBorder)
+                }
             }
         }
         .formStyle(.grouped)
