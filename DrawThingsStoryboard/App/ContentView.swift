@@ -123,7 +123,10 @@ struct ContentView: View {
                 StoryboardBrowserView(
                     acts: currentEpisodeActsBinding,
                     selection: $storyboardSelection,
-                    lookName: resolvedLookName
+                    lookName: Binding(
+                        get: { resolvedLookName },
+                        set: { _ in }   // read-only
+                    )
                 )
             default:
                 ItemBrowserView(

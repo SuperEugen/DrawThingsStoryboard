@@ -9,7 +9,7 @@ struct StoryboardBrowserView: View {
     @Binding var acts: [MockAct]
     @Binding var selection: StoryboardSelection?
     /// Name of the resolved preferred look for the current episode.
-    var lookName: String? = nil
+    @Binding var lookName: String?
 
     /// Tracks which IDs are collapsed (hidden children). Expanded by default.
     @State private var collapsedIDs: Set<String> = []
@@ -457,6 +457,6 @@ private struct StoryboardPanelTileView: View {
 #Preview {
     @Previewable @State var acts = MockData.sampleActs
     @Previewable @State var sel: StoryboardSelection? = nil
-    StoryboardBrowserView(acts: $acts, selection: $sel)
+    StoryboardBrowserView(acts: $acts, selection: $sel, lookName: .constant(nil))
         .frame(width: 420, height: 600)
 }
