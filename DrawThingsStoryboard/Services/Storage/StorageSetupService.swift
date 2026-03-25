@@ -72,10 +72,8 @@ final class StorageSetupService {
             version: 1,
             defaultLookName: "Photorealistic",
             modelConfigs: [
-                ModelConfigJSON(id: UUID().uuidString, name: "SDXL Standard",
-                                model: "sd_xl_base_1.0.safetensors", steps: 30, guidanceScale: 7.0),
-                ModelConfigJSON(id: UUID().uuidString, name: "Flux Schnell",
-                                model: "flux_1_schnell_q5p.ckpt", steps: 4, guidanceScale: 1.0),
+                ModelConfigJSON(id: UUID().uuidString, name: "FLUX 2 klein KV",
+                                model: "flux_2_klein_9b_kv_q8p.ckpt", steps: 6, guidanceScale: 1.0)
             ],
             previewVariantWidth:  SizeConfigDefaults.previewVariantWidth,
             previewVariantHeight: SizeConfigDefaults.previewVariantHeight,
