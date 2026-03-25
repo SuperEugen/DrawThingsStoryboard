@@ -14,6 +14,20 @@ struct AppConfig: VersionedJSON {
     var version: Int = 1
     var defaultLookName: String?
     var modelConfigs: [ModelConfigJSON]
+
+    // Image sizes
+    var previewVariantWidth:  Int    = SizeConfigDefaults.previewVariantWidth
+    var previewVariantHeight: Int    = SizeConfigDefaults.previewVariantHeight
+    var finalWidth:           Int    = SizeConfigDefaults.finalWidth
+    var finalHeight:          Int    = SizeConfigDefaults.finalHeight
+
+    // Look example prompts
+    var lookPromptCharacter: String = SizeConfigDefaults.lookPromptCharacter
+    var lookPromptLocation:  String = SizeConfigDefaults.lookPromptLocation
+    var lookPromptPanel:     String = SizeConfigDefaults.lookPromptPanel
+
+    // Draw Things shared secret
+    var sharedSecret: String = ""
 }
 
 struct ModelConfigJSON: Codable, Identifiable {

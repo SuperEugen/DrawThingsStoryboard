@@ -82,7 +82,7 @@ final class StorageSetupService {
 
         // ── Folder URLs ──────────────────────────────────────────────────
         let libraryURL  = root.appendingPathComponent("library")
-        let looksURL    = libraryURL                                           // lo-*.json sit directly in library/
+        let looksURL    = libraryURL
         let studioURL   = libraryURL.appendingPathComponent(studioName)
         let customerURL = studioURL.appendingPathComponent(customerName)
         let charURL     = customerURL.appendingPathComponent("ch-\(charName)")
@@ -94,9 +94,7 @@ final class StorageSetupService {
             .appendingPathComponent("Scene 1")
             .appendingPathComponent("Panel 1")
 
-        // Create all directories
-        for url in [libraryURL, studioURL, customerURL, charURL, locURL,
-                    episodeURL, panelURL] {
+        for url in [libraryURL, studioURL, customerURL, charURL, locURL, episodeURL, panelURL] {
             try makeDir(url)
         }
 
@@ -109,7 +107,15 @@ final class StorageSetupService {
                                 model: "sd_xl_base_1.0.safetensors", steps: 30, guidanceScale: 7.0),
                 ModelConfigJSON(id: UUID().uuidString, name: "Flux Schnell",
                                 model: "flux_1_schnell_q5p.ckpt", steps: 4, guidanceScale: 1.0),
-            ]
+            ],
+            previewVariantWidth:  SizeConfigDefaults.previewVariantWidth,
+            previewVariantHeight: SizeConfigDefaults.previewVariantHeight,
+            finalWidth:           SizeConfigDefaults.finalWidth,
+            finalHeight:          SizeConfigDefaults.finalHeight,
+            lookPromptCharacter:  "An astronaut riding a horse.",
+            lookPromptLocation:   "Wide establishing shot, big city.",
+            lookPromptPanel:      "Cinematic composition, detailed scene, consistent lighting.",
+            sharedSecret:         ""
         )
         try write(appConfig, to: appConfigURL)
 
@@ -124,80 +130,65 @@ final class StorageSetupService {
         )
         try write(looksConfig, to: looksURL.appendingPathComponent("lo-config.json"))
 
-        // ── lo-catalog.json ──────────────────────────────────────────────
-        let looksCatalog = LooksCatalog(version: 1, entries: [])
-        try write(looksCatalog, to: looksURL.appendingPathComponent("lo-catalog.json"))
+        // ── lo-catalog.json
+        try write(LooksCatalog(version: 1, entries: []), to: looksURL.appendingPathComponent("lo-catalog.json"))
 
-        // ── st-config.json ───────────────────────────────────────────────
-        let studioConfig = StudioConfig(
-            version: 1, id: studioID, name: studioName,
-            rules: "", preferredLookID: lookID
-        )
-        try write(studioConfig, to: studioURL.appendingPathComponent("st-config.json"))
+        // ── st-config.json
+        try write(StudioConfig(version: 1, id: studioID, name: studioName, rules: "", preferredLookID: lookID),
+                  to: studioURL.appendingPathComponent("st-config.json"))
 
-        // ── st-catalog.json ──────────────────────────────────────────────
-        let studioCatalog = AssetCatalog(version: 1, entries: [])
-        try write(studioCatalog, to: studioURL.appendingPathComponent("st-catalog.json"))
+        // ── st-catalog.json
+        try write(AssetCatalog(version: 1, entries: []), to: studioURL.appendingPathComponent("st-catalog.json"))
 
-        // ── cu-config.json ───────────────────────────────────────────────
-        let customerConfig = CustomerConfig(
-            version: 1, id: customerID, name: customerName,
-            rules: "", preferredLookID: nil
-        )
-        try write(customerConfig, to: customerURL.appendingPathComponent("cu-config.json"))
+        // ── cu-config.json
+        try write(CustomerConfig(version: 1, id: customerID, name: customerName, rules: "", preferredLookID: nil),
+                  to: customerURL.appendingPathComponent("cu-config.json"))
 
-        // ── cu-catalog.json ──────────────────────────────────────────────
-        let customerCatalog = AssetCatalog(version: 1, entries: [])
-        try write(customerCatalog, to: customerURL.appendingPathComponent("cu-catalog.json"))
+        // ── cu-catalog.json
+        try write(AssetCatalog(version: 1, entries: []), to: customerURL.appendingPathComponent("cu-catalog.json"))
 
-        // ── ch-My Character/as-config.json ───────────────────────────────
+        // ── ch-My Character/as-config.json
         let charConfig = AssetConfig(
             version: 1, id: charID, name: charName,
             description: "Describe your character here.",
             assetType: "character", gender: "male",
             locationSetting: nil, libraryLevel: "customer",
             variants: (1...4).map {
-                VariantJSON(id: "\(charID)-v\($0)", label: "Variant \($0)",
-                            isApproved: false, isGenerated: false, fileName: nil)
+                VariantJSON(id: "\(charID)-v\($0)", label: "Variant \($0)", isApproved: false, isGenerated: false, fileName: nil)
             }
         )
         try write(charConfig, to: charURL.appendingPathComponent("as-config.json"))
 
-        // ── lo-My Location/as-config.json ────────────────────────────────
+        // ── lo-My Location/as-config.json
         let locConfig = AssetConfig(
             version: 1, id: locID, name: locName,
             description: "Describe your location here.",
             assetType: "location", gender: nil,
             locationSetting: "interior", libraryLevel: "customer",
             variants: (1...4).map {
-                VariantJSON(id: "\(locID)-v\($0)", label: "Variant \($0)",
-                            isApproved: false, isGenerated: false, fileName: nil)
+                VariantJSON(id: "\(locID)-v\($0)", label: "Variant \($0)", isApproved: false, isGenerated: false, fileName: nil)
             }
         )
         try write(locConfig, to: locURL.appendingPathComponent("as-config.json"))
 
-        // ── ep-config.json ───────────────────────────────────────────────
-        let episodeConfig = EpisodeConfig(
-            version: 1, id: episodeID, name: episodeName,
-            rules: "", preferredLookID: nil,
-            characterIDs: [charID], locationIDs: [locID]
+        // ── ep-config.json
+        try write(
+            EpisodeConfig(version: 1, id: episodeID, name: episodeName, rules: "",
+                          preferredLookID: nil, characterIDs: [charID], locationIDs: [locID]),
+            to: episodeURL.appendingPathComponent("ep-config.json")
         )
-        try write(episodeConfig, to: episodeURL.appendingPathComponent("ep-config.json"))
 
-        // ── ep-catalog.json ──────────────────────────────────────────────
-        let episodeCatalog = EpisodeCatalog(version: 1, entries: [])
-        try write(episodeCatalog, to: episodeURL.appendingPathComponent("ep-catalog.json"))
+        // ── ep-catalog.json
+        try write(EpisodeCatalog(version: 1, entries: []), to: episodeURL.appendingPathComponent("ep-catalog.json"))
 
-        // ── Panel 1/pa-config.json ───────────────────────────────────────
-        let panelConfig = PanelConfig(
-            version: 1, id: panelID,
-            name: "Panel 1", description: "",
-            actName: "Act 1", sequenceName: "Sequence 1", sceneName: "Scene 1",
-            attachedAssetIDs: [],
-            smallPanelAvailable: false, largePanelAvailable: false,
-            smallFileName: nil, largeFileName: nil
+        // ── Panel 1/pa-config.json
+        try write(
+            PanelConfig(version: 1, id: panelID, name: "Panel 1", description: "",
+                        actName: "Act 1", sequenceName: "Sequence 1", sceneName: "Scene 1",
+                        attachedAssetIDs: [], smallPanelAvailable: false, largePanelAvailable: false,
+                        smallFileName: nil, largeFileName: nil),
+            to: panelURL.appendingPathComponent("pa-config.json")
         )
-        try write(panelConfig, to: panelURL.appendingPathComponent("pa-config.json"))
     }
 
     // MARK: - Helpers
