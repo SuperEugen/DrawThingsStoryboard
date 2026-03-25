@@ -238,7 +238,7 @@ struct GenerationTemplate: Identifiable {
 
 // MARK: - Generation job
 
-struct GenerationJob: Identifiable {
+struct GenerationJob: Identifiable, Equatable {
     let id: String
     let itemName: String
     let itemType: CastingItemType
@@ -260,7 +260,7 @@ struct GenerationJob: Identifiable {
     var completedAt: Date? = nil
 }
 
-struct JobAssetInfo: Identifiable {
+struct JobAssetInfo: Identifiable, Equatable {
     let id: String
     let name: String
     let type: CastingItemType
