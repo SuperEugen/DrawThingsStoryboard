@@ -1,9 +1,6 @@
 import Foundation
 
 // MARK: - StorageSetupService
-//
-// Runs once at app launch. If dtsb-config.json is missing, creates the
-// complete default folder structure and all *-config / *-catalog JSON files.
 
 final class StorageSetupService {
 
@@ -17,8 +14,6 @@ final class StorageSetupService {
         return e
     }()
 
-    // MARK: - Entry point
-
     func setupIfNeeded() {
         let root = StorageService.shared.rootURL
         let appConfigURL = root.appendingPathComponent("dtsb-config.json")
@@ -30,8 +25,6 @@ final class StorageSetupService {
             print("[StorageSetupService] Setup failed: \(error)")
         }
     }
-
-    // MARK: - Default structure
 
     private func createDefaultStructure(root: URL, appConfigURL: URL) throws {
 
@@ -50,7 +43,6 @@ final class StorageSetupService {
         let charName     = "My Character"
         let locName      = "My Location"
 
-        // ── Folder URLs
         let libraryURL  = root.appendingPathComponent("library")
         let studioURL   = libraryURL.appendingPathComponent(studioName)
         let customerURL = studioURL.appendingPathComponent(customerName)
@@ -67,56 +59,44 @@ final class StorageSetupService {
             try makeDir(url)
         }
 
-        // ── dtsb-config.json
+        // ── dtsb-config.json (no panel prompt)
         let appConfig = AppConfig(
             version: 1,
             defaultLookName: "Photorealistic",
             modelConfigs: [
-                ModelConfigJSON(id: UUID().uuidString, name: "FLUX 2 klein KV",
-                                model: "flux_2_klein_9b_kv_q8p.ckpt", steps: 6, guidanceScale: 1.0)
+                ModelConfigJSON(id: UUID().uuidString, name: "SDXL Standard",
+                                model: "sd_xl_base_1.0.safetensors", steps: 30, guidanceScale: 7.0),
+                ModelConfigJSON(id: UUID().uuidString, name: "Flux Schnell",
+                                model: "flux_1_schnell_q5p.ckpt", steps: 4, guidanceScale: 1.0),
             ],
             previewVariantWidth:  SizeConfigDefaults.previewVariantWidth,
             previewVariantHeight: SizeConfigDefaults.previewVariantHeight,
             finalWidth:           SizeConfigDefaults.finalWidth,
             finalHeight:          SizeConfigDefaults.finalHeight,
             lookExamplePrompt:    SizeConfigDefaults.lookExamplePrompt,
-            lookPromptPanel:      SizeConfigDefaults.lookPromptPanel,
             sharedSecret:         ""
         )
         try write(appConfig, to: appConfigURL)
 
-        // ── lo-config.json  (two default looks)
-        let looksConfig = LooksConfig(
-            version: 1,
-            looks: [
-                LookJSON(id: look1ID, name: "Photorealistic",
-                         description: "Photorealistic, cinematic lighting, 8k resolution, dramatic shadows.",
-                         lookStatus: "noExample", exampleFileName: nil),
-                LookJSON(id: look2ID, name: "Comic Style",
-                         description: "Illustration in 2-d flat color art style. Highly stylised with very low detail and no textures, simplified. Minimalistic background.",
-                         lookStatus: "noExample", exampleFileName: nil),
-            ]
-        )
+        // ── lo-config.json
+        let looksConfig = LooksConfig(version: 1, looks: [
+            LookJSON(id: look1ID, name: "Photorealistic",
+                     description: "Photorealistic, cinematic lighting, 8k resolution, dramatic shadows.",
+                     lookStatus: "noExample", exampleFileName: nil),
+            LookJSON(id: look2ID, name: "Comic Style",
+                     description: "Illustration in 2-d flat color art style. Highly stylised with very low detail and no textures, simplified. Minimalistic background.",
+                     lookStatus: "noExample", exampleFileName: nil),
+        ])
         try write(looksConfig, to: libraryURL.appendingPathComponent("lo-config.json"))
 
-        // ── lo-catalog.json
         try write(LooksCatalog(version: 1, entries: []), to: libraryURL.appendingPathComponent("lo-catalog.json"))
-
-        // ── st-config.json
         try write(StudioConfig(version: 1, id: studioID, name: studioName, rules: "", preferredLookID: look1ID),
                   to: studioURL.appendingPathComponent("st-config.json"))
-
-        // ── st-catalog.json
         try write(AssetCatalog(version: 1, entries: []), to: studioURL.appendingPathComponent("st-catalog.json"))
-
-        // ── cu-config.json
         try write(CustomerConfig(version: 1, id: customerID, name: customerName, rules: "", preferredLookID: nil),
                   to: customerURL.appendingPathComponent("cu-config.json"))
-
-        // ── cu-catalog.json
         try write(AssetCatalog(version: 1, entries: []), to: customerURL.appendingPathComponent("cu-catalog.json"))
 
-        // ── ch-My Character/as-config.json
         let charConfig = AssetConfig(
             version: 1, id: charID, name: charName,
             description: "Describe your character here.",
@@ -128,7 +108,6 @@ final class StorageSetupService {
         )
         try write(charConfig, to: charURL.appendingPathComponent("as-config.json"))
 
-        // ── lo-My Location/as-config.json
         let locConfig = AssetConfig(
             version: 1, id: locID, name: locName,
             description: "Describe your location here.",
@@ -140,17 +119,12 @@ final class StorageSetupService {
         )
         try write(locConfig, to: locURL.appendingPathComponent("as-config.json"))
 
-        // ── ep-config.json
         try write(
             EpisodeConfig(version: 1, id: episodeID, name: episodeName, rules: "",
                           preferredLookID: nil, characterIDs: [charID], locationIDs: [locID]),
             to: episodeURL.appendingPathComponent("ep-config.json")
         )
-
-        // ── ep-catalog.json
         try write(EpisodeCatalog(version: 1, entries: []), to: episodeURL.appendingPathComponent("ep-catalog.json"))
-
-        // ── Panel 1/pa-config.json
         try write(
             PanelConfig(version: 1, id: panelID, name: "Panel 1", description: "",
                         actName: "Act 1", sequenceName: "Sequence 1", sceneName: "Scene 1",
@@ -159,8 +133,6 @@ final class StorageSetupService {
             to: panelURL.appendingPathComponent("pa-config.json")
         )
     }
-
-    // MARK: - Helpers
 
     private func makeDir(_ url: URL) throws {
         try fm.createDirectory(at: url, withIntermediateDirectories: true, attributes: nil)

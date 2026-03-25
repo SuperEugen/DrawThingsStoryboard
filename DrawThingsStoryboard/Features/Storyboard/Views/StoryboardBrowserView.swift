@@ -12,7 +12,14 @@ struct StoryboardBrowserView: View {
         VStack(spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "pencil.and.list.clipboard").font(.title2).foregroundStyle(.secondary)
-                Text("Storyboard").font(.title2.bold())
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Storyboard").font(.title2.bold())
+                    if let name = lookName {
+                        Text(name)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 Spacer()
             }
             .padding(.horizontal, 16).padding(.vertical, 12)
@@ -47,23 +54,19 @@ private struct ActRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Act header
             HStack(spacing: 6) {
                 Button { isExpanded.toggle() } label: {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                         .font(.caption.weight(.medium)).frame(width: 16)
                 }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
-
                 Image(systemName: StoryboardLevel.act.icon)
                     .foregroundStyle(StoryboardLevel.act.color).frame(width: 16)
                 Text(act.name).font(.subheadline.weight(.semibold))
                 Spacer()
             }
             .padding(.horizontal, 12).padding(.vertical, 6)
-            .background(
-                selection == .act(act.id) ? Color.accentColor.opacity(0.1) : Color.clear
-            )
+            .background(selection == .act(act.id) ? Color.accentColor.opacity(0.1) : Color.clear)
             .contentShape(Rectangle())
             .onTapGesture { selection = .act(act.id) }
 
@@ -92,7 +95,6 @@ private struct SequenceRow: View {
                         .font(.caption.weight(.medium)).frame(width: 16)
                 }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
-
                 Image(systemName: StoryboardLevel.sequence.icon)
                     .foregroundStyle(StoryboardLevel.sequence.color).frame(width: 16)
                 Text(sequence.name).font(.subheadline)
@@ -128,7 +130,6 @@ private struct SceneRow: View {
                         .font(.caption.weight(.medium)).frame(width: 16)
                 }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
-
                 Image(systemName: StoryboardLevel.scene.icon)
                     .foregroundStyle(StoryboardLevel.scene.color).frame(width: 16)
                 Text(scene.name).font(.subheadline)
@@ -180,7 +181,7 @@ private struct PanelRow: View {
 #Preview {
     @Previewable @State var acts: [MockAct] = []
     @Previewable @State var sel: StoryboardSelection? = nil
-    @Previewable @State var lookName: String? = nil
+    @Previewable @State var lookName: String? = "Photorealistic"
     StoryboardBrowserView(acts: $acts, selection: $sel, lookName: $lookName)
         .frame(width: 300, height: 600)
 }

@@ -228,7 +228,6 @@ enum LookStatus: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-/// A visual style template. No itemType — looks apply to all generation types.
 struct GenerationTemplate: Identifiable {
     let id: String
     var name: String
@@ -277,7 +276,6 @@ enum SizeConfigKeys {
     static let finalWidth           = "dts.finalWidth"
     static let finalHeight          = "dts.finalHeight"
     static let lookExamplePrompt    = "dts.lookExamplePrompt"
-    static let lookPromptPanel      = "dts.lookPromptPanel"
 }
 
 enum SizeConfigDefaults {
@@ -286,7 +284,6 @@ enum SizeConfigDefaults {
     static let finalWidth           = 1920
     static let finalHeight          = 1080
     static let lookExamplePrompt    = "An astronaut riding a horse."
-    static let lookPromptPanel      = "Cinematic composition, detailed scene, consistent lighting."
 }
 
 // MARK: - Generic browser item

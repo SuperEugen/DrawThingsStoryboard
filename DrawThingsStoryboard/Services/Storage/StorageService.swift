@@ -7,10 +7,10 @@ import Foundation
 //
 // Structure under ~/Pictures/DrawThings-Storyboard/:
 //   library/
-//     assets/     ← Variant images  (<assetID>_v<n>.png)
-//     examples/   ← Look examples   (<lookName>.png)
+//     <lookName>.png          ← Look example images (alongside lo-config.json)
+//     assets/                 ← Variant images (<assetID>_v<n>.png)
 //   <EpisodeName>/
-//     panels/     ← Panel images    (<panelID>.png)
+//     panels/                 ← Panel images (<panelID>.png)
 
 enum StorageError: LocalizedError {
     case couldNotCreateDirectory(URL)
@@ -42,9 +42,11 @@ final class StorageService {
 
     // MARK: - Sub-directories
 
-    var libraryURL: URL   { rootURL.appendingPathComponent("library") }
-    var assetsURL: URL    { libraryURL.appendingPathComponent("assets") }
-    var examplesURL: URL  { libraryURL.appendingPathComponent("examples") }
+    var libraryURL: URL { rootURL.appendingPathComponent("library") }
+    var assetsURL: URL  { libraryURL.appendingPathComponent("assets") }
+
+    /// Look example images live directly in library/, alongside lo-config.json.
+    var looksURL: URL   { libraryURL }
 
     func panelsURL(episodeName: String) -> URL {
         rootURL
@@ -55,7 +57,6 @@ final class StorageService {
     // MARK: - Save helpers
 
     /// Save a variant image.
-    /// Returns the file URL on success.
     @discardableResult
     func saveVariantImage(
         _ image: NSImage,
@@ -69,13 +70,13 @@ final class StorageService {
         return url
     }
 
-    /// Save a Look example image.
+    /// Save a Look example image directly into library/.
     @discardableResult
     func saveLookExample(
         _ image: NSImage,
         lookName: String
     ) throws -> URL {
-        let dir = examplesURL
+        let dir = looksURL
         try makeDirectory(dir)
         let url = dir.appendingPathComponent("\(sanitize(lookName)).png")
         try writePNG(image, to: url)
@@ -103,18 +104,16 @@ final class StorageService {
         return NSImage(contentsOf: url)
     }
 
-    /// Loads the first available variant image for an asset (v0..v3).
     func loadFirstAvailableVariant(assetID: String) -> NSImage? {
         for idx in 0..<4 {
-            if let img = loadVariantImage(assetID: assetID, variantIndex: idx) {
-                return img
-            }
+            if let img = loadVariantImage(assetID: assetID, variantIndex: idx) { return img }
         }
         return nil
     }
 
+    /// Load a Look example image from library/<lookName>.png
     func loadLookExample(lookName: String) -> NSImage? {
-        let url = examplesURL.appendingPathComponent("\(sanitize(lookName)).png")
+        let url = looksURL.appendingPathComponent("\(sanitize(lookName)).png")
         return NSImage(contentsOf: url)
     }
 
@@ -129,9 +128,7 @@ final class StorageService {
     private func makeDirectory(_ url: URL) throws {
         do {
             try FileManager.default.createDirectory(
-                at: url,
-                withIntermediateDirectories: true,
-                attributes: nil
+                at: url, withIntermediateDirectories: true, attributes: nil
             )
         } catch {
             throw StorageError.couldNotCreateDirectory(url)
@@ -143,9 +140,7 @@ final class StorageService {
             let tiff = image.tiffRepresentation,
             let bmp  = NSBitmapImageRep(data: tiff),
             let png  = bmp.representation(using: .png, properties: [:])
-        else {
-            throw StorageError.couldNotSaveImage(url)
-        }
+        else { throw StorageError.couldNotSaveImage(url) }
         do {
             try png.write(to: url)
         } catch {
@@ -153,18 +148,17 @@ final class StorageService {
         }
     }
 
-    /// Replaces characters that are unsafe in file/folder names.
-    private func sanitize(_ name: String) -> String {
+    func sanitize(_ name: String) -> String {
         name
             .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: "/", with: "-")
-            .replacingOccurrences(of: ":", with: "-")
+            .replacingOccurrences(of: "/",  with: "-")
+            .replacingOccurrences(of: ":",  with: "-")
             .replacingOccurrences(of: "\\", with: "-")
             .replacingOccurrences(of: "\"", with: "")
-            .replacingOccurrences(of: "*", with: "")
-            .replacingOccurrences(of: "?", with: "")
-            .replacingOccurrences(of: "<", with: "")
-            .replacingOccurrences(of: ">", with: "")
-            .replacingOccurrences(of: "|", with: "-")
+            .replacingOccurrences(of: "*",  with: "")
+            .replacingOccurrences(of: "?",  with: "")
+            .replacingOccurrences(of: "<",  with: "")
+            .replacingOccurrences(of: ">",  with: "")
+            .replacingOccurrences(of: "|",  with: "-")
     }
 }

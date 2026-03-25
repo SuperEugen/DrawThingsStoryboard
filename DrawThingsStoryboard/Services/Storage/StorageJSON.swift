@@ -2,14 +2,12 @@ import Foundation
 
 // MARK: - Versioned JSON base
 
-/// Every persisted JSON file carries a schema version for future migration.
 protocol VersionedJSON: Codable {
     var version: Int { get }
 }
 
 // MARK: - dtsb-config.json  (app-wide)
 
-/// Top-level app config stored at ~/Pictures/DrawThings-Storyboard/dtsb-config.json
 struct AppConfig: VersionedJSON {
     var version: Int = 1
     var defaultLookName: String?
@@ -21,11 +19,8 @@ struct AppConfig: VersionedJSON {
     var finalWidth:           Int = SizeConfigDefaults.finalWidth
     var finalHeight:          Int = SizeConfigDefaults.finalHeight
 
-    // Look example prompt (single, appended to every look description)
+    // Look example prompt (appended to look description for example generation)
     var lookExamplePrompt: String = SizeConfigDefaults.lookExamplePrompt
-
-    // Panel prompt
-    var lookPromptPanel: String = SizeConfigDefaults.lookPromptPanel
 
     // Draw Things shared secret
     var sharedSecret: String = ""
@@ -41,7 +36,6 @@ struct ModelConfigJSON: Codable, Identifiable {
 
 // MARK: - lo-config.json  (looks library)
 
-/// Stored at ~/Pictures/DrawThings-Storyboard/library/lo-config.json
 struct LooksConfig: VersionedJSON {
     var version: Int = 1
     var looks: [LookJSON]
@@ -50,15 +44,13 @@ struct LooksConfig: VersionedJSON {
 struct LookJSON: Codable, Identifiable {
     var id: String
     var name: String
-    /// Style prompt describing the visual look.
     var description: String
     var lookStatus: String        // "noExample" | "exampleAvailable"
     var exampleFileName: String?
 }
 
-// MARK: - lo-catalog.json  (looks library)
+// MARK: - lo-catalog.json
 
-/// Lists all look example PNG files in the looks folder.
 struct LooksCatalog: VersionedJSON {
     var version: Int = 1
     var entries: [LookCatalogEntry]
@@ -69,7 +61,7 @@ struct LookCatalogEntry: Codable {
     var fileName: String
 }
 
-// MARK: - st-config.json  (studio)
+// MARK: - st-config.json
 
 struct StudioConfig: VersionedJSON {
     var version: Int = 1
@@ -79,9 +71,8 @@ struct StudioConfig: VersionedJSON {
     var preferredLookID: String?
 }
 
-// MARK: - st-catalog.json / cu-catalog.json  (asset catalogs)
+// MARK: - st-catalog.json / cu-catalog.json
 
-/// Lists all asset PNG files at this library level.
 struct AssetCatalog: VersionedJSON {
     var version: Int = 1
     var entries: [AssetCatalogEntry]
@@ -94,7 +85,7 @@ struct AssetCatalogEntry: Codable {
     var isApproved: Bool
 }
 
-// MARK: - cu-config.json  (customer)
+// MARK: - cu-config.json
 
 struct CustomerConfig: VersionedJSON {
     var version: Int = 1
@@ -104,17 +95,17 @@ struct CustomerConfig: VersionedJSON {
     var preferredLookID: String?
 }
 
-// MARK: - as-config.json  (asset — character or location)
+// MARK: - as-config.json
 
 struct AssetConfig: VersionedJSON {
     var version: Int = 1
     var id: String
     var name: String
     var description: String
-    var assetType: String         // "character" | "location"
-    var gender: String?           // character only
-    var locationSetting: String?  // location only
-    var libraryLevel: String      // "studio" | "customer" | "episode"
+    var assetType: String
+    var gender: String?
+    var locationSetting: String?
+    var libraryLevel: String
     var variants: [VariantJSON]
 }
 
@@ -126,7 +117,7 @@ struct VariantJSON: Codable {
     var fileName: String?
 }
 
-// MARK: - ep-config.json  (episode)
+// MARK: - ep-config.json
 
 struct EpisodeConfig: VersionedJSON {
     var version: Int = 1
@@ -138,7 +129,7 @@ struct EpisodeConfig: VersionedJSON {
     var locationIDs: [String]
 }
 
-// MARK: - ep-catalog.json  (episode panel images)
+// MARK: - ep-catalog.json
 
 struct EpisodeCatalog: VersionedJSON {
     var version: Int = 1
@@ -151,7 +142,7 @@ struct PanelCatalogEntry: Codable {
     var isSmall: Bool
 }
 
-// MARK: - pa-config.json  (panel)
+// MARK: - pa-config.json
 
 struct PanelConfig: VersionedJSON {
     var version: Int = 1
