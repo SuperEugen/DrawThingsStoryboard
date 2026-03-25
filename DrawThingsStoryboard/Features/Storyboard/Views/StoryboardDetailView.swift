@@ -223,14 +223,8 @@ private struct StoryboardPanelDetailView: View {
     @AppStorage(SizeConfigKeys.lookPromptPanel)      private var lookPromptPanel      = SizeConfigDefaults.lookPromptPanel
 
     @State private var showAssetPicker = false
-
-    /// Local copy of attached IDs kept in sync with the binding.
-    /// Using @State + .onAppear/.onChange ensures SwiftUI tracks mutations
-    /// and re-renders the view reliably, avoiding deep-binding propagation issues.
     @State private var attachedIDs: [String] = []
 
-    /// Resolved attached assets (matched by ID from the available pool).
-    /// Locations are always shown first.
     private var attachedAssets: [CastingItem] {
         let resolved = attachedIDs.compactMap { id in
             availableAssets.first { $0.id == id }
@@ -242,196 +236,119 @@ private struct StoryboardPanelDetailView: View {
         }
     }
 
-    /// Whether the + button is enabled.
-    private var canAddAsset: Bool {
-        attachedIDs.count < 4
-    }
+    private var canAddAsset: Bool { attachedIDs.count < 4 }
+    private var hasLocation: Bool { attachedAssets.contains { $0.type == .location } }
 
-    /// Whether a location is already attached.
-    private var hasLocation: Bool {
-        attachedAssets.contains { $0.type == .location }
-    }
-
-    /// Whether a small panel job is already in the queue.
     private var smallPanelQueued: Bool {
         generationQueue.contains { $0.itemName == panel.name && $0.jobType == .generatePanel && $0.size == .small }
     }
-
-    /// Whether a large panel job is already in the queue.
     private var largePanelQueued: Bool {
         generationQueue.contains { $0.itemName == panel.name && $0.jobType == .generatePanel && $0.size == .large }
     }
 
-    /// Write local state back to the binding.
-    private func syncToBinding() {
-        panel.attachedAssetIDs = attachedIDs
-    }
+    private func syncToBinding() { panel.attachedAssetIDs = attachedIDs }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                // Thumbnail header
-                UnifiedThumbnailView(
-                    itemType: .panel,
-                    name: "",
-                    sizeMode: .header
-                )
-                .padding(.bottom, 16)
+                UnifiedThumbnailView(itemType: .panel, name: "", sizeMode: .header)
+                    .padding(.bottom, 16)
 
-                // Status with S/L rows and generate buttons
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Status")
 
-                    // Small Panel row
                     HStack(spacing: 8) {
-                        Text("S")
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        Text("S").font(.system(size: 10, weight: .bold, design: .monospaced))
                             .foregroundStyle(panel.smallPanelAvailable ? .green : .gray)
-                        Text("Small Panel available:")
-                            .font(.callout)
-                        Text(panel.smallPanelAvailable ? "yes" : "not yet")
-                            .font(.callout)
+                        Text("Small Panel available:").font(.callout)
+                        Text(panel.smallPanelAvailable ? "yes" : "not yet").font(.callout)
                             .foregroundStyle(panel.smallPanelAvailable ? .green : .secondary)
                         Spacer()
-
                         if !panel.smallPanelAvailable {
                             if smallPanelQueued {
-                                Text("queued")
-                                    .font(.caption)
-                                    .foregroundStyle(.orange)
+                                Text("queued").font(.caption).foregroundStyle(.orange)
                             } else {
-                                Button {
-                                    generateSmallPanel()
-                                } label: {
-                                    Label("Generate Small Panel", systemImage: "photo")
-                                        .font(.caption)
+                                Button { generateSmallPanel() } label: {
+                                    Label("Generate Small Panel", systemImage: "photo").font(.caption)
                                 }
-                                .buttonStyle(.bordered)
-                                .controlSize(.mini)
+                                .buttonStyle(.bordered).controlSize(.mini)
                             }
                         }
                     }
-                    .padding(.vertical, 5)
-                    .padding(.horizontal, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 7)
-                            .fill(Color.accentColor.opacity(0.07))
-                    )
+                    .padding(.vertical, 5).padding(.horizontal, 8)
+                    .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
 
-                    // Large Panel row
                     HStack(spacing: 8) {
-                        Text("L")
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        Text("L").font(.system(size: 10, weight: .bold, design: .monospaced))
                             .foregroundStyle(panel.largePanelAvailable ? .green : .gray)
-                        Text("Large Panel available:")
-                            .font(.callout)
+                        Text("Large Panel available:").font(.callout)
                         Text(panel.largePanelAvailable ? "yes" : (panel.smallPanelAvailable ? "not yet" : "no Small Panel"))
-                            .font(.callout)
-                            .foregroundStyle(panel.largePanelAvailable ? .green : .secondary)
+                            .font(.callout).foregroundStyle(panel.largePanelAvailable ? .green : .secondary)
                         Spacer()
-
                         if panel.smallPanelAvailable && !panel.largePanelAvailable {
                             if largePanelQueued {
-                                Text("queued")
-                                    .font(.caption)
-                                    .foregroundStyle(.green)
+                                Text("queued").font(.caption).foregroundStyle(.green)
                             } else {
-                                Button {
-                                    generateLargePanel()
-                                } label: {
-                                    Label("Generate Large Panel", systemImage: "photo.badge.checkmark")
-                                        .font(.caption)
+                                Button { generateLargePanel() } label: {
+                                    Label("Generate Large Panel", systemImage: "photo.badge.checkmark").font(.caption)
                                 }
-                                .buttonStyle(.bordered)
-                                .controlSize(.mini)
+                                .buttonStyle(.bordered).controlSize(.mini)
                             }
                         }
                     }
-                    .padding(.vertical, 5)
-                    .padding(.horizontal, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 7)
-                            .fill(Color.accentColor.opacity(0.07))
-                    )
+                    .padding(.vertical, 5).padding(.horizontal, 8)
+                    .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
                 }
                 .padding(.bottom, 12)
 
                 Divider().padding(.vertical, 8)
 
-                // Name
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Name")
-                    TextField("Name", text: $panel.name)
-                        .textFieldStyle(.roundedBorder)
+                    TextField("Name", text: $panel.name).textFieldStyle(.roundedBorder)
                 }
                 .padding(.bottom, 12)
 
-                // Description
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Description")
-                    TextEditor(text: $panel.description)
-                        .font(.callout)
-                        .frame(minHeight: 80)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(Color.secondary.opacity(0.25), lineWidth: 0.5)
-                        )
+                    TextEditor(text: $panel.description).font(.callout).frame(minHeight: 80)
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.25), lineWidth: 0.5))
                 }
                 .padding(.bottom, 12)
 
-                // File Name (read-only)
                 if !panel.fileName.isEmpty {
                     VStack(alignment: .leading, spacing: 6) {
                         sectionLabel("File Name")
-                        Text(panel.fileName)
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
-                            .padding(.vertical, 5)
-                            .padding(.horizontal, 8)
+                        Text(panel.fileName).font(.callout).foregroundStyle(.secondary)
+                            .textSelection(.enabled).padding(.vertical, 5).padding(.horizontal, 8)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(
-                                RoundedRectangle(cornerRadius: 7)
-                                    .fill(Color.accentColor.opacity(0.07))
-                            )
+                            .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
                     }
                     .padding(.bottom, 12)
                 }
 
                 Divider().padding(.vertical, 8)
 
-                // Attached Assets
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         sectionLabel("Assets (\(attachedIDs.count)/4)")
                         Spacer()
-                        Button {
-                            showAssetPicker = true
-                        } label: {
-                            Image(systemName: "plus")
-                                .frame(width: 22, height: 22)
+                        Button { showAssetPicker = true } label: {
+                            Image(systemName: "plus").frame(width: 22, height: 22)
                         }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
-                        .disabled(!canAddAsset)
+                        .buttonStyle(.bordered).controlSize(.mini).disabled(!canAddAsset)
                     }
-
                     if attachedAssets.isEmpty {
                         Text("No assets attached — tap + to add.")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                            .padding(.vertical, 8)
+                            .font(.caption).foregroundStyle(.tertiary).padding(.vertical, 8)
                     } else {
                         let columns = [GridItem(.adaptive(minimum: 288, maximum: 320), spacing: 12)]
                         LazyVGrid(columns: columns, spacing: 8) {
                             ForEach(attachedAssets) { asset in
-                                PanelAssetTileView(
-                                    item: asset,
-                                    onRemove: {
-                                        attachedIDs.removeAll { $0 == asset.id }
-                                        syncToBinding()
-                                    }
-                                )
+                                PanelAssetTileView(item: asset, onRemove: {
+                                    attachedIDs.removeAll { $0 == asset.id }
+                                    syncToBinding()
+                                })
                             }
                         }
                     }
@@ -453,45 +370,27 @@ private struct StoryboardPanelDetailView: View {
                 availableAssets: availableAssets,
                 attachedIDs: $attachedIDs,
                 allAvailableAssets: availableAssets,
-                onDone: {
-                    syncToBinding()
-                    showAssetPicker = false
-                }
+                onDone: { syncToBinding(); showAssetPicker = false }
             )
         }
     }
 
     private var assetInfos: [JobAssetInfo] {
         attachedAssets.map { asset in
-            let icon: String
-            if asset.type == .character {
-                icon = asset.gender?.icon ?? "person.fill"
-            } else {
-                icon = asset.locationSetting?.icon ?? "map"
-            }
-            return JobAssetInfo(
-                id: asset.id, name: asset.name, type: asset.type, icon: icon,
-                gender: asset.gender, locationSetting: asset.locationSetting
-            )
+            let icon = asset.type == .character ? (asset.gender?.icon ?? "person.fill") : (asset.locationSetting?.icon ?? "map")
+            return JobAssetInfo(id: asset.id, name: asset.name, type: asset.type, icon: icon,
+                                gender: asset.gender, locationSetting: asset.locationSetting)
         }
     }
 
     private func generateSmallPanel() {
         let combined = buildCombinedPrompt()
         var job = GenerationJob(
-            id: UUID().uuidString,
-            itemName: panel.name,
-            itemType: .character,    // panel — no specific casting type
-            jobType: .generatePanel,
-            size: .small,
-            lookName: resolvedLookName ?? "—",
-            queuedAt: Date(),
-            estimatedDuration: 120,
-            itemIcon: "photo",
+            id: UUID().uuidString, itemName: panel.name, itemType: .character,
+            jobType: .generatePanel, size: .small, lookName: resolvedLookName ?? "—",
+            queuedAt: Date(), estimatedDuration: 120, itemIcon: "photo",
             seed: Int64.random(in: 1...999_999),
-            width: previewVariantWidth,
-            height: previewVariantHeight,
-            combinedPrompt: combined
+            width: previewVariantWidth, height: previewVariantHeight, combinedPrompt: combined
         )
         job.attachedAssets = assetInfos
         generationQueue.append(job)
@@ -500,25 +399,16 @@ private struct StoryboardPanelDetailView: View {
     private func generateLargePanel() {
         let combined = buildCombinedPrompt()
         var job = GenerationJob(
-            id: UUID().uuidString,
-            itemName: panel.name,
-            itemType: .character,    // panel — no specific casting type
-            jobType: .generatePanel,
-            size: .large,
-            lookName: resolvedLookName ?? "—",
-            queuedAt: Date(),
-            estimatedDuration: 240,
-            itemIcon: "photo",
+            id: UUID().uuidString, itemName: panel.name, itemType: .character,
+            jobType: .generatePanel, size: .large, lookName: resolvedLookName ?? "—",
+            queuedAt: Date(), estimatedDuration: 240, itemIcon: "photo",
             seed: Int64.random(in: 1...999_999),
-            width: finalWidth,
-            height: finalHeight,
-            combinedPrompt: combined
+            width: finalWidth, height: finalHeight, combinedPrompt: combined
         )
         job.attachedAssets = assetInfos
         generationQueue.append(job)
     }
 
-    /// Assembles: look description + lookPromptPanel + panel description
     private func buildCombinedPrompt() -> String {
         [lookDescription, lookPromptPanel, panel.description]
             .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
@@ -526,7 +416,7 @@ private struct StoryboardPanelDetailView: View {
     }
 }
 
-// MARK: - Panel asset tile (attached asset with x-remove)
+// MARK: - Panel asset tile
 
 private struct PanelAssetTileView: View {
     let item: CastingItem
@@ -534,12 +424,9 @@ private struct PanelAssetTileView: View {
 
     var body: some View {
         UnifiedThumbnailView(
-            itemType: item.thumbnailType,
-            name: item.name,
-            sizeMode: .standard,
+            itemType: item.thumbnailType, name: item.name, sizeMode: .standard,
             badges: ThumbnailBadges(
-                showDeleteButton: true,
-                onDelete: onRemove,
+                showDeleteButton: true, onDelete: onRemove,
                 levelBadgeText: item.type == .character ? "CH" : "LO",
                 levelBadgeColor: item.thumbnailType.backgroundColor
             )
@@ -558,14 +445,10 @@ private struct PanelAssetPickerView: View {
 
     private let columns = [GridItem(.adaptive(minimum: 288, maximum: 320), spacing: 12)]
 
-    /// Whether a location is already attached (read live from binding).
     private var hasLocation: Bool {
-        attachedIDs.contains { id in
-            allAvailableAssets.first { $0.id == id }?.type == .location
-        }
+        attachedIDs.contains { id in allAvailableAssets.first { $0.id == id }?.type == .location }
     }
 
-    /// Assets that can still be picked (not already attached, respecting location limit).
     private var pickableAssets: [CastingItem] {
         let attached = Set(attachedIDs)
         return availableAssets.filter { asset in
@@ -575,74 +458,42 @@ private struct PanelAssetPickerView: View {
         }
     }
 
-    private var characters: [CastingItem] {
-        pickableAssets.filter { $0.type == .character }
-    }
-
-    private var locations: [CastingItem] {
-        pickableAssets.filter { $0.type == .location }
-    }
+    private var characters: [CastingItem] { pickableAssets.filter { $0.type == .character } }
+    private var locations:  [CastingItem] { pickableAssets.filter { $0.type == .location  } }
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
             HStack {
-                Text("Add Asset to Panel: \(panelName)")
-                    .font(.headline)
+                Text("Add Asset to Panel: \(panelName)").font(.headline)
                 Spacer()
-                Button("Cancel", action: onDone)
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+                Button("Cancel", action: onDone).buttonStyle(.bordered).controlSize(.small)
             }
             .padding()
-
             Divider()
 
             if pickableAssets.isEmpty {
                 Spacer()
-                ContentUnavailableView(
-                    "No assets available",
-                    systemImage: "tray",
-                    description: Text("All assets are already attached or no assets exist.")
-                )
+                ContentUnavailableView("No assets available", systemImage: "tray",
+                    description: Text("All assets are already attached or no assets exist."))
                 Spacer()
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
                         if !characters.isEmpty {
-                            Text("Characters")
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 16)
-
+                            Text("Characters").font(.subheadline.weight(.medium)).foregroundStyle(.secondary).padding(.horizontal, 16)
                             LazyVGrid(columns: columns, spacing: 10) {
                                 ForEach(characters) { asset in
-                                    PickerAssetTileView(item: asset)
-                                        .onTapGesture {
-                                            attachedIDs.append(asset.id)
-                                            onDone()
-                                        }
+                                    PickerAssetTileView(item: asset).onTapGesture { attachedIDs.append(asset.id); onDone() }
                                 }
-                            }
-                            .padding(.horizontal, 16)
+                            }.padding(.horizontal, 16)
                         }
-
                         if !locations.isEmpty {
-                            Text("Locations")
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 16)
-
+                            Text("Locations").font(.subheadline.weight(.medium)).foregroundStyle(.secondary).padding(.horizontal, 16)
                             LazyVGrid(columns: columns, spacing: 10) {
                                 ForEach(locations) { asset in
-                                    PickerAssetTileView(item: asset)
-                                        .onTapGesture {
-                                            attachedIDs.append(asset.id)
-                                            onDone()
-                                        }
+                                    PickerAssetTileView(item: asset).onTapGesture { attachedIDs.append(asset.id); onDone() }
                                 }
-                            }
-                            .padding(.horizontal, 16)
+                            }.padding(.horizontal, 16)
                         }
                     }
                     .padding(.vertical, 12)
@@ -653,24 +504,20 @@ private struct PanelAssetPickerView: View {
     }
 }
 
-// MARK: - Picker tile (for the asset picker sheet)
+// MARK: - Picker tile
 
 private struct PickerAssetTileView: View {
     let item: CastingItem
 
     private var levelColor: Color {
         switch item.libraryLevel {
-        case .studio:   return .purple
-        case .customer: return .teal
-        case .episode:  return .blue
+        case .studio: return .purple; case .customer: return .teal; case .episode: return .blue
         }
     }
 
     var body: some View {
         UnifiedThumbnailView(
-            itemType: item.thumbnailType,
-            name: item.name,
-            sizeMode: .standard,
+            itemType: item.thumbnailType, name: item.name, sizeMode: .standard,
             badges: ThumbnailBadges(
                 assetStatus: item.assetStatusFlags,
                 levelBadgeText: String(item.libraryLevel.rawValue.prefix(2)).uppercased(),
@@ -682,13 +529,13 @@ private struct PickerAssetTileView: View {
 }
 
 #Preview {
-    @Previewable @State var acts = MockData.sampleActs
+    @Previewable @State var acts: [MockAct] = []
     @Previewable @State var queue: [GenerationJob] = []
     StoryboardDetailView(
         acts: $acts,
-        selection: .act("act-01"),
+        selection: nil,
         generationQueue: $queue,
-        studios: MockData.defaultStudios,
+        studios: [],
         studioIndex: 0,
         customerIndex: 0,
         episodeIndex: 0
