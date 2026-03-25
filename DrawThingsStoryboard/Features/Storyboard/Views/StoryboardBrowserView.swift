@@ -1,462 +1,186 @@
 import SwiftUI
 
-/// Center pane for the Storyboard section.
-/// Shows a nested outline of Acts > Sequences > Scenes > Panel thumbnails.
-/// Clicking on an Act, Sequence, or Scene header selects it for the detail pane.
-/// Each grouping level is collapsible via a disclosure triangle and has +/- buttons.
+// MARK: - StoryboardBrowserView
+
 struct StoryboardBrowserView: View {
 
     @Binding var acts: [MockAct]
     @Binding var selection: StoryboardSelection?
-    /// Name of the resolved preferred look for the current episode.
     @Binding var lookName: String?
-
-    /// Tracks which IDs are collapsed (hidden children). Expanded by default.
-    @State private var collapsedIDs: Set<String> = []
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "pencil.and.list.clipboard")
-                    .font(.title2)
-                    .foregroundStyle(.secondary)
-                Text("Storyboard")
-                    .font(.title2.bold())
-                if let lookName {
-                    Text("— \(lookName)")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                }
+                Image(systemName: "pencil.and.list.clipboard").font(.title2).foregroundStyle(.secondary)
+                Text("Storyboard").font(.title2.bold())
                 Spacer()
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-
+            .padding(.horizontal, 16).padding(.vertical, 12)
             Divider()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(acts.enumerated()), id: \.element.id) { actIdx, _ in
-                        ActSectionView(
-                            acts: $acts,
-                            actIndex: actIdx,
-                            selection: $selection,
-                            collapsedIDs: $collapsedIDs
-                        )
-
-                        if actIdx < acts.count - 1 {
-                            Divider().padding(.vertical, 6).padding(.horizontal, 14)
+            if acts.isEmpty {
+                Spacer()
+                ContentUnavailableView("No acts yet", systemImage: "pencil.and.list.clipboard",
+                    description: Text("Add an act to start building your storyboard."))
+                Spacer()
+            } else {
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(acts.indices, id: \.self) { ai in
+                            ActRow(act: $acts[ai], selection: $selection)
                         }
                     }
+                    .padding(.vertical, 8)
                 }
-                .padding(.bottom, 16)
             }
         }
         .background(Color(NSColor.windowBackgroundColor))
-        .onAppear {
-            ensureSelection()
-        }
-    }
-
-    private func ensureSelection() {
-        guard !acts.isEmpty, selection == nil else { return }
-        selection = .act(acts[0].id)
     }
 }
 
-// MARK: - Act section
+// MARK: - Act row
 
-private struct ActSectionView: View {
-    @Binding var acts: [MockAct]
-    let actIndex: Int
+private struct ActRow: View {
+    @Binding var act: MockAct
     @Binding var selection: StoryboardSelection?
-    @Binding var collapsedIDs: Set<String>
-
-    private var act: MockAct { acts[actIndex] }
-
-    private var isSelected: Bool {
-        selection == .act(act.id)
-    }
-
-    private var isCollapsed: Bool {
-        collapsedIDs.contains(act.id)
-    }
+    @State private var isExpanded = true
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            StoryboardOutlineHeader(
-                level: .act,
-                name: act.name,
-                number: actIndex + 1,
-                isSelected: isSelected,
-                isCollapsed: isCollapsed,
-                canRemove: acts.count > 1,
-                onTap: { selection = .act(act.id) },
-                onToggleCollapse: { toggleCollapse(act.id) },
-                onAdd: addAct,
-                onRemove: removeAct
-            )
+        VStack(spacing: 0) {
+            // Act header
+            HStack(spacing: 6) {
+                Button { isExpanded.toggle() } label: {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption.weight(.medium)).frame(width: 16)
+                }
+                .buttonStyle(.plain).foregroundStyle(.secondary)
 
-            if !isCollapsed {
-                ForEach(Array(act.sequences.enumerated()), id: \.element.id) { seqIdx, _ in
-                    SequenceSectionView(
-                        sequences: $acts[actIndex].sequences,
-                        sequenceIndex: seqIdx,
-                        selection: $selection,
-                        collapsedIDs: $collapsedIDs
-                    )
+                Image(systemName: StoryboardLevel.act.icon)
+                    .foregroundStyle(StoryboardLevel.act.color).frame(width: 16)
+                Text(act.name).font(.subheadline.weight(.semibold))
+                Spacer()
+            }
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .background(
+                selection == .act(act.id) ? Color.accentColor.opacity(0.1) : Color.clear
+            )
+            .contentShape(Rectangle())
+            .onTapGesture { selection = .act(act.id) }
+
+            if isExpanded {
+                ForEach(act.sequences.indices, id: \.self) { si in
+                    SequenceRow(sequence: $act.sequences[si], selection: $selection)
+                        .padding(.leading, 16)
                 }
             }
         }
     }
-
-    private func addAct() {
-        let newAct = MockAct(
-            id: UUID().uuidString,
-            name: "New Act",
-            description: "",
-            sequences: [
-                MockSequence(
-                    id: UUID().uuidString,
-                    name: "New Sequence",
-                    description: "",
-                    scenes: [
-                        MockScene(
-                            id: UUID().uuidString,
-                            name: "New Scene",
-                            description: "",
-                            panels: [
-                                MockPanel(id: UUID().uuidString, name: "New Panel", description: "")
-                            ]
-                        )
-                    ]
-                )
-            ]
-        )
-        acts.insert(newAct, at: actIndex + 1)
-        selection = .act(newAct.id)
-    }
-
-    private func removeAct() {
-        guard acts.count > 1 else { return }
-        acts.remove(at: actIndex)
-        let fallbackIdx = min(actIndex, acts.count - 1)
-        selection = .act(acts[fallbackIdx].id)
-    }
-
-    private func toggleCollapse(_ id: String) {
-        if collapsedIDs.contains(id) {
-            collapsedIDs.remove(id)
-        } else {
-            collapsedIDs.insert(id)
-        }
-    }
 }
 
-// MARK: - Sequence section
+// MARK: - Sequence row
 
-private struct SequenceSectionView: View {
-    @Binding var sequences: [MockSequence]
-    let sequenceIndex: Int
+private struct SequenceRow: View {
+    @Binding var sequence: MockSequence
     @Binding var selection: StoryboardSelection?
-    @Binding var collapsedIDs: Set<String>
-
-    private var sequence: MockSequence { sequences[sequenceIndex] }
-
-    private var isSelected: Bool {
-        selection == .sequence(sequence.id)
-    }
-
-    private var isCollapsed: Bool {
-        collapsedIDs.contains(sequence.id)
-    }
+    @State private var isExpanded = true
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            StoryboardOutlineHeader(
-                level: .sequence,
-                name: sequence.name,
-                number: sequenceIndex + 1,
-                isSelected: isSelected,
-                isCollapsed: isCollapsed,
-                canRemove: sequences.count > 1,
-                onTap: { selection = .sequence(sequence.id) },
-                onToggleCollapse: { toggleCollapse(sequence.id) },
-                onAdd: addSequence,
-                onRemove: removeSequence
-            )
-            .padding(.leading, 16)
+        VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Button { isExpanded.toggle() } label: {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption.weight(.medium)).frame(width: 16)
+                }
+                .buttonStyle(.plain).foregroundStyle(.secondary)
 
-            if !isCollapsed {
-                ForEach(Array(sequence.scenes.enumerated()), id: \.element.id) { scnIdx, _ in
-                    SceneSectionView(
-                        scenes: $sequences[sequenceIndex].scenes,
-                        sceneIndex: scnIdx,
-                        selection: $selection,
-                        collapsedIDs: $collapsedIDs
-                    )
+                Image(systemName: StoryboardLevel.sequence.icon)
+                    .foregroundStyle(StoryboardLevel.sequence.color).frame(width: 16)
+                Text(sequence.name).font(.subheadline)
+                Spacer()
+            }
+            .padding(.horizontal, 12).padding(.vertical, 5)
+            .background(selection == .sequence(sequence.id) ? Color.accentColor.opacity(0.1) : Color.clear)
+            .contentShape(Rectangle())
+            .onTapGesture { selection = .sequence(sequence.id) }
+
+            if isExpanded {
+                ForEach(sequence.scenes.indices, id: \.self) { sci in
+                    SceneRow(scene: $sequence.scenes[sci], selection: $selection)
+                        .padding(.leading, 16)
                 }
             }
         }
     }
-
-    private func addSequence() {
-        let newSeq = MockSequence(
-            id: UUID().uuidString,
-            name: "New Sequence",
-            description: "",
-            scenes: [
-                MockScene(
-                    id: UUID().uuidString,
-                    name: "New Scene",
-                    description: "",
-                    panels: [
-                        MockPanel(id: UUID().uuidString, name: "New Panel", description: "")
-                    ]
-                )
-            ]
-        )
-        sequences.insert(newSeq, at: sequenceIndex + 1)
-        selection = .sequence(newSeq.id)
-    }
-
-    private func removeSequence() {
-        guard sequences.count > 1 else { return }
-        sequences.remove(at: sequenceIndex)
-        let fallbackIdx = min(sequenceIndex, sequences.count - 1)
-        selection = .sequence(sequences[fallbackIdx].id)
-    }
-
-    private func toggleCollapse(_ id: String) {
-        if collapsedIDs.contains(id) {
-            collapsedIDs.remove(id)
-        } else {
-            collapsedIDs.insert(id)
-        }
-    }
 }
 
-// MARK: - Scene section (contains panel thumbnails)
+// MARK: - Scene row
 
-private struct SceneSectionView: View {
-    @Binding var scenes: [MockScene]
-    let sceneIndex: Int
+private struct SceneRow: View {
+    @Binding var scene: MockScene
     @Binding var selection: StoryboardSelection?
-    @Binding var collapsedIDs: Set<String>
-
-    private let columns = [GridItem(.adaptive(minimum: 288, maximum: 320), spacing: 12)]
-
-    private var scene: MockScene { scenes[sceneIndex] }
-
-    private var isSelected: Bool {
-        selection == .scene(scene.id)
-    }
-
-    private var isCollapsed: Bool {
-        collapsedIDs.contains(scene.id)
-    }
+    @State private var isExpanded = true
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            StoryboardOutlineHeader(
-                level: .scene,
-                name: scene.name,
-                number: sceneIndex + 1,
-                isSelected: isSelected,
-                isCollapsed: isCollapsed,
-                canRemove: scenes.count > 1,
-                onTap: { selection = .scene(scene.id) },
-                onToggleCollapse: { toggleCollapse(scene.id) },
-                onAdd: addScene,
-                onRemove: removeScene
-            )
-            .padding(.leading, 32)
-
-            // Panel thumbnails with + button
-            if !isCollapsed {
-                if !scene.panels.isEmpty {
-                    LazyVGrid(columns: columns, spacing: 8) {
-                        ForEach(scene.panels) { panel in
-                            StoryboardPanelTileView(
-                                panel: panel,
-                                isSelected: selection == .panel(panel.id),
-                                canDelete: scene.panels.count > 1,
-                                onTap: { selection = .panel(panel.id) },
-                                onDelete: { removePanel(id: panel.id) }
-                            )
-                        }
-                    }
-                    .padding(.horizontal, 46)
-                    .padding(.vertical, 4)
+        VStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Button { isExpanded.toggle() } label: {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption.weight(.medium)).frame(width: 16)
                 }
+                .buttonStyle(.plain).foregroundStyle(.secondary)
 
-                // Panel + button
-                HStack {
-                    Spacer()
-                    Button(action: addPanel) {
-                        Image(systemName: "plus")
-                            .frame(width: 22, height: 22)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
-                }
-                .padding(.horizontal, 46)
-                .padding(.bottom, 4)
+                Image(systemName: StoryboardLevel.scene.icon)
+                    .foregroundStyle(StoryboardLevel.scene.color).frame(width: 16)
+                Text(scene.name).font(.subheadline)
+                Spacer()
             }
-        }
-    }
+            .padding(.horizontal, 12).padding(.vertical, 5)
+            .background(selection == .scene(scene.id) ? Color.accentColor.opacity(0.1) : Color.clear)
+            .contentShape(Rectangle())
+            .onTapGesture { selection = .scene(scene.id) }
 
-    private func addPanel() {
-        let newPanel = MockPanel(
-            id: UUID().uuidString,
-            name: "New Panel",
-            description: ""
-        )
-        scenes[sceneIndex].panels.append(newPanel)
-        selection = .panel(newPanel.id)
-    }
-
-    private func removePanel(id: String) {
-        guard scenes[sceneIndex].panels.count > 1,
-              let idx = scenes[sceneIndex].panels.firstIndex(where: { $0.id == id }) else { return }
-        scenes[sceneIndex].panels.remove(at: idx)
-        let fallbackIdx = min(idx, scenes[sceneIndex].panels.count - 1)
-        selection = .panel(scenes[sceneIndex].panels[fallbackIdx].id)
-    }
-
-    private func addScene() {
-        let newScene = MockScene(
-            id: UUID().uuidString,
-            name: "New Scene",
-            description: "",
-            panels: [
-                MockPanel(id: UUID().uuidString, name: "New Panel", description: "")
-            ]
-        )
-        scenes.insert(newScene, at: sceneIndex + 1)
-        selection = .scene(newScene.id)
-    }
-
-    private func removeScene() {
-        guard scenes.count > 1 else { return }
-        scenes.remove(at: sceneIndex)
-        let fallbackIdx = min(sceneIndex, scenes.count - 1)
-        selection = .scene(scenes[fallbackIdx].id)
-    }
-
-    private func toggleCollapse(_ id: String) {
-        if collapsedIDs.contains(id) {
-            collapsedIDs.remove(id)
-        } else {
-            collapsedIDs.insert(id)
+            if isExpanded {
+                ForEach(scene.panels.indices, id: \.self) { pi in
+                    PanelRow(panel: $scene.panels[pi], selection: $selection)
+                        .padding(.leading, 16)
+                }
+            }
         }
     }
 }
 
-// MARK: - Outline header (clickable Act / Sequence / Scene header with disclosure + / -)
+// MARK: - Panel row
 
-private struct StoryboardOutlineHeader: View {
-    let level: StoryboardLevel
-    let name: String
-    let number: Int
-    let isSelected: Bool
-    let isCollapsed: Bool
-    let canRemove: Bool
-    let onTap: () -> Void
-    let onToggleCollapse: () -> Void
-    let onAdd: () -> Void
-    let onRemove: () -> Void
+private struct PanelRow: View {
+    @Binding var panel: MockPanel
+    @Binding var selection: StoryboardSelection?
 
     var body: some View {
-        HStack(spacing: 0) {
-            // Disclosure triangle
-            Button(action: onToggleCollapse) {
-                Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 20, height: 20)
-                    .contentShape(Rectangle())
+        HStack(spacing: 6) {
+            Image(systemName: StoryboardLevel.panel.icon)
+                .foregroundStyle(StoryboardLevel.panel.color).frame(width: 16)
+            Text(panel.name).font(.subheadline)
+            Spacer()
+            if panel.smallPanelAvailable {
+                Text("S").font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.orange).padding(2)
             }
-            .buttonStyle(.plain)
-
-            // Selectable header content
-            Button(action: onTap) {
-                HStack(spacing: 6) {
-                    Image(systemName: level.icon)
-                        .foregroundStyle(level.color)
-                        .frame(width: 16)
-                    Text("\(level.label) \(number)")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(level.color)
-                    Text("— \(name)")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(isSelected ? .primary : .secondary)
-                        .lineLimit(1)
-                    Spacer()
-                }
+            if panel.largePanelAvailable {
+                Text("L").font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.green).padding(2)
             }
-            .buttonStyle(.plain)
-
-            // + / - buttons
-            Button(action: onRemove) {
-                Image(systemName: "minus")
-                    .frame(width: 22, height: 22)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.mini)
-            .disabled(!canRemove)
-
-            Button(action: onAdd) {
-                Image(systemName: "plus")
-                    .frame(width: 22, height: 22)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.mini)
         }
-        .padding(.vertical, 6)
-        .padding(.leading, 6)
-        .padding(.trailing, 14)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(isSelected ? level.color.opacity(0.1) : Color.clear)
-        )
-    }
-}
-
-// MARK: - Panel thumbnail tile
-
-private struct StoryboardPanelTileView: View {
-    let panel: MockPanel
-    let isSelected: Bool
-    let canDelete: Bool
-    let onTap: () -> Void
-    let onDelete: () -> Void
-
-    var body: some View {
-        UnifiedThumbnailView(
-            itemType: .panel,
-            name: panel.name,
-            sizeMode: .standard,
-            badges: ThumbnailBadges(
-                panelStatus: panel.panelStatusFlags,
-                showDeleteButton: canDelete,
-                onDelete: onDelete,
-                showSelectionStroke: isSelected
-            )
-        )
-        .padding(3)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(isSelected ? Color.accentColor.opacity(0.07) : Color.clear)
-        )
-        .onTapGesture { onTap() }
+        .padding(.horizontal, 12).padding(.vertical, 4)
+        .background(selection == .panel(panel.id) ? Color.accentColor.opacity(0.1) : Color.clear)
+        .contentShape(Rectangle())
+        .onTapGesture { selection = .panel(panel.id) }
     }
 }
 
 #Preview {
-    @Previewable @State var acts = MockData.sampleActs
+    @Previewable @State var acts: [MockAct] = []
     @Previewable @State var sel: StoryboardSelection? = nil
-    StoryboardBrowserView(acts: $acts, selection: $sel, lookName: .constant(nil))
-        .frame(width: 420, height: 600)
+    @Previewable @State var lookName: String? = nil
+    StoryboardBrowserView(acts: $acts, selection: $sel, lookName: $lookName)
+        .frame(width: 300, height: 600)
 }

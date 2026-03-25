@@ -48,7 +48,6 @@ struct ProjectsBrowserView: View {
                     onRemove: removeStudio,
                     onSelect: { newStudioID in
                         selectedProjectsLevel = .studio
-                        // Cascade: select first customer → first episode of the new studio
                         guard let si = studios.firstIndex(where: { $0.id == newStudioID }) else { return }
                         let firstCust = studios[si].customers.first
                         selectedCustomerID = firstCust?.id
@@ -69,7 +68,6 @@ struct ProjectsBrowserView: View {
                     onRemove: removeCustomer,
                     onSelect: { newCustID in
                         selectedProjectsLevel = .customer
-                        // Cascade: select first episode of the new customer
                         guard let si = studioIndex,
                               let ci = studios[si].customers.firstIndex(where: { $0.id == newCustID }) else { return }
                         selectedEpisodeID = studios[si].customers[ci].episodes.first?.id
@@ -168,7 +166,6 @@ struct ProjectsBrowserView: View {
         selectedEpisodeID = eps[min(ei, eps.count - 1)].id
     }
 
-    /// Guarantee at least one customer and one episode exist for the selected studio.
     private func ensureMinimum() {
         guard let si = studioIndex else { return }
         if studios[si].customers.isEmpty {
@@ -192,7 +189,6 @@ struct ProjectsBrowserView: View {
 
 // MARK: - Lightweight ID wrapper
 
-/// A simple id+name pair used by the generic sub-section view.
 struct NamedID: Identifiable {
     let id: String
     let name: String
@@ -208,44 +204,32 @@ private struct ProjectsSubSection: View {
     @Binding var selectedID: String?
     let onAdd: () -> Void
     let onRemove: () -> Void
-    /// Called when the user taps a *different* row. Receives the new ID.
     var onSelect: ((String) -> Void)? = nil
-    /// Called when the user taps the already-selected row.
     var onReselect: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header row with + / - buttons
             HStack {
                 Label(title, systemImage: icon)
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button(action: onRemove) {
-                    Image(systemName: "minus")
-                        .frame(width: 22, height: 22)
+                    Image(systemName: "minus").frame(width: 22, height: 22)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
+                .buttonStyle(.bordered).controlSize(.mini)
                 .disabled(items.count <= 1)
 
                 Button(action: onAdd) {
-                    Image(systemName: "plus")
-                        .frame(width: 22, height: 22)
+                    Image(systemName: "plus").frame(width: 22, height: 22)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
+                .buttonStyle(.bordered).controlSize(.mini)
             }
-            .padding(.horizontal, 14)
-            .padding(.top, 12)
-            .padding(.bottom, 6)
+            .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 6)
 
-            // Item rows
             if items.isEmpty {
                 Text("No \(title.lowercased()) yet — tap + to add one.")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .padding(.vertical, 20)
+                    .font(.caption).foregroundStyle(.tertiary).padding(.vertical, 20)
             } else {
                 VStack(spacing: 2) {
                     ForEach(items) { item in
@@ -254,16 +238,11 @@ private struct ProjectsSubSection: View {
                             .onTapGesture {
                                 let changed = selectedID != item.id
                                 selectedID = item.id
-                                if changed {
-                                    onSelect?(item.id)
-                                } else {
-                                    onReselect?()
-                                }
+                                if changed { onSelect?(item.id) } else { onReselect?() }
                             }
                     }
                 }
-                .padding(.horizontal, 14)
-                .padding(.bottom, 8)
+                .padding(.horizontal, 14).padding(.bottom, 8)
             }
         }
     }
@@ -277,8 +256,7 @@ private struct ProjectsRow: View {
 
     var body: some View {
         HStack {
-            Text(name)
-                .font(.body)
+            Text(name).font(.body)
                 .foregroundStyle(isSelected ? Color.accentColor : .primary)
             Spacer()
             if isSelected {
@@ -287,8 +265,7 @@ private struct ProjectsRow: View {
                     .foregroundStyle(Color.accentColor)
             }
         }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 10)
+        .padding(.vertical, 6).padding(.horizontal, 10)
         .background(
             RoundedRectangle(cornerRadius: 6)
                 .fill(isSelected ? Color.accentColor.opacity(0.08) : Color.clear)
@@ -297,10 +274,10 @@ private struct ProjectsRow: View {
 }
 
 #Preview {
-    @Previewable @State var studios = MockData.defaultStudios
-    @Previewable @State var studioID: String? = MockData.defaultStudios[0].id
-    @Previewable @State var customerID: String? = MockData.defaultStudios[0].customers[0].id
-    @Previewable @State var episodeID: String? = MockData.defaultStudios[0].customers[0].episodes[0].id
+    @Previewable @State var studios: [MockStudio] = []
+    @Previewable @State var studioID: String? = nil
+    @Previewable @State var customerID: String? = nil
+    @Previewable @State var episodeID: String? = nil
     @Previewable @State var level: ProjectsLevel = .episode
 
     ProjectsBrowserView(

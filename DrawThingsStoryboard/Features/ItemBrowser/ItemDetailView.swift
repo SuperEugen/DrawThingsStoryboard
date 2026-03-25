@@ -90,30 +90,31 @@ func sectionLabel(_ title: String) -> some View {
 }
 
 #Preview("Project — Episode") {
-    @Previewable @State var studios = MockData.defaultStudios
+    @Previewable @State var studios: [MockStudio] = []
     ItemDetailView(
         section: .projects,
         studios: $studios,
-        selectedStudioID: MockData.defaultStudios[0].id,
-        selectedCustomerID: MockData.defaultStudios[0].customers[0].id,
-        selectedEpisodeID: MockData.defaultStudios[0].customers[0].episodes[0].id,
+        selectedStudioID: nil,
+        selectedCustomerID: nil,
+        selectedEpisodeID: nil,
         selectedProjectsLevel: .episode,
         selectedItemID: nil,
-        templates: MockData.defaultTemplates
+        templates: []
     )
     .frame(width: 280, height: 700)
 }
+
 #Preview("Project — Studio") {
-    @Previewable @State var studios = MockData.defaultStudios
+    @Previewable @State var studios: [MockStudio] = []
     ItemDetailView(
         section: .projects,
         studios: $studios,
-        selectedStudioID: MockData.defaultStudios[0].id,
-        selectedCustomerID: MockData.defaultStudios[0].customers[0].id,
-        selectedEpisodeID: MockData.defaultStudios[0].customers[0].episodes[0].id,
+        selectedStudioID: nil,
+        selectedCustomerID: nil,
+        selectedEpisodeID: nil,
         selectedProjectsLevel: .studio,
         selectedItemID: nil,
-        templates: MockData.defaultTemplates
+        templates: []
     )
     .frame(width: 280, height: 700)
 }
