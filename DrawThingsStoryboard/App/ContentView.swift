@@ -1,6 +1,7 @@
 import SwiftUI
 
 /// Root layout: three-pane NavigationSplitView.
+/// State is loaded from disk via StorageLoadService on appear.
 struct ContentView: View {
 
     // MARK: - Navigation state
@@ -8,7 +9,7 @@ struct ContentView: View {
     @State private var selectedItemID: String?           = nil
 
     // MARK: - Hierarchy state (Studio → Customer → Episode)
-    @State private var studios: [MockStudio]             = MockData.defaultStudios
+    @State private var studios: [MockStudio]             = []
     @State private var selectedStudioID: String?         = nil
     @State private var selectedCustomerID: String?       = nil
     @State private var selectedEpisodeID: String?        = nil
@@ -19,7 +20,7 @@ struct ContentView: View {
     @State private var libraryRefreshToken: UUID         = UUID()
 
     // MARK: - Looks state
-    @State private var templates: [GenerationTemplate]  = MockData.defaultTemplates
+    @State private var templates: [GenerationTemplate]  = []
     @State private var selectedTemplateID: String?       = nil
 
     // MARK: - Model Config state
@@ -30,7 +31,7 @@ struct ContentView: View {
     @State private var storyboardSelection: StoryboardSelection? = nil
 
     // MARK: - Production Queue state
-    @State private var generationQueue: [GenerationJob]  = MockData.sampleQueue
+    @State private var generationQueue: [GenerationJob]  = []
     @State private var selectedJobID: String?            = nil
     @State private var doneQueue: [GenerationJob]        = []
 
@@ -51,7 +52,7 @@ struct ContentView: View {
     private var currentEpisodeName: String {
         guard let si = selectedStudioIndex,
               let ci = selectedCustomerIndex,
-              let ei = selectedEpisodeIndex else { return "First Episode" }
+              let ei = selectedEpisodeIndex else { return "Episode" }
         return studios[si].customers[ci].episodes[ei].name
     }
 
@@ -83,6 +84,8 @@ struct ContentView: View {
     private var windowTitle: String {
         "Draw Things Storyboard - \(currentEpisodeName)"
     }
+
+    // MARK: - Body
 
     var body: some View {
         NavigationSplitView {
@@ -125,7 +128,7 @@ struct ContentView: View {
                     selection: $storyboardSelection,
                     lookName: Binding(
                         get: { resolvedLookName },
-                        set: { _ in }   // read-only
+                        set: { _ in }
                     )
                 )
             default:
@@ -221,11 +224,7 @@ struct ContentView: View {
         .frame(minWidth: 1100, minHeight: 680)
         .navigationTitle(windowTitle)
         .onAppear {
-            ensureSelection()
-            // Ensure a model config is always selected
-            if selectedModelConfigID == nil {
-                selectedModelConfigID = modelConfigs.first?.id
-            }
+            loadFromDisk()
         }
         .onChange(of: selectedEpisodeID) { _, _ in
             guard let si = selectedStudioIndex,
@@ -235,34 +234,41 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Load from disk
+
+    private func loadFromDisk() {
+        let state = StorageLoadService.shared.load()
+        studios      = state.studios
+        templates    = state.templates
+        modelConfigs = state.modelConfigs
+        ensureSelection()
+        if selectedModelConfigID == nil {
+            selectedModelConfigID = modelConfigs.first?.id
+        }
+    }
+
     // MARK: - Guarantee at-least-one selection
 
     private func ensureSelection() {
-        if studios.isEmpty {
-            studios.append(MockStudio(
-                id: UUID().uuidString, name: "Your Studio",
-                customers: [], characters: [], locations: []
-            ))
+        guard !studios.isEmpty else { return }
+        if selectedStudioID == nil || !studios.contains(where: { $0.id == selectedStudioID }) {
+            selectedStudioID = studios[0].id
         }
-        let studio = studios[0]
-        if selectedStudioID == nil { selectedStudioID = studio.id }
-        let si = studios.firstIndex { $0.id == selectedStudioID } ?? 0
-        if studios[si].customers.isEmpty {
-            studios[si].customers.append(MockCustomer(
-                id: UUID().uuidString, name: "Your Customer", episodes: []
-            ))
+        guard let si = studios.firstIndex(where: { $0.id == selectedStudioID }),
+              !studios[si].customers.isEmpty else { return }
+        if selectedCustomerID == nil || !studios[si].customers.contains(where: { $0.id == selectedCustomerID }) {
+            selectedCustomerID = studios[si].customers[0].id
         }
-        if selectedCustomerID == nil { selectedCustomerID = studios[si].customers[0].id }
-        let ci = studios[si].customers.firstIndex { $0.id == selectedCustomerID } ?? 0
-        if studios[si].customers[ci].episodes.isEmpty {
-            studios[si].customers[ci].episodes.append(MockEpisode(
-                id: UUID().uuidString, name: "First Episode",
-                characters: [], locations: []
-            ))
+        guard let ci = studios[si].customers.firstIndex(where: { $0.id == selectedCustomerID }),
+              !studios[si].customers[ci].episodes.isEmpty else { return }
+        if selectedEpisodeID == nil || !studios[si].customers[ci].episodes.contains(where: { $0.id == selectedEpisodeID }) {
+            selectedEpisodeID = studios[si].customers[ci].episodes[0].id
         }
-        if selectedEpisodeID == nil { selectedEpisodeID = studios[si].customers[ci].episodes[0].id }
-        let ei = studios[si].customers[ci].episodes.firstIndex { $0.id == selectedEpisodeID } ?? 0
+        guard let ei = studios[si].customers[ci].episodes.firstIndex(where: { $0.id == selectedEpisodeID }) else { return }
         ensureMinimalStoryboard(studioIndex: si, customerIndex: ci, episodeIndex: ei)
+        if selectedTemplateID == nil {
+            selectedTemplateID = templates.first?.id
+        }
     }
 
     private func ensureMinimalStoryboard(studioIndex si: Int, customerIndex ci: Int, episodeIndex ei: Int) {
