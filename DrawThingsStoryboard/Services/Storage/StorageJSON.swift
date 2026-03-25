@@ -16,15 +16,16 @@ struct AppConfig: VersionedJSON {
     var modelConfigs: [ModelConfigJSON]
 
     // Image sizes
-    var previewVariantWidth:  Int    = SizeConfigDefaults.previewVariantWidth
-    var previewVariantHeight: Int    = SizeConfigDefaults.previewVariantHeight
-    var finalWidth:           Int    = SizeConfigDefaults.finalWidth
-    var finalHeight:          Int    = SizeConfigDefaults.finalHeight
+    var previewVariantWidth:  Int = SizeConfigDefaults.previewVariantWidth
+    var previewVariantHeight: Int = SizeConfigDefaults.previewVariantHeight
+    var finalWidth:           Int = SizeConfigDefaults.finalWidth
+    var finalHeight:          Int = SizeConfigDefaults.finalHeight
 
-    // Look example prompts
-    var lookPromptCharacter: String = SizeConfigDefaults.lookPromptCharacter
-    var lookPromptLocation:  String = SizeConfigDefaults.lookPromptLocation
-    var lookPromptPanel:     String = SizeConfigDefaults.lookPromptPanel
+    // Look example prompt (single, appended to every look description)
+    var lookExamplePrompt: String = SizeConfigDefaults.lookExamplePrompt
+
+    // Panel prompt
+    var lookPromptPanel: String = SizeConfigDefaults.lookPromptPanel
 
     // Draw Things shared secret
     var sharedSecret: String = ""
@@ -51,7 +52,6 @@ struct LookJSON: Codable, Identifiable {
     var name: String
     /// Style prompt describing the visual look.
     var description: String
-    var itemType: String          // "character" | "location"
     var lookStatus: String        // "noExample" | "exampleAvailable"
     var exampleFileName: String?
 }

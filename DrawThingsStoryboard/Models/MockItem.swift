@@ -228,11 +228,11 @@ enum LookStatus: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+/// A visual style template. No itemType — looks apply to all generation types.
 struct GenerationTemplate: Identifiable {
     let id: String
     var name: String
     var description: String
-    var itemType: CastingItemType
     var lookStatus: LookStatus = .noExample
 }
 
@@ -276,8 +276,7 @@ enum SizeConfigKeys {
     static let previewVariantHeight = "dts.previewVariantHeight"
     static let finalWidth           = "dts.finalWidth"
     static let finalHeight          = "dts.finalHeight"
-    static let lookPromptCharacter  = "dts.lookPromptCharacter"
-    static let lookPromptLocation   = "dts.lookPromptLocation"
+    static let lookExamplePrompt    = "dts.lookExamplePrompt"
     static let lookPromptPanel      = "dts.lookPromptPanel"
 }
 
@@ -286,8 +285,7 @@ enum SizeConfigDefaults {
     static let previewVariantHeight = 320
     static let finalWidth           = 1920
     static let finalHeight          = 1080
-    static let lookPromptCharacter  = "Full-body character portrait, neutral background, consistent lighting."
-    static let lookPromptLocation   = "Wide establishing shot, detailed environment, consistent lighting."
+    static let lookExamplePrompt    = "An astronaut riding a horse."
     static let lookPromptPanel      = "Cinematic composition, detailed scene, consistent lighting."
 }
 
@@ -302,7 +300,7 @@ struct MockItem: Identifiable {
     var variantCount: Int = 0
 }
 
-// MARK: - MockData  (previews only — no sample data)
+// MARK: - MockData  (previews only)
 
 struct MockData {
     static func items(for section: AppSection?) -> [MockItem] { [] }

@@ -1,11 +1,6 @@
 import Foundation
 
 // MARK: - StorageLoadService
-//
-// Reads the persisted folder structure from disk and builds the in-memory
-// app models (MockStudio hierarchy, GenerationTemplate list, DTModelConfig list).
-//
-// Call load() once at app start, after StorageSetupService.setupIfNeeded().
 
 final class StorageLoadService {
 
@@ -34,14 +29,10 @@ final class StorageLoadService {
             DTModelConfig(id: $0.id, name: $0.name, model: $0.model,
                           steps: $0.steps, guidanceScale: $0.guidanceScale)
         } ?? DTModelConfig.defaultConfigs
-        let studios      = loadStudios(from: library, root: root, templates: templates)
+        let studios = loadStudios(from: library, root: root)
 
-        return AppState(
-            studios: studios,
-            templates: templates,
-            modelConfigs: modelConfigs,
-            appConfig: appConfig
-        )
+        return AppState(studios: studios, templates: templates,
+                        modelConfigs: modelConfigs, appConfig: appConfig)
     }
 
     // MARK: - App config
@@ -51,8 +42,7 @@ final class StorageLoadService {
     }
 
     func saveAppConfig(_ config: AppConfig) {
-        let root = StorageService.shared.rootURL
-        let url  = root.appendingPathComponent("dtsb-config.json")
+        let url = StorageService.shared.rootURL.appendingPathComponent("dtsb-config.json")
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         guard let data = try? encoder.encode(config) else { return }
@@ -67,16 +57,30 @@ final class StorageLoadService {
         return config.looks.map { look in
             GenerationTemplate(
                 id: look.id, name: look.name, description: look.description,
-                itemType: look.itemType == "location" ? .location : .character,
                 lookStatus: look.lookStatus == "exampleAvailable" ? .exampleAvailable : .noExample
             )
         }
     }
 
+    /// Persists the current in-memory templates back to lo-config.json.
+    func saveTemplates(_ templates: [GenerationTemplate]) {
+        let library = StorageService.shared.rootURL.appendingPathComponent("library")
+        let url = library.appendingPathComponent("lo-config.json")
+        let looks = templates.map { t in
+            LookJSON(id: t.id, name: t.name, description: t.description,
+                     lookStatus: t.lookStatus == .exampleAvailable ? "exampleAvailable" : "noExample",
+                     exampleFileName: nil)
+        }
+        let config = LooksConfig(version: 1, looks: looks)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(config) else { return }
+        try? data.write(to: url, options: .atomic)
+    }
+
     // MARK: - Studios
 
-    private func loadStudios(from library: URL, root: URL,
-                             templates: [GenerationTemplate]) -> [MockStudio] {
+    private func loadStudios(from library: URL, root: URL) -> [MockStudio] {
         return subdirectories(of: library).compactMap { studioDir in
             guard let sc: StudioConfig = decode(studioDir.appendingPathComponent("st-config.json"))
             else { return nil }

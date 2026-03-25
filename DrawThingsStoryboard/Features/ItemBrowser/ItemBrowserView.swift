@@ -16,7 +16,6 @@ struct ItemBrowserView: View {
         VStack(spacing: 0) {
             BrowserHeaderView(section: section)
             Divider()
-
             switch section {
             case .projects:
                 ProjectsBrowserView(
@@ -66,7 +65,6 @@ struct ProductionBrowserView: View {
         for job in queue { total += max(0, job.estimatedDuration - Date().timeIntervalSince(job.queuedAt)) }
         return Date().addingTimeInterval(total)
     }
-
     private var finishTimeString: String {
         guard let t = estimatedFinishTime else { return "\u{2014}" }
         let fmt = DateFormatter(); fmt.timeStyle = .short
@@ -104,10 +102,8 @@ struct ProductionBrowserView: View {
                     Spacer()
                 } else {
                     List(queue, selection: $selectedJobID) { job in
-                        ProductionJobRow(job: job, onDelete: { queue.removeAll { $0.id == job.id } })
-                            .tag(job.id)
-                    }
-                    .listStyle(.plain)
+                        ProductionJobRow(job: job, onDelete: { queue.removeAll { $0.id == job.id } }).tag(job.id)
+                    }.listStyle(.plain)
                 }
             }
             .frame(minHeight: 120)
@@ -274,7 +270,7 @@ struct LooksBrowserView: View {
 
     private func addLook() {
         let id = UUID().uuidString
-        templates.append(GenerationTemplate(id: id, name: "New Look", description: "", itemType: .character))
+        templates.append(GenerationTemplate(id: id, name: "New Look", description: ""))
         selectedTemplateID = id
     }
     private func removeLook(id: String) {
@@ -353,10 +349,7 @@ private struct LookTile: View {
 
 struct ConfigurationView: View {
 
-    // Loaded from / saved to dtsb-config.json
-    @State private var appConfig: AppConfig = AppConfig(
-        modelConfigs: []
-    )
+    @State private var appConfig: AppConfig = AppConfig(modelConfigs: [])
 
     var body: some View {
         Form {
@@ -372,33 +365,28 @@ struct ConfigurationView: View {
                 LabeledContent("Large Width")  { TextField("Width",  value: $appConfig.finalWidth,           format: .number).textFieldStyle(.roundedBorder).frame(maxWidth: 120) }
                 LabeledContent("Large Height") { TextField("Height", value: $appConfig.finalHeight,          format: .number).textFieldStyle(.roundedBorder).frame(maxWidth: 120) }
             }
-            Section("Look Example Prompts") {
-                Text("These prompts are appended to the Look description when generating an example image.")
-                    .font(.caption).foregroundStyle(.secondary)
-                LabeledContent("Character") {
-                    TextField("Character prompt", text: $appConfig.lookPromptCharacter)
+            Section("Look Prompts") {
+                LabeledContent("Example Prompt") {
+                    TextField("Appended to look description for example images",
+                              text: $appConfig.lookExamplePrompt)
                         .textFieldStyle(.roundedBorder)
                 }
-                LabeledContent("Location") {
-                    TextField("Location prompt", text: $appConfig.lookPromptLocation)
-                        .textFieldStyle(.roundedBorder)
-                }
-                LabeledContent("Panel") {
-                    TextField("Panel prompt", text: $appConfig.lookPromptPanel)
+                LabeledContent("Panel Prompt") {
+                    TextField("Appended to look description for panels",
+                              text: $appConfig.lookPromptPanel)
                         .textFieldStyle(.roundedBorder)
                 }
             }
         }
         .formStyle(.grouped)
         .onAppear { loadConfig() }
-        .onChange(of: appConfig.sharedSecret)          { _, _ in saveConfig() }
-        .onChange(of: appConfig.previewVariantWidth)   { _, _ in saveConfig() }
-        .onChange(of: appConfig.previewVariantHeight)  { _, _ in saveConfig() }
-        .onChange(of: appConfig.finalWidth)            { _, _ in saveConfig() }
-        .onChange(of: appConfig.finalHeight)           { _, _ in saveConfig() }
-        .onChange(of: appConfig.lookPromptCharacter)   { _, _ in saveConfig() }
-        .onChange(of: appConfig.lookPromptLocation)    { _, _ in saveConfig() }
-        .onChange(of: appConfig.lookPromptPanel)       { _, _ in saveConfig() }
+        .onChange(of: appConfig.sharedSecret)         { _, _ in saveConfig() }
+        .onChange(of: appConfig.previewVariantWidth)  { _, _ in saveConfig() }
+        .onChange(of: appConfig.previewVariantHeight) { _, _ in saveConfig() }
+        .onChange(of: appConfig.finalWidth)           { _, _ in saveConfig() }
+        .onChange(of: appConfig.finalHeight)          { _, _ in saveConfig() }
+        .onChange(of: appConfig.lookExamplePrompt)    { _, _ in saveConfig() }
+        .onChange(of: appConfig.lookPromptPanel)      { _, _ in saveConfig() }
     }
 
     private func loadConfig() {
@@ -407,7 +395,6 @@ struct ConfigurationView: View {
             appConfig = loaded
         }
     }
-
     private func saveConfig() {
         StorageLoadService.shared.saveAppConfig(appConfig)
     }

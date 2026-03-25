@@ -7,11 +7,8 @@ struct LooksDetailView: View {
     @Binding var selectedTemplateID: String?
     @Binding var generationQueue: [GenerationJob]
 
-    @AppStorage(SizeConfigKeys.previewVariantWidth)  private var previewVariantWidth  = SizeConfigDefaults.previewVariantWidth
+    @AppStorage(SizeConfigKeys.previewVariantWidth) private var previewVariantWidth = SizeConfigDefaults.previewVariantWidth
     @AppStorage(SizeConfigKeys.previewVariantHeight) private var previewVariantHeight = SizeConfigDefaults.previewVariantHeight
-    @AppStorage(SizeConfigKeys.lookPromptCharacter)  private var lookPromptCharacter  = SizeConfigDefaults.lookPromptCharacter
-    @AppStorage(SizeConfigKeys.lookPromptLocation)   private var lookPromptLocation   = SizeConfigDefaults.lookPromptLocation
-    @AppStorage(SizeConfigKeys.lookPromptPanel)      private var lookPromptPanel      = SizeConfigDefaults.lookPromptPanel
 
     private var selectedIndex: Int? {
         guard let id = selectedTemplateID else { return nil }
@@ -23,12 +20,8 @@ struct LooksDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
 
-                    UnifiedThumbnailView(
-                        itemType: .look,
-                        name: "",
-                        sizeMode: .header
-                    )
-                    .padding(.bottom, 16)
+                    UnifiedThumbnailView(itemType: .look, name: "", sizeMode: .header)
+                        .padding(.bottom, 16)
 
                     // Status + Generate Example
                     VStack(alignment: .leading, spacing: 6) {
@@ -60,12 +53,8 @@ struct LooksDetailView: View {
                                 }
                             }
                         }
-                        .padding(.vertical, 5)
-                        .padding(.horizontal, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 7)
-                                .fill(Color.accentColor.opacity(0.07))
-                        )
+                        .padding(.vertical, 5).padding(.horizontal, 8)
+                        .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
                     }
                     .padding(.bottom, 12)
 
@@ -83,15 +72,11 @@ struct LooksDetailView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         sectionLabel("Description")
                         Text("Describe the visual style — this text is appended to every prompt.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(.caption).foregroundStyle(.secondary)
                         TextEditor(text: $templates[idx].description)
-                            .font(.callout)
-                            .frame(minHeight: 100)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color.secondary.opacity(0.25), lineWidth: 0.5)
-                            )
+                            .font(.callout).frame(minHeight: 100)
+                            .overlay(RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.secondary.opacity(0.25), lineWidth: 0.5))
                     }
                     .padding(.bottom, 12)
 
@@ -100,6 +85,10 @@ struct LooksDetailView: View {
                 .padding(14)
             }
             .background(Color(NSColor.windowBackgroundColor))
+            // When a queued example job moves to done, mark the look as exampleAvailable
+            .onChange(of: generationQueue) { _, newQueue in
+                updateLookStatusFromQueue(currentQueue: newQueue, idx: idx)
+            }
         } else {
             ContentUnavailableView(
                 "No look selected",
@@ -109,21 +98,21 @@ struct LooksDetailView: View {
         }
     }
 
+    // MARK: - Generate example job
+
     private func generateExample(at idx: Int) {
         let template = templates[idx]
-        // Combined prompt: look description + type-specific config prompt
-        let typePrompt: String
-        switch template.itemType {
-        case .character: typePrompt = lookPromptCharacter
-        case .location:  typePrompt = lookPromptLocation
-        }
-        let combined = [template.description, typePrompt]
+        // Load example prompt from config
+        let root = StorageService.shared.rootURL
+        let examplePrompt = StorageLoadService.shared.loadAppConfig(from: root)?.lookExamplePrompt
+            ?? SizeConfigDefaults.lookExamplePrompt
+        let combined = [template.description, examplePrompt]
             .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
             .joined(separator: ", ")
         let job = GenerationJob(
             id: UUID().uuidString,
             itemName: template.name,
-            itemType: template.itemType,
+            itemType: .character,
             jobType: .generateExample,
             size: .small,
             lookName: template.name,
@@ -137,5 +126,22 @@ struct LooksDetailView: View {
         )
         generationQueue.append(job)
     }
-}
 
+    // MARK: - Status update
+
+    /// If the generation queue no longer contains a job for this look,
+    /// but it did before, the job completed — mark the look as exampleAvailable.
+    private func updateLookStatusFromQueue(currentQueue: [GenerationJob], idx: Int) {
+        guard templates.indices.contains(idx) else { return }
+        let lookName = templates[idx].name
+        let stillQueued = currentQueue.contains {
+            $0.itemName == lookName && $0.jobType == .generateExample
+        }
+        // Job was in queue and is now gone — it completed
+        if !stillQueued && templates[idx].lookStatus == .noExample {
+            templates[idx].lookStatus = .exampleAvailable
+            // Persist the new status to disk
+            StorageLoadService.shared.saveTemplates(templates)
+        }
+    }
+}

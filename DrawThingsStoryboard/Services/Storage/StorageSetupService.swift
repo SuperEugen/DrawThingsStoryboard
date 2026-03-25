@@ -4,32 +4,6 @@ import Foundation
 //
 // Runs once at app launch. If dtsb-config.json is missing, creates the
 // complete default folder structure and all *-config / *-catalog JSON files.
-//
-// Default structure:
-//
-//   ~/Pictures/DrawThings-Storyboard/
-//   │   dtsb-config.json
-//   ├── library/
-//   │   ├── lo-config.json
-//   │   ├── lo-catalog.json
-//   │   └── My Studio/
-//   │       ├── st-config.json
-//   │       ├── st-catalog.json
-//   │       └── My Customer/
-//   │           ├── cu-config.json
-//   │           ├── cu-catalog.json
-//   │           ├── ch-My Character/
-//   │           │   └── as-config.json
-//   │           └── lo-My Location/
-//   │               └── as-config.json
-//   └── My Episode/
-//       ├── ep-config.json
-//       ├── ep-catalog.json
-//       └── Act 1/
-//           └── Sequence 1/
-//               └── Scene 1/
-//                   └── Panel 1/
-//                       └── pa-config.json
 
 final class StorageSetupService {
 
@@ -45,13 +19,10 @@ final class StorageSetupService {
 
     // MARK: - Entry point
 
-    /// Call once from the App entry point.
-    /// Does nothing if dtsb-config.json already exists.
     func setupIfNeeded() {
         let root = StorageService.shared.rootURL
         let appConfigURL = root.appendingPathComponent("dtsb-config.json")
         guard !fm.fileExists(atPath: appConfigURL.path) else { return }
-
         do {
             try createDefaultStructure(root: root, appConfigURL: appConfigURL)
             print("[StorageSetupService] First-launch structure created at \(root.path)")
@@ -64,11 +35,11 @@ final class StorageSetupService {
 
     private func createDefaultStructure(root: URL, appConfigURL: URL) throws {
 
-        // IDs for cross-referencing
         let studioID    = UUID().uuidString
         let customerID  = UUID().uuidString
         let episodeID   = UUID().uuidString
-        let lookID      = UUID().uuidString
+        let look1ID     = UUID().uuidString
+        let look2ID     = UUID().uuidString
         let charID      = UUID().uuidString
         let locID       = UUID().uuidString
         let panelID     = UUID().uuidString
@@ -76,13 +47,11 @@ final class StorageSetupService {
         let studioName   = "My Studio"
         let customerName = "My Customer"
         let episodeName  = "My Episode"
-        let lookName     = "Default Look"
         let charName     = "My Character"
         let locName      = "My Location"
 
-        // ── Folder URLs ──────────────────────────────────────────────────
+        // ── Folder URLs
         let libraryURL  = root.appendingPathComponent("library")
-        let looksURL    = libraryURL
         let studioURL   = libraryURL.appendingPathComponent(studioName)
         let customerURL = studioURL.appendingPathComponent(customerName)
         let charURL     = customerURL.appendingPathComponent("ch-\(charName)")
@@ -98,10 +67,10 @@ final class StorageSetupService {
             try makeDir(url)
         }
 
-        // ── dtsb-config.json ─────────────────────────────────────────────
+        // ── dtsb-config.json
         let appConfig = AppConfig(
             version: 1,
-            defaultLookName: lookName,
+            defaultLookName: "Photorealistic",
             modelConfigs: [
                 ModelConfigJSON(id: UUID().uuidString, name: "SDXL Standard",
                                 model: "sd_xl_base_1.0.safetensors", steps: 30, guidanceScale: 7.0),
@@ -112,29 +81,31 @@ final class StorageSetupService {
             previewVariantHeight: SizeConfigDefaults.previewVariantHeight,
             finalWidth:           SizeConfigDefaults.finalWidth,
             finalHeight:          SizeConfigDefaults.finalHeight,
-            lookPromptCharacter:  "An astronaut riding a horse.",
-            lookPromptLocation:   "Wide establishing shot, big city.",
-            lookPromptPanel:      "Cinematic composition, detailed scene, consistent lighting.",
+            lookExamplePrompt:    SizeConfigDefaults.lookExamplePrompt,
+            lookPromptPanel:      SizeConfigDefaults.lookPromptPanel,
             sharedSecret:         ""
         )
         try write(appConfig, to: appConfigURL)
 
-        // ── lo-config.json ───────────────────────────────────────────────
+        // ── lo-config.json  (two default looks)
         let looksConfig = LooksConfig(
             version: 1,
             looks: [
-                LookJSON(id: lookID, name: lookName,
+                LookJSON(id: look1ID, name: "Photorealistic",
                          description: "Photorealistic, cinematic lighting, 8k resolution, dramatic shadows.",
-                         itemType: "character", lookStatus: "noExample", exampleFileName: nil)
+                         lookStatus: "noExample", exampleFileName: nil),
+                LookJSON(id: look2ID, name: "Comic Style",
+                         description: "Illustration in 2-d flat color art style. Highly stylised with very low detail and no textures, simplified. Minimalistic background.",
+                         lookStatus: "noExample", exampleFileName: nil),
             ]
         )
-        try write(looksConfig, to: looksURL.appendingPathComponent("lo-config.json"))
+        try write(looksConfig, to: libraryURL.appendingPathComponent("lo-config.json"))
 
         // ── lo-catalog.json
-        try write(LooksCatalog(version: 1, entries: []), to: looksURL.appendingPathComponent("lo-catalog.json"))
+        try write(LooksCatalog(version: 1, entries: []), to: libraryURL.appendingPathComponent("lo-catalog.json"))
 
         // ── st-config.json
-        try write(StudioConfig(version: 1, id: studioID, name: studioName, rules: "", preferredLookID: lookID),
+        try write(StudioConfig(version: 1, id: studioID, name: studioName, rules: "", preferredLookID: look1ID),
                   to: studioURL.appendingPathComponent("st-config.json"))
 
         // ── st-catalog.json
