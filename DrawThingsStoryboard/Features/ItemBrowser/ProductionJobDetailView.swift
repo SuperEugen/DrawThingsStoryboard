@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - Production job detail (read-only view of a queued job)
+// MARK: - Production job detail
 
 struct ProductionJobDetailView: View {
     let queue: [GenerationJob]
@@ -34,7 +34,12 @@ struct ProductionJobDetailView: View {
 
                     Divider().padding(.vertical, 8)
 
-                    GenerateTestPanel(job: job, episodeName: episodeName, vm: vm, onJobCompleted: onJobCompleted)
+                    GenerateTestPanel(
+                        job: job,
+                        episodeName: episodeName,
+                        vm: vm,
+                        onJobCompleted: onJobCompleted
+                    )
 
                     Spacer(minLength: 20)
                 }
@@ -63,14 +68,12 @@ struct ProductionJobDetailView: View {
             vm.guidanceScale = config.guidanceScale
             vm.model         = config.model
         }
-        // For panel jobs: load attached asset images into moodboard (max 3) + initImage (4th)
         if job.jobType == .generatePanel {
             let assetImages: [NSImage] = job.attachedAssets.compactMap { asset in
                 StorageService.shared.loadFirstAvailableVariant(assetID: asset.id)
             }
             vm.moodboardImages = Array(assetImages.prefix(3))
             vm.initImage       = assetImages.count >= 4 ? assetImages[3] : nil
-            print("[syncJob] Panel assets: \(assetImages.count) loaded, moodboard: \(vm.moodboardImages.count), initImage: \(vm.initImage != nil)")
         } else {
             vm.moodboardImages = []
             vm.initImage       = nil
@@ -135,8 +138,7 @@ private struct AttachedAssetsView: View {
                             .fill((asset.type == .character ? Color.blue : Color.teal).opacity(0.15))
                             .frame(width: 28, height: 28)
                             .overlay {
-                                Image(systemName: asset.icon)
-                                    .font(.system(size: 12))
+                                Image(systemName: asset.icon).font(.system(size: 12))
                                     .foregroundStyle(asset.type == .character ? .blue : .teal)
                             }
                         VStack(alignment: .leading, spacing: 1) {
@@ -147,15 +149,14 @@ private struct AttachedAssetsView: View {
                     }
                 }
             }
-            .padding(8)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(8).frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.05)))
         }
         .padding(.bottom, 12)
     }
 }
 
-// MARK: - Dimensions + seed section
+// MARK: - Dimensions section
 
 private struct JobDimensionsSection: View {
     let job: GenerationJob
@@ -174,7 +175,7 @@ private struct JobDimensionsSection: View {
     }
 }
 
-// MARK: - Combined prompt section
+// MARK: - Prompt section
 
 private struct JobPromptSection: View {
     let job: GenerationJob
@@ -206,11 +207,17 @@ private struct JobPromptSection: View {
 
 private struct JobTimingSection: View {
     let job: GenerationJob
+
     private var estString: String {
-        let m = Int(job.estimatedDuration) / 60
-        let s = Int(job.estimatedDuration) % 60
-        return m > 0 ? "\(m)m \(s)s" : "\(s)s"
+        let total = Int(job.estimatedDuration)
+        guard total > 0 else { return "unknown" }
+        let m = total / 60
+        let s = total % 60
+        if m > 0 && s > 0 { return "\(m)m \(s)s" }
+        if m > 0           { return "\(m)m" }
+        return "\(s)s"
     }
+
     var body: some View {
         Group {
             Divider().padding(.vertical, 8)
@@ -285,19 +292,15 @@ private struct GenerateTestPanel: View {
         if !generatedImages.isEmpty {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                 ForEach(Array(generatedImages.enumerated()), id: \.offset) { idx, img in
-                    Image(nsImage: img)
-                        .resizable().scaledToFit()
+                    Image(nsImage: img).resizable().scaledToFit()
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                         .overlay(RoundedRectangle(cornerRadius: 6)
                             .stroke(Color.secondary.opacity(0.2), lineWidth: 0.5))
                         .overlay(alignment: .bottomTrailing) {
                             Text("V\(idx + 1)")
-                                .font(.system(size: 9, weight: .bold))
-                                .padding(3)
-                                .background(Color.black.opacity(0.5))
-                                .foregroundStyle(.white)
-                                .clipShape(RoundedRectangle(cornerRadius: 3))
-                                .padding(4)
+                                .font(.system(size: 9, weight: .bold)).padding(3)
+                                .background(Color.black.opacity(0.5)).foregroundStyle(.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 3)).padding(4)
                         }
                 }
             }
@@ -343,27 +346,30 @@ private struct GenerateTestPanel: View {
     @MainActor
     private func generateNextVariant() async {
         guard currentVariant < totalVariants else {
+            // All variants done — mark job complete
             var done = job
             done.startedAt = startedAt
             done.completedAt = Date()
             onJobCompleted?(done)
             return
         }
-        // Vary seed per variant when using random seed
-        if job.seed == -1 {
-            vm.seed = -1
-        } else {
-            vm.seed = Int(job.seed) + currentVariant
-        }
+
+        vm.seed = job.seed == -1 ? -1 : Int(job.seed) + currentVariant
         await vm.generate()
-        guard let image = vm.generatedImage else {
-            saveError = vm.errorMessage ?? "No image for variant \(currentVariant + 1)"
-            return
+
+        if let image = vm.generatedImage {
+            generatedImages.append(image)
+            await saveVariant(image: image, index: currentVariant)
+            currentVariant += 1
+            await generateNextVariant()
+        } else {
+            // Generation returned no image (error or cancelled) — still complete the job
+            saveError = vm.errorMessage ?? "No image returned for variant \(currentVariant + 1)"
+            var done = job
+            done.startedAt = startedAt
+            done.completedAt = Date()
+            onJobCompleted?(done)
         }
-        generatedImages.append(image)
-        await saveVariant(image: image, index: currentVariant)
-        currentVariant += 1
-        await generateNextVariant()
     }
 
     @MainActor

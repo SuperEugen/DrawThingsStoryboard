@@ -59,15 +59,16 @@ final class StorageSetupService {
             try makeDir(url)
         }
 
-        // ── dtsb-config.json (no panel prompt)
+        // ── dtsb-config.json
         let appConfig = AppConfig(
             version: 1,
             defaultLookName: "Photorealistic",
             modelConfigs: [
-                ModelConfigJSON(id: UUID().uuidString, name: "SDXL Standard",
-                                model: "sd_xl_base_1.0.safetensors", steps: 30, guidanceScale: 7.0),
-                ModelConfigJSON(id: UUID().uuidString, name: "Flux Schnell",
-                                model: "flux_1_schnell_q5p.ckpt", steps: 4, guidanceScale: 1.0),
+                ModelConfigJSON(id: UUID().uuidString,
+                                name: "FLUX 2 klein KV",
+                                model: "flux_2_klein_9b_kv_q8p.ckpt",
+                                steps: 4,
+                                guidanceScale: 1.0),
             ],
             previewVariantWidth:  SizeConfigDefaults.previewVariantWidth,
             previewVariantHeight: SizeConfigDefaults.previewVariantHeight,
@@ -103,7 +104,8 @@ final class StorageSetupService {
             assetType: "character", gender: "male",
             locationSetting: nil, libraryLevel: "customer",
             variants: (1...4).map {
-                VariantJSON(id: "\(charID)-v\($0)", label: "Variant \($0)", isApproved: false, isGenerated: false, fileName: nil)
+                VariantJSON(id: "\(charID)-v\($0)", label: "Variant \($0)",
+                            isApproved: false, isGenerated: false, fileName: nil)
             }
         )
         try write(charConfig, to: charURL.appendingPathComponent("as-config.json"))
@@ -114,7 +116,8 @@ final class StorageSetupService {
             assetType: "location", gender: nil,
             locationSetting: "interior", libraryLevel: "customer",
             variants: (1...4).map {
-                VariantJSON(id: "\(locID)-v\($0)", label: "Variant \($0)", isApproved: false, isGenerated: false, fileName: nil)
+                VariantJSON(id: "\(locID)-v\($0)", label: "Variant \($0)",
+                            isApproved: false, isGenerated: false, fileName: nil)
             }
         )
         try write(locConfig, to: locURL.appendingPathComponent("as-config.json"))
