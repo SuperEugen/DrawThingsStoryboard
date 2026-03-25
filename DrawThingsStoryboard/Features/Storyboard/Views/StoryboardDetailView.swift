@@ -1,7 +1,6 @@
 import SwiftUI
 
 /// Right pane for the Storyboard section.
-/// Shows properties (Name, Description) for the selected Act, Sequence, Scene, or Panel.
 struct StoryboardDetailView: View {
 
     @Binding var acts: [MockAct]
@@ -12,33 +11,23 @@ struct StoryboardDetailView: View {
     let studioIndex: Int
     let customerIndex: Int
     let episodeIndex: Int
-    /// Resolved preferred look name for the current episode (own → customer → studio).
     var resolvedLookName: String? = nil
-    /// All look templates (to look up the description for combinedPrompt).
     var templates: [GenerationTemplate] = []
 
-    /// All assets available to the current episode (studio + customer + episode level).
     private var availableAssets: [CastingItem] {
         guard studios.indices.contains(studioIndex) else { return [] }
         let studio = studios[studioIndex]
         var assets: [CastingItem] = []
-
-        // Studio-level assets
         assets.append(contentsOf: studio.characters)
         assets.append(contentsOf: studio.locations)
-
-        // Customer-level assets
         guard studio.customers.indices.contains(customerIndex) else { return assets }
         let customer = studio.customers[customerIndex]
         assets.append(contentsOf: customer.characters)
         assets.append(contentsOf: customer.locations)
-
-        // Episode-level assets
         guard customer.episodes.indices.contains(episodeIndex) else { return assets }
         let episode = customer.episodes[episodeIndex]
         assets.append(contentsOf: episode.characters)
         assets.append(contentsOf: episode.locations)
-
         return assets
     }
 
@@ -47,36 +36,24 @@ struct StoryboardDetailView: View {
             switch selection {
             case .act(let id):
                 if let actIdx = acts.firstIndex(where: { $0.id == id }) {
-                    StoryboardNodeDetailView(
-                        level: .act,
+                    StoryboardNodeDetailView(level: .act,
                         name: $acts[actIdx].name,
-                        description: $acts[actIdx].description
-                    )
-                } else {
-                    emptyState
-                }
+                        description: $acts[actIdx].description)
+                } else { emptyState }
 
             case .sequence(let id):
                 if let (ai, si) = findSequenceIndices(id) {
-                    StoryboardNodeDetailView(
-                        level: .sequence,
+                    StoryboardNodeDetailView(level: .sequence,
                         name: $acts[ai].sequences[si].name,
-                        description: $acts[ai].sequences[si].description
-                    )
-                } else {
-                    emptyState
-                }
+                        description: $acts[ai].sequences[si].description)
+                } else { emptyState }
 
             case .scene(let id):
                 if let (ai, si, sci) = findSceneIndices(id) {
-                    StoryboardNodeDetailView(
-                        level: .scene,
+                    StoryboardNodeDetailView(level: .scene,
                         name: $acts[ai].sequences[si].scenes[sci].name,
-                        description: $acts[ai].sequences[si].scenes[sci].description
-                    )
-                } else {
-                    emptyState
-                }
+                        description: $acts[ai].sequences[si].scenes[sci].description)
+                } else { emptyState }
 
             case .panel(let id):
                 if let (ai, si, sci, pi) = findPanelIndices(id) {
@@ -87,9 +64,7 @@ struct StoryboardDetailView: View {
                         resolvedLookName: resolvedLookName,
                         lookDescription: templates.first { $0.name == resolvedLookName }?.description ?? ""
                     )
-                } else {
-                    emptyState
-                }
+                } else { emptyState }
             }
         } else {
             emptyState
@@ -98,20 +73,15 @@ struct StoryboardDetailView: View {
 
     private var emptyState: some View {
         ContentUnavailableView(
-            "Nothing selected",
-            systemImage: "square.dashed",
+            "Nothing selected", systemImage: "square.dashed",
             description: Text("Select an act, sequence, scene, or panel to see its properties.")
         )
     }
 
-    // MARK: - Index lookup helpers
-
     private func findSequenceIndices(_ id: String) -> (Int, Int)? {
         for ai in acts.indices {
             for si in acts[ai].sequences.indices {
-                if acts[ai].sequences[si].id == id {
-                    return (ai, si)
-                }
+                if acts[ai].sequences[si].id == id { return (ai, si) }
             }
         }
         return nil
@@ -121,9 +91,7 @@ struct StoryboardDetailView: View {
         for ai in acts.indices {
             for si in acts[ai].sequences.indices {
                 for sci in acts[ai].sequences[si].scenes.indices {
-                    if acts[ai].sequences[si].scenes[sci].id == id {
-                        return (ai, si, sci)
-                    }
+                    if acts[ai].sequences[si].scenes[sci].id == id { return (ai, si, sci) }
                 }
             }
         }
@@ -135,9 +103,7 @@ struct StoryboardDetailView: View {
             for si in acts[ai].sequences.indices {
                 for sci in acts[ai].sequences[si].scenes.indices {
                     for pi in acts[ai].sequences[si].scenes[sci].panels.indices {
-                        if acts[ai].sequences[si].scenes[sci].panels[pi].id == id {
-                            return (ai, si, sci, pi)
-                        }
+                        if acts[ai].sequences[si].scenes[sci].panels[pi].id == id { return (ai, si, sci, pi) }
                     }
                 }
             }
@@ -156,46 +122,33 @@ private struct StoryboardNodeDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                // Type badge header
                 ZStack(alignment: .topLeading) {
                     RoundedRectangle(cornerRadius: 10)
                         .fill(level.color.opacity(0.12))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 100)
+                        .frame(maxWidth: .infinity).frame(height: 100)
                         .overlay {
-                            Image(systemName: level.icon)
-                                .font(.system(size: 40))
+                            Image(systemName: level.icon).font(.system(size: 40))
                                 .foregroundStyle(level.color.opacity(0.6))
                         }
-                    Text(level.label)
-                        .font(.caption.weight(.medium))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
+                    Text(level.label).font(.caption.weight(.medium))
+                        .padding(.horizontal, 8).padding(.vertical, 4)
                         .background(.thinMaterial, in: Capsule())
-                        .foregroundStyle(.secondary)
-                        .padding(10)
+                        .foregroundStyle(.secondary).padding(10)
                 }
 
                 Divider().padding(.vertical, 8)
 
-                // Name
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Name")
-                    TextField("Name", text: $name)
-                        .textFieldStyle(.roundedBorder)
+                    TextField("Name", text: $name).textFieldStyle(.roundedBorder)
                 }
                 .padding(.bottom, 16)
 
-                // Description
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Description")
-                    TextEditor(text: $description)
-                        .font(.callout)
-                        .frame(minHeight: 120)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(Color.secondary.opacity(0.25), lineWidth: 0.5)
-                        )
+                    TextEditor(text: $description).font(.callout).frame(minHeight: 120)
+                        .overlay(RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color.secondary.opacity(0.25), lineWidth: 0.5))
                 }
                 .padding(.bottom, 16)
 
@@ -220,15 +173,12 @@ private struct StoryboardPanelDetailView: View {
     @AppStorage(SizeConfigKeys.previewVariantHeight) private var previewVariantHeight = SizeConfigDefaults.previewVariantHeight
     @AppStorage(SizeConfigKeys.finalWidth)           private var finalWidth           = SizeConfigDefaults.finalWidth
     @AppStorage(SizeConfigKeys.finalHeight)          private var finalHeight          = SizeConfigDefaults.finalHeight
-    @AppStorage(SizeConfigKeys.lookPromptPanel)      private var lookPromptPanel      = SizeConfigDefaults.lookPromptPanel
 
     @State private var showAssetPicker = false
     @State private var attachedIDs: [String] = []
 
     private var attachedAssets: [CastingItem] {
-        let resolved = attachedIDs.compactMap { id in
-            availableAssets.first { $0.id == id }
-        }
+        let resolved = attachedIDs.compactMap { id in availableAssets.first { $0.id == id } }
         return resolved.sorted { a, b in
             if a.type == .location && b.type != .location { return true }
             if a.type != .location && b.type == .location { return false }
@@ -237,7 +187,6 @@ private struct StoryboardPanelDetailView: View {
     }
 
     private var canAddAsset: Bool { attachedIDs.count < 4 }
-    private var hasLocation: Bool { attachedAssets.contains { $0.type == .location } }
 
     private var smallPanelQueued: Bool {
         generationQueue.contains { $0.itemName == panel.name && $0.jobType == .generatePanel && $0.size == .small }
@@ -312,7 +261,8 @@ private struct StoryboardPanelDetailView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Description")
                     TextEditor(text: $panel.description).font(.callout).frame(minHeight: 80)
-                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.25), lineWidth: 0.5))
+                        .overlay(RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color.secondary.opacity(0.25), lineWidth: 0.5))
                 }
                 .padding(.bottom, 12)
 
@@ -377,40 +327,43 @@ private struct StoryboardPanelDetailView: View {
 
     private var assetInfos: [JobAssetInfo] {
         attachedAssets.map { asset in
-            let icon = asset.type == .character ? (asset.gender?.icon ?? "person.fill") : (asset.locationSetting?.icon ?? "map")
+            let icon = asset.type == .character
+                ? (asset.gender?.icon ?? "person.fill")
+                : (asset.locationSetting?.icon ?? "map")
             return JobAssetInfo(id: asset.id, name: asset.name, type: asset.type, icon: icon,
                                 gender: asset.gender, locationSetting: asset.locationSetting)
         }
     }
 
     private func generateSmallPanel() {
-        let combined = buildCombinedPrompt()
         var job = GenerationJob(
             id: UUID().uuidString, itemName: panel.name, itemType: .character,
             jobType: .generatePanel, size: .small, lookName: resolvedLookName ?? "—",
             queuedAt: Date(), estimatedDuration: 120, itemIcon: "photo",
             seed: Int64.random(in: 1...999_999),
-            width: previewVariantWidth, height: previewVariantHeight, combinedPrompt: combined
+            width: previewVariantWidth, height: previewVariantHeight,
+            combinedPrompt: buildCombinedPrompt()
         )
         job.attachedAssets = assetInfos
         generationQueue.append(job)
     }
 
     private func generateLargePanel() {
-        let combined = buildCombinedPrompt()
         var job = GenerationJob(
             id: UUID().uuidString, itemName: panel.name, itemType: .character,
             jobType: .generatePanel, size: .large, lookName: resolvedLookName ?? "—",
             queuedAt: Date(), estimatedDuration: 240, itemIcon: "photo",
             seed: Int64.random(in: 1...999_999),
-            width: finalWidth, height: finalHeight, combinedPrompt: combined
+            width: finalWidth, height: finalHeight,
+            combinedPrompt: buildCombinedPrompt()
         )
         job.attachedAssets = assetInfos
         generationQueue.append(job)
     }
 
+    /// Combined prompt: look description + panel description
     private func buildCombinedPrompt() -> String {
-        [lookDescription, lookPromptPanel, panel.description]
+        [lookDescription, panel.description]
             .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
             .joined(separator: ", ")
     }
@@ -480,18 +433,22 @@ private struct PanelAssetPickerView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
                         if !characters.isEmpty {
-                            Text("Characters").font(.subheadline.weight(.medium)).foregroundStyle(.secondary).padding(.horizontal, 16)
+                            Text("Characters").font(.subheadline.weight(.medium))
+                                .foregroundStyle(.secondary).padding(.horizontal, 16)
                             LazyVGrid(columns: columns, spacing: 10) {
                                 ForEach(characters) { asset in
-                                    PickerAssetTileView(item: asset).onTapGesture { attachedIDs.append(asset.id); onDone() }
+                                    PickerAssetTileView(item: asset)
+                                        .onTapGesture { attachedIDs.append(asset.id); onDone() }
                                 }
                             }.padding(.horizontal, 16)
                         }
                         if !locations.isEmpty {
-                            Text("Locations").font(.subheadline.weight(.medium)).foregroundStyle(.secondary).padding(.horizontal, 16)
+                            Text("Locations").font(.subheadline.weight(.medium))
+                                .foregroundStyle(.secondary).padding(.horizontal, 16)
                             LazyVGrid(columns: columns, spacing: 10) {
                                 ForEach(locations) { asset in
-                                    PickerAssetTileView(item: asset).onTapGesture { attachedIDs.append(asset.id); onDone() }
+                                    PickerAssetTileView(item: asset)
+                                        .onTapGesture { attachedIDs.append(asset.id); onDone() }
                                 }
                             }.padding(.horizontal, 16)
                         }
@@ -532,13 +489,8 @@ private struct PickerAssetTileView: View {
     @Previewable @State var acts: [MockAct] = []
     @Previewable @State var queue: [GenerationJob] = []
     StoryboardDetailView(
-        acts: $acts,
-        selection: nil,
-        generationQueue: $queue,
-        studios: [],
-        studioIndex: 0,
-        customerIndex: 0,
-        episodeIndex: 0
+        acts: $acts, selection: nil, generationQueue: $queue,
+        studios: [], studioIndex: 0, customerIndex: 0, episodeIndex: 0
     )
     .frame(width: 300, height: 600)
 }
