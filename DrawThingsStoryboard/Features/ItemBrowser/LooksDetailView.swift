@@ -7,7 +7,7 @@ struct LooksDetailView: View {
     @Binding var selectedTemplateID: String?
     @Binding var generationQueue: [GenerationJob]
 
-    @AppStorage(SizeConfigKeys.previewVariantWidth) private var previewVariantWidth = SizeConfigDefaults.previewVariantWidth
+    @AppStorage(SizeConfigKeys.previewVariantWidth)  private var previewVariantWidth  = SizeConfigDefaults.previewVariantWidth
     @AppStorage(SizeConfigKeys.previewVariantHeight) private var previewVariantHeight = SizeConfigDefaults.previewVariantHeight
 
     private var selectedIndex: Int? {
@@ -17,78 +17,16 @@ struct LooksDetailView: View {
 
     var body: some View {
         if let idx = selectedIndex {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-
-                    UnifiedThumbnailView(itemType: .look, name: "", sizeMode: .header)
-                        .padding(.bottom, 16)
-
-                    // Status + Generate Example
-                    VStack(alignment: .leading, spacing: 6) {
-                        sectionLabel("Status")
-                        HStack(spacing: 8) {
-                            Text("E")
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .foregroundStyle(templates[idx].lookStatus == .exampleAvailable ? .green : .gray)
-                            Text("Example:")
-                                .font(.callout)
-                            Text(templates[idx].lookStatus == .exampleAvailable ? "available" : "not yet")
-                                .font(.callout)
-                                .foregroundStyle(templates[idx].lookStatus == .exampleAvailable ? .green : .secondary)
-                            Spacer()
-                            if templates[idx].lookStatus == .noExample {
-                                if generationQueue.contains(where: {
-                                    $0.itemName == templates[idx].name && $0.jobType == .generateExample
-                                }) {
-                                    Text("Queued")
-                                        .font(.caption)
-                                        .foregroundStyle(.purple)
-                                } else {
-                                    Button { generateExample(at: idx) } label: {
-                                        Label("Generate Example", systemImage: "eye")
-                                            .font(.caption)
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .controlSize(.mini)
-                                }
-                            }
-                        }
-                        .padding(.vertical, 5).padding(.horizontal, 8)
-                        .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
-                    }
-                    .padding(.bottom, 12)
-
-                    // Name
-                    VStack(alignment: .leading, spacing: 6) {
-                        sectionLabel("Name")
-                        TextField("Look name", text: $templates[idx].name)
-                            .textFieldStyle(.roundedBorder)
-                    }
-                    .padding(.bottom, 12)
-
-                    Divider().padding(.vertical, 8)
-
-                    // Description = style prompt
-                    VStack(alignment: .leading, spacing: 6) {
-                        sectionLabel("Description")
-                        Text("Describe the visual style — this text is appended to every prompt.")
-                            .font(.caption).foregroundStyle(.secondary)
-                        TextEditor(text: $templates[idx].description)
-                            .font(.callout).frame(minHeight: 100)
-                            .overlay(RoundedRectangle(cornerRadius: 6)
-                                .stroke(Color.secondary.opacity(0.25), lineWidth: 0.5))
-                    }
-                    .padding(.bottom, 12)
-
-                    Spacer(minLength: 20)
-                }
-                .padding(14)
-            }
-            .background(Color(NSColor.windowBackgroundColor))
-            // When a queued example job moves to done, mark the look as exampleAvailable
-            .onChange(of: generationQueue) { _, newQueue in
-                updateLookStatusFromQueue(currentQueue: newQueue, idx: idx)
-            }
+            LookEditorView(
+                template: $templates[idx],
+                generationQueue: $generationQueue,
+                previewVariantWidth: previewVariantWidth,
+                previewVariantHeight: previewVariantHeight,
+                onStatusUpdate: { updatedTemplates in
+                    StorageLoadService.shared.saveTemplates(updatedTemplates)
+                },
+                allTemplates: $templates
+            )
         } else {
             ContentUnavailableView(
                 "No look selected",
@@ -97,12 +35,111 @@ struct LooksDetailView: View {
             )
         }
     }
+}
 
-    // MARK: - Generate example job
+// MARK: - Look editor (extracted to avoid type-checker timeout)
 
-    private func generateExample(at idx: Int) {
-        let template = templates[idx]
-        // Load example prompt from config
+private struct LookEditorView: View {
+    @Binding var template: GenerationTemplate
+    @Binding var generationQueue: [GenerationJob]
+    let previewVariantWidth: Int
+    let previewVariantHeight: Int
+    let onStatusUpdate: ([GenerationTemplate]) -> Void
+    @Binding var allTemplates: [GenerationTemplate]
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+
+                UnifiedThumbnailView(itemType: .look, name: "", sizeMode: .header)
+                    .padding(.bottom, 16)
+
+                LookStatusRow(
+                    template: $template,
+                    generationQueue: $generationQueue,
+                    allTemplates: $allTemplates,
+                    previewVariantWidth: previewVariantWidth,
+                    previewVariantHeight: previewVariantHeight,
+                    onStatusUpdate: onStatusUpdate
+                )
+                .padding(.bottom, 12)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    sectionLabel("Name")
+                    TextField("Look name", text: $template.name)
+                        .textFieldStyle(.roundedBorder)
+                }
+                .padding(.bottom, 12)
+
+                Divider().padding(.vertical, 8)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    sectionLabel("Description")
+                    Text("Describe the visual style — this text is appended to every prompt.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    TextEditor(text: $template.description)
+                        .font(.callout).frame(minHeight: 100)
+                        .overlay(RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color.secondary.opacity(0.25), lineWidth: 0.5))
+                }
+                .padding(.bottom, 12)
+
+                Spacer(minLength: 20)
+            }
+            .padding(14)
+        }
+        .background(Color(NSColor.windowBackgroundColor))
+    }
+}
+
+// MARK: - Status row (extracted to avoid type-checker timeout)
+
+private struct LookStatusRow: View {
+    @Binding var template: GenerationTemplate
+    @Binding var generationQueue: [GenerationJob]
+    @Binding var allTemplates: [GenerationTemplate]
+    let previewVariantWidth: Int
+    let previewVariantHeight: Int
+    let onStatusUpdate: ([GenerationTemplate]) -> Void
+
+    private var isQueued: Bool {
+        generationQueue.contains {
+            $0.itemName == template.name && $0.jobType == .generateExample
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionLabel("Status")
+            HStack(spacing: 8) {
+                Text("E")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundStyle(template.lookStatus == .exampleAvailable ? .green : .gray)
+                Text("Example:").font(.callout)
+                Text(template.lookStatus == .exampleAvailable ? "available" : "not yet")
+                    .font(.callout)
+                    .foregroundStyle(template.lookStatus == .exampleAvailable ? Color.green : Color.secondary)
+                Spacer()
+                if template.lookStatus == .noExample {
+                    if isQueued {
+                        Text("Queued").font(.caption).foregroundStyle(Color.purple)
+                    } else {
+                        Button { generateExample() } label: {
+                            Label("Generate Example", systemImage: "eye").font(.caption)
+                        }
+                        .buttonStyle(.bordered).controlSize(.mini)
+                    }
+                }
+            }
+            .padding(.vertical, 5).padding(.horizontal, 8)
+            .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
+        }
+        .onChange(of: generationQueue) { _, newQueue in
+            updateStatus(currentQueue: newQueue)
+        }
+    }
+
+    private func generateExample() {
         let root = StorageService.shared.rootURL
         let examplePrompt = StorageLoadService.shared.loadAppConfig(from: root)?.lookExamplePrompt
             ?? SizeConfigDefaults.lookExamplePrompt
@@ -127,21 +164,13 @@ struct LooksDetailView: View {
         generationQueue.append(job)
     }
 
-    // MARK: - Status update
-
-    /// If the generation queue no longer contains a job for this look,
-    /// but it did before, the job completed — mark the look as exampleAvailable.
-    private func updateLookStatusFromQueue(currentQueue: [GenerationJob], idx: Int) {
-        guard templates.indices.contains(idx) else { return }
-        let lookName = templates[idx].name
+    private func updateStatus(currentQueue: [GenerationJob]) {
         let stillQueued = currentQueue.contains {
-            $0.itemName == lookName && $0.jobType == .generateExample
+            $0.itemName == template.name && $0.jobType == .generateExample
         }
-        // Job was in queue and is now gone — it completed
-        if !stillQueued && templates[idx].lookStatus == .noExample {
-            templates[idx].lookStatus = .exampleAvailable
-            // Persist the new status to disk
-            StorageLoadService.shared.saveTemplates(templates)
+        if !stillQueued && template.lookStatus == .noExample {
+            template.lookStatus = .exampleAvailable
+            onStatusUpdate(allTemplates)
         }
     }
 }
