@@ -16,7 +16,7 @@ enum ThumbnailItemType {
         case .location:    return .green
         case .look:        return .orange
         case .panel:       return .yellow
-        case .modelConfig: return Color(red: 0.7, green: 0.5, blue: 0.9) // hell-lila
+        case .modelConfig: return Color(red: 0.7, green: 0.5, blue: 0.9)
         }
     }
 
@@ -36,6 +36,17 @@ enum ThumbnailItemType {
 
     var iconColor: Color {
         backgroundColor.opacity(0.7)
+    }
+
+    /// Human-readable type name for accessibility.
+    var accessibilityTypeName: String {
+        switch self {
+        case .character: return "Character"
+        case .location:  return "Location"
+        case .look:      return "Look"
+        case .panel:     return "Panel"
+        case .modelConfig: return "Model Configuration"
+        }
     }
 }
 
@@ -86,6 +97,14 @@ struct AssetStatusFlags {
     var variantsAvailable: Bool
     var smallImageAvailable: Bool
     var largeImageAvailable: Bool
+
+    /// Accessibility description of all three flags.
+    var accessibilityDescription: String {
+        let v = variantsAvailable ? "Variants available" : "No variants"
+        let s = smallImageAvailable ? "small image available" : "no small image"
+        let l = largeImageAvailable ? "large image available" : "no large image"
+        return "\(v), \(s), \(l)"
+    }
 }
 
 // MARK: - Badge configuration
@@ -114,6 +133,25 @@ struct UnifiedThumbnailView: View {
     let sizeMode: ThumbnailSizeMode
     var badges: ThumbnailBadges = ThumbnailBadges()
 
+    // MARK: Accessibility helpers
+
+    private var accessibilityLabel: String {
+        name.isEmpty ? itemType.accessibilityTypeName : "\(name), \(itemType.accessibilityTypeName)"
+    }
+
+    private var accessibilityValue: String {
+        if let flags = badges.assetStatus {
+            return flags.accessibilityDescription
+        } else if let flags = badges.panelStatus {
+            let s = flags.smallPanelAvailable ? "small panel available" : "no small panel"
+            let l = flags.largePanelAvailable ? "large panel available" : "no large panel"
+            return "\(s), \(l)"
+        } else if badges.showExampleIndicator {
+            return badges.exampleAvailable ? "Example image available" : "No example image"
+        }
+        return ""
+    }
+
     var body: some View {
         VStack(spacing: sizeMode == .compact ? 2 : 4) {
             ZStack {
@@ -122,6 +160,7 @@ struct UnifiedThumbnailView: View {
                 Image(systemName: itemType.icon)
                     .font(.system(size: sizeMode.iconSize))
                     .foregroundStyle(itemType.iconColor)
+                    .accessibilityHidden(true)
 
                 badgeOverlays
             }
@@ -134,8 +173,12 @@ struct UnifiedThumbnailView: View {
                     .font(sizeMode == .header ? .caption : .caption2)
                     .lineLimit(sizeMode == .header ? 2 : 1)
                     .multilineTextAlignment(.center)
+                    .accessibilityHidden(true) // covered by container label
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(accessibilityValue)
     }
 
     @ViewBuilder
@@ -144,11 +187,13 @@ struct UnifiedThumbnailView: View {
             RoundedRectangle(cornerRadius: sizeMode.cornerRadius)
                 .fill(itemType.backgroundFill)
                 .frame(width: w, height: sizeMode.height)
+                .accessibilityHidden(true)
         } else {
             RoundedRectangle(cornerRadius: sizeMode.cornerRadius)
                 .fill(itemType.backgroundFill)
                 .frame(maxWidth: .infinity)
                 .frame(height: sizeMode.height)
+                .accessibilityHidden(true)
         }
     }
 
@@ -161,6 +206,7 @@ struct UnifiedThumbnailView: View {
                         .font(.system(size: sizeMode == .compact ? 9 : 13))
                         .foregroundStyle(.green)
                         .padding(sizeMode == .compact ? 2 : 4)
+                        .accessibilityLabel("Approved")
                     Spacer()
                 }
                 Spacer()
@@ -179,6 +225,8 @@ struct UnifiedThumbnailView: View {
                     }
                     .buttonStyle(.plain)
                     .padding(sizeMode == .compact ? 1 : 2)
+                    .accessibilityLabel("Delete \(name)")
+                    .accessibilityHint("Removes this item from the list")
                 }
                 Spacer()
             }
@@ -201,6 +249,7 @@ struct UnifiedThumbnailView: View {
                     .background(badges.levelBadgeColor.opacity(0.2), in: RoundedRectangle(cornerRadius: 3))
                     .foregroundStyle(badges.levelBadgeColor)
                     .padding(sizeMode == .compact ? 2 : 3)
+                    .accessibilityHidden(true) // level info covered by container accessibilityValue
                     Spacer()
                 }
             }
@@ -221,6 +270,7 @@ struct UnifiedThumbnailView: View {
                     .padding(.vertical, 1)
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 3))
                     .padding(sizeMode == .compact ? 2 : 4)
+                    .accessibilityHidden(true) // spoken via container accessibilityValue
                 }
             }
         } else if let flags = badges.panelStatus {
@@ -237,6 +287,7 @@ struct UnifiedThumbnailView: View {
                     .padding(.vertical, 1)
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 3))
                     .padding(sizeMode == .compact ? 2 : 4)
+                    .accessibilityHidden(true)
                 }
             }
         } else if badges.showExampleIndicator {
@@ -251,6 +302,7 @@ struct UnifiedThumbnailView: View {
                         .padding(.vertical, 1)
                         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 3))
                         .padding(sizeMode == .compact ? 2 : 4)
+                        .accessibilityHidden(true)
                 }
             }
         } else if badges.showStatusDot {
@@ -265,6 +317,7 @@ struct UnifiedThumbnailView: View {
                             height: sizeMode == .compact ? 4 : 6
                         )
                         .padding(sizeMode == .compact ? 2 : 4)
+                        .accessibilityHidden(true)
                 }
             }
         }
@@ -275,6 +328,7 @@ struct UnifiedThumbnailView: View {
         if badges.showSelectionStroke {
             RoundedRectangle(cornerRadius: sizeMode.cornerRadius)
                 .stroke(Color.accentColor, lineWidth: 1.5)
+                .accessibilityHidden(true)
         }
     }
 }

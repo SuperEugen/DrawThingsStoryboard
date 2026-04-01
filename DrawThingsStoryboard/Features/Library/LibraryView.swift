@@ -24,6 +24,7 @@ struct LibraryBrowserView: View {
         VStack(spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Image(systemName: "photo.stack").font(.title2).foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
                 Text("Library").font(.title2.bold())
                 Spacer()
             }
@@ -38,6 +39,7 @@ struct LibraryBrowserView: View {
                     if let studio {
                         LibraryLevelHeader(
                             icon: "building.columns", iconColor: .purple, name: studio.name,
+                            levelName: "Studio",
                             canGoBack: studioIndex > 0,
                             canGoForward: studioIndex < studios.count - 1,
                             onBack: { studioIndex -= 1; customerIndex = 0; selectedItem = nil },
@@ -55,6 +57,7 @@ struct LibraryBrowserView: View {
                     if let customer {
                         LibraryLevelHeader(
                             icon: "person.text.rectangle", iconColor: .teal, name: customer.name,
+                            levelName: "Customer",
                             canGoBack: customerIndex > 0,
                             canGoForward: customerIndex < customers.count - 1,
                             onBack: { customerIndex -= 1; selectedItem = nil },
@@ -85,10 +88,13 @@ struct LibraryBrowserView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack(spacing: 6) {
                                     Image(systemName: "film").foregroundStyle(.blue).frame(width: 16)
+                                        .accessibilityHidden(true)
                                     Text(episode.name).font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
                                     Spacer()
                                 }
                                 .padding(.horizontal, 14).padding(.top, idx == 0 ? 10 : 6)
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel("Episode: \(episode.name)")
                                 LibraryCastGrid(
                                     characters: episode.characters.filter { $0.libraryLevel == .episode },
                                     locations: episode.locations.filter { $0.libraryLevel == .episode },
@@ -115,18 +121,29 @@ struct LibraryBrowserView: View {
 
 private struct LibraryLevelHeader: View {
     let icon: String; let iconColor: Color; let name: String
+    let levelName: String
     let canGoBack: Bool; let canGoForward: Bool
     let onBack: () -> Void; let onForward: () -> Void
 
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: icon).foregroundStyle(iconColor).frame(width: 16)
+                .accessibilityHidden(true)
             Text(name).font(.subheadline.weight(.medium)).foregroundStyle(.secondary).lineLimit(1)
             Spacer()
-            Button(action: onBack)    { Image(systemName: "chevron.left").font(.caption.weight(.medium)).frame(width: 20, height: 20) }
-                .buttonStyle(.bordered).controlSize(.mini).disabled(!canGoBack)
-            Button(action: onForward) { Image(systemName: "chevron.right").font(.caption.weight(.medium)).frame(width: 20, height: 20) }
-                .buttonStyle(.bordered).controlSize(.mini).disabled(!canGoForward)
+            Button(action: onBack) {
+                Image(systemName: "chevron.left").font(.caption.weight(.medium)).frame(width: 20, height: 20)
+            }
+            .buttonStyle(.bordered).controlSize(.mini).disabled(!canGoBack)
+            .accessibilityLabel("Previous \(levelName)")
+            .accessibilityHint(canGoBack ? "Go to previous \(levelName.lowercased())" : "No previous \(levelName.lowercased()) available")
+
+            Button(action: onForward) {
+                Image(systemName: "chevron.right").font(.caption.weight(.medium)).frame(width: 20, height: 20)
+            }
+            .buttonStyle(.bordered).controlSize(.mini).disabled(!canGoForward)
+            .accessibilityLabel("Next \(levelName)")
+            .accessibilityHint(canGoForward ? "Go to next \(levelName.lowercased())" : "No next \(levelName.lowercased()) available")
         }
         .padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 4)
     }
@@ -175,6 +192,8 @@ private struct LibraryCastGrid: View {
         )
         .padding(3)
         .background(RoundedRectangle(cornerRadius: 12).fill(isSelected ? Color.accentColor.opacity(0.07) : Color.clear))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityHint("Double-tap to select \(item.name)")
     }
 }
 
