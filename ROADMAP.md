@@ -2,26 +2,34 @@
 
 This roadmap outlines the planned development direction. Items are grouped by theme, not by strict release order. Priorities may shift based on feedback and available time.
 
-## v0.2 — Persistence
+## v0.2 — Flat JSON Storage & Simplified Data Model ✅
 
-The biggest gap in the current version: all project data is lost when the app quits.
+Completed: April 2026
 
-- [ ] Define JSON format for project data (see `ARCHITECTURE.md`)
-- [ ] `Codable` conformance on all models
-- [ ] Save/load project via JSON file(s)
-- [ ] Auto-save on change
-- [ ] Multiple projects / recent projects list
-- [ ] Persistent `DTModelConfig` (currently in-memory only)
+- [x] Replace Studio/Customer/Episode hierarchy with flat 6-JSON storage
+- [x] All images stored as UUID.png in single root folder
+- [x] Codable structs matching JSON schema (DataModels.swift)
+- [x] StorageSetupService creates demo data on first launch
+- [x] StorageLoadService reads/writes all 6 JSON files
+- [x] Rename Looks → Styles throughout
+- [x] Remove Projects section
+- [x] New sidebar: Storyboard, Assets, Styles, Models, Production Queue, Settings
+- [x] Seed 0 = unassigned, app generates random seeds
+- [x] Style example generation writes UUID back to styles.json
+- [x] Generated style images shown in tiles and detail view
 
-## v0.3 — Generated images in the UI
+## v0.3 — Complete Generation Wiring
 
-Images are already saved to disk, but not yet shown back in the app.
+Images are saved but not yet fully wired back into assets and panels.
 
-- [ ] Approved variant image as thumbnail in Asset Browser
-- [ ] Panel images shown in Storyboard Browser tiles
-- [ ] Look example image already works — extend pattern to assets and panels
+- [ ] Asset variant generation: image UUIDs → AssetEntry.variant1–4.smallImageID
+- [ ] Asset large image generation: UUID → AssetEntry.largeImageID
+- [ ] Panel generation: UUID → PanelEntry.smallImageID / largeImageID
+- [ ] Show actual variant images in Asset Browser tiles
+- [ ] Show panel images in Storyboard Browser
+- [ ] Production log entries written after each generation
 
-## v0.4 — Production workflow
+## v0.4 — Production Workflow
 
 The current "Generate (Test)" button is a proof of concept. The real workflow needs proper queue processing.
 
@@ -31,22 +39,22 @@ The current "Generate (Test)" button is a proof of concept. The real workflow ne
 - [ ] Proper error handling when Draw Things is not running
 - [ ] gRPC address and port configurable in Settings
 
-## v0.5 - More Draw Things control
+## v0.5 — More Draw Things Control
 
-To get consistant images over several panels it is crucial to use the moodboard feature.
+To get consistent images over several panels it is crucial to use the moodboard feature.
 
 - [ ] Generate large image uses the same seed used for generation of variant or small image
-- [ ] Generate panel use reference images attached to the job
+- [ ] Generate panel uses reference images attached to the job
 
-## v0.6 — Prompt refinement
+## v0.6 — Prompt Refinement
 
 Better control of the prompts used to generate each image. A modular system.
 
-- [ ] Prompt assembly for Asset jobs: `item.description` + `item.prompt` + look suffix
 - [ ] Prompt preview before queuing
 - [ ] Prompt history per item
+- [ ] Modular prompt assembly with reusable fragments
 
-## v0.7 — Storyboard export
+## v0.7 — Storyboard Export
 
 The goal of the app. Something to hand out.
 
@@ -54,35 +62,36 @@ The goal of the app. Something to hand out.
 - [ ] Export individual panels as PNG/JPEG
 - [ ] Export asset sheet (all approved variants per character/location)
 
-## 0.8 - Import fountain files
+## v0.8 — Import Fountain Files
 
 Connect to other apps in the whole production workflow.
 
 - [ ] Import fountain file format used by screenwriting software like Beat to import acts, sequences and scenes
 - [ ] Use fountain import to create character and location assets
 
-## 0.9 - Dialog and actions
+## v0.9 — Dialog and Actions
 
 Essential for a complete storyboard.
 
-- [ ] New fields for each panel for character dialog, action instruction and camera movement and framing are included
+- [ ] Panel fields for dialogue, action instruction, camera movement already exist in data model
+- [ ] UI polish for these fields in the Storyboard detail view
 
-## 1.0 - Clean up
+## v1.0 — Clean Up
 
-The user interface and the code must be checked to have a prober v1.
+The user interface and the code must be checked for a proper v1.
 
-- [ ]  The complete UI must be checked for consistancy and ease of use
-- [ ]  Create missing visuals
-- [ ]  Update documentation
-- [ ]  Check the code and refactor where necessary
+- [ ] Complete UI consistency check
+- [ ] Create missing visuals
+- [ ] Update documentation
+- [ ] Code review and refactor where necessary
 
-## Future ideas
+## Future Ideas
 
 - **Draw Things on iPhone** — connect to Draw Things iOS over local network
-- **Prompt templates** — reusable prompt building blocks beyond look suffixes
-- **Export character turn-around sheets** - special prompts create a turn-around sheet for a character
-- **Export characters as parted image** - special prompts create characters with separate elements for 2d character animation
-- **Export vectorized assets** - usable in 2d animation software like Moho
-- **Export Pitch-Book** - export a pitch book to present the story to someone
-- **Export Video** - create a video out of the storyboard
-- **Support LoRAs** - add LoRA support in the generation of images
+- **Prompt templates** — reusable prompt building blocks beyond style suffixes
+- **Export character turn-around sheets** — special prompts create turn-around sheets
+- **Export characters as parted image** — separate elements for 2D character animation
+- **Export vectorized assets** — usable in 2D animation software like Moho
+- **Export Pitch Book** — export a pitch book to present the story
+- **Export Video** — create a video from the storyboard
+- **Support LoRAs** — add LoRA support in image generation

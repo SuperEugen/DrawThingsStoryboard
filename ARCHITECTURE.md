@@ -18,40 +18,62 @@ External (Draw Things via gRPC, ~/Pictures filesystem)
 
 ## Navigation
 
-A three-pane `NavigationSplitView` with seven sidebar sections (`AppSection`):
+A three-pane `NavigationSplitView` with six sidebar sections (`AppSection`):
 
 | Section | Content pane | Detail pane |
 |---------|-------------|-------------|
-| projects | ProjectsBrowserView | ProjectsDetailView |
-| assets | AssetDetailPane | LibraryBrowserView |
-| looks | LooksBrowserView | LooksDetailView |
 | storyboard | StoryboardBrowserView | StoryboardDetailView |
-| modelConfig | ModelConfigBrowserView | ModelConfigDetailView |
+| assets | AssetsBrowserView | AssetsDetailView |
+| styles | StylesBrowserView | StylesDetailView |
+| models | ModelsBrowserView | ModelsDetailView |
 | productionQueue | ProductionBrowserView | ProductionJobDetailView |
-| configuration | ConfigurationView | — |
+| settings | SettingsContentView | — |
 
 ## Data model
 
-All models are plain Swift structs — value types, `Identifiable`, no persistence layer yet.
+All models are plain Swift `Codable` structs stored as 6 JSON files in `~/Pictures/DrawThings-Storyboard/`. All generated images are stored as `<UUID>.png` in the same folder (flat structure, no subfolders).
+
+### JSON files and their structs (DataModels.swift)
 
 ```
-MockStudio
-  └── MockCustomer
-        └── MockEpisode
-              ├── [CastingItem]   characters
-              ├── [CastingItem]   locations
-              └── [MockAct]
-                    └── [MockSequence]
-                          └── [MockScene]
-                                └── [MockPanel]
+config.json        → AppConfig
+                     (image sizes, panel duration, style prompt, shared secret)
 
-CastingItem
-  └── [Variant]   up to 4, isApproved / isGenerated
+models.json        → ModelsFile
+                     └── [ModelEntry]  (modelID, name, model filename, steps, guidanceScale, gen times)
 
-GenerationTemplate   (Look — style prompt)
-DTModelConfig        (Draw Things model parameters)
-GenerationJob        (queued/done generation task)
+styles.json        → StylesFile
+                     └── [StyleEntry]  (styleID, name, style prompt, smallImageID, isGenerated)
+
+storyboards.json   → StoryboardsFile
+                     └── [StoryboardEntry]  (name, modelID, styleID)
+                           └── [ActEntry]
+                                 └── [SequenceEntry]
+                                       └── [SceneEntry]
+                                             └── [PanelEntry]  (panelID, description, dialogue,
+                                                                cameraMovement, duration, seed,
+                                                                smallImageID, largeImageID,
+                                                                ref1ID–ref4ID)
+
+assets.json        → AssetsFile
+                     └── [AssetEntry]  (assetID, name, type, subType, description,
+                                        smallImageID, largeImageID, seed,
+                                        variant1–variant4: AssetVariant)
+
+production-log.json → ProductionLogFile
+                      └── [GeneratedImageEntry]  (imageID, type, modelID, styleID,
+                                                   refs, times, seed, prompt)
 ```
+
+### Image references
+
+All image fields (`smallImageID`, `largeImageID`, variant `smallImageID`) store UUID strings that correspond to `<UUID>.png` files in the root folder.
+
+### Seed handling
+
+- `seed = 0` means "not yet assigned" (ungenerated)
+- The app generates random seeds via `SeedHelper.randomSeed()` before sending to Draw Things
+- Draw Things receives actual seed values (never 0)
 
 ## Draw Things integration
 
@@ -73,77 +95,27 @@ DrawThingsClientProtocol
 
 | Job type | Combined prompt |
 |----------|----------------|
-| Asset variant | `item.description`, `item.prompt` |
-| Look example | `look.description`, `lookPromptCharacter/Location` |
-| Panel | `look.description`, `lookPromptPanel`, `panel.description` |
-
-The type-specific suffixes (`lookPromptCharacter`, `lookPromptLocation`, `lookPromptPanel`) are stored via `@AppStorage` and editable in the Configuration section.
+| Style example | `style.style` + `config.stylePrompt` |
+| Panel | `style.style` + `panel.description` |
 
 ## File storage
 
-`StorageService.shared` writes to the macOS sandbox-safe Pictures directory:
+`StorageService.shared` writes to `~/Pictures/DrawThings-Storyboard/`.
 
-```
-~/Pictures/DrawThings-Storyboard/    dtsb-config.json
-├── library/
-│   ├── <studioName>/                st-config.json, st-catalog.json, <assetFileName>.png
-│   │   └── <customerName>/          cu-config.json, cu-catalog.json, <assetFileName>.png
-│   │       └── <episodeName>/       ep-config.json, ep-catalog.json, <assetFileName>.png
-│   └── looks/                       lo-catalog.json, <lookFileName>.png
-└── <episodeName>/                   pa-config.json, pa-catalog.json, <panelFileName>.png
-```
-Images are loaded back on demand (e.g. `loadFirstAvailableVariant(assetID:)` for panel moodboards).
+All files are flat in the root folder:
+- 6 JSON files for data
+- `<UUID>.png` for all generated images
 
----
+On first launch, `StorageSetupService` creates the folder and all 6 JSON files with demo data (4 characters, 4 locations, 3 styles, 1 model, 1 storyboard).
 
-## Persistence — Concepts
+## Generation flow
 
-> This section captures ideas and drafts for future persistent data storage.
+1. User clicks "Generate" in a section (Styles, Assets, Storyboard)
+2. A `GenerationJob` is created with `styleID`/`assetID`/`panelID` and added to `generationQueue`
+3. User navigates to Production Queue, selects the job, clicks "Generate"
+4. `GeneratePanel` calls `ImageGenerationViewModel.generate()` via Draw Things gRPC
+5. Resulting image is saved as `<UUID>.png` via `StorageService.saveImage()`
+6. `onJobCompleted` passes the job (with `savedImageIDs`) back to `ContentView.handleJobCompleted()`
+7. `handleJobCompleted` writes the image UUID into the appropriate data model and persists the JSON
 
-### Current state
-
-All data (Studios, Episodes, Templates, ModelConfigs) lives exclusively as in-memory `@State` in `ContentView`. It is lost when the app quits. Only generated images are persisted to the filesystem.
-
-### Goals
-
-- Project data survives an app restart
-- Multiple projects / studios can be managed
-- Exchangeable format (e.g. for backup or versioning)
-- Simplest possible implementation without an external database
-
-### Plan
-
-All *.json files need to have a version to make it possible to migrate to a newer version if necessary.
-
-**JSON file for app-wide configs**
-- ModelConfigs are stored in dtsb-config.json.
-- All other Configuration data (app-wide) is also stored in dtsb-config.json.
-
-**JSON files per project**
-- One folder per project/episode in `~/Pictures/DrawThings-Storyboard/<EpisodeName>/`
-- `pa-config.json` contains Studio, Customer, Episode, CharacterItems, LocationItems
-- Simple, human-readable, versionable with git
-- `Codable` conformance on all models is sufficient
-
-**Additional JSON files in library**
-- The *-config.json files contain all the configuration data that should persist, i.e. name, rules, preferred look etc.
-- The *-catalog.json files are lists of all *.png files in the respective folders containing all metadata of all generated images in the folder. The entries are found by their filename.
-- When assets are moved from one level to another (e.g. from Studio to Customer) the catalog files have to be updated accordingly (the from and the to catalog).
-
-### Planned JSON structures
-
-> *Concrete JSON formats will be documented here once they are defined.*
-
-```json
-// Placeholder — will be filled with concrete ideas
-{
-  "version": "1",
-  "studio": { },
-  "templates": [ ],
-  "modelConfigs": [ ]
-}
-```
-
-### Open questions
-
-- Should CastingItems reference their generated variant paths in JSON?
+Currently implemented for **Styles** (image UUID → `StyleEntry.smallImageID`, persisted to `styles.json`).

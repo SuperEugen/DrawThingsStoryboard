@@ -8,17 +8,17 @@ DrawThingsStoryboard organises your visual storytelling workflow around a film p
 
 ## Features
 
-- **Projects** — Studio → Customer → Episode hierarchy with inherited Look preferences and production rules
-- **Assets** — Character and location library with variant generation (up to 4 variants per item, approve/disapprove workflow)
-- **Looks** — Visual style templates that assemble prompts from description + type-specific suffixes; generates example images
-- **Storyboard** — Act → Sequence → Scene → Panel hierarchy; attach up to 4 assets per panel (3 moodboard + 1 canvas)
-- **Model Config** — Named Draw Things model configurations (model filename, steps, guidance scale)
+- **Storyboard** — Act → Sequence → Scene → Panel hierarchy with camera movement, dialogue, and duration per panel
+- **Assets** — Character and location library with variant generation (up to 4 variants per asset, approve workflow)
+- **Styles** — Visual style templates (e.g. Photorealistic, Comic, Sketch) that assemble prompts; generates example images
+- **Models** — Named Draw Things model configurations (model filename, steps, guidance scale, estimated gen times)
 - **Production Queue** — Queued jobs with model picker, live generation progress, and done list with timing
-- **Local storage** — All generated images saved to `~/Pictures/DrawThings-Storyboard/` with a structured layout
+- **Settings** — Image sizes, style preview prompt, panel duration defaults, shared secret
+- **Flat JSON storage** — All data in 6 JSON files, all images as UUID.png in a single folder
 
 ## Screenshot
 
-![Projects view](docs/images/projects.png)
+![Storyboard view](docs/images/projects.png)
 
 ## Requirements
 
@@ -34,7 +34,7 @@ cd DrawThingsStoryboard
 open DrawThingsStoryboard.xcodeproj
 ```
 
-Build and run in Xcode (⌘R). Before generating images, make sure Draw Things is running with gRPC enabled.
+Build and run in Xcode (⌘R). On first launch the app creates default data in `~/Pictures/DrawThings-Storyboard/` including demo assets and styles.
 
 ### Draw Things configuration
 
@@ -47,55 +47,60 @@ In Draw Things, go to **Advanced → API Server** and set:
 | Port | 7859 (default) |
 | Transport Layer Security | enabled |
 
-The app connects to `localhost:7859` with TLS by default. Port and address can be adjusted in the **Configuration** section of the app.
+The app connects to `localhost:7859` with TLS by default.
 
 ## How It Works
 
-### Prompt assembly
+### Data storage
 
-Every generation job assembles its prompt from several pieces:
-
-- **Asset variants** — `item.description` + `item.prompt`
-- **Look examples** — `look.description` + look prompt suffix (Character / Location, configured in Settings)
-- **Panels** — `look.description` + panel prompt suffix + `panel.description`
-
-### Panel generation and reference images
-
-When a panel job is generated, attached assets are loaded from the local library and passed to Draw Things as ControlNet shuffle hints (moodboard). Up to 3 assets go into the moodboard; a 4th asset is passed as the canvas image (img2img).
-
-### Output structure
+All data lives in `~/Pictures/DrawThings-Storyboard/` as 6 JSON files plus UUID-named PNG images:
 
 ```
 ~/Pictures/DrawThings-Storyboard/
-├── library/
-│   ├── assets/          # <assetID>_v0.png, _v1.png, …
-│   └── examples/        # <lookName>.png
-└── <EpisodeName>/
-    └── panels/          # <panelID>.png
+├── config.json          # App settings (image sizes, style prompt, shared secret)
+├── models.json          # Draw Things model configurations
+├── styles.json          # Visual styles with style prompts
+├── storyboards.json     # Storyboard hierarchy (acts/sequences/scenes/panels)
+├── assets.json          # Characters and locations with variants
+├── production-log.json  # Log of all generated images
+└── <UUID>.png           # All generated images (flat, no subfolders)
 ```
+
+### Prompt assembly
+
+Every generation job assembles its prompt from style description + item-specific text:
+
+- **Style examples** — `style.style` + `config.stylePrompt`
+- **Panels** — `style.style` + `panel.description`
+
+### Panel generation and reference images
+
+Panels can reference up to 4 assets (characters/locations) via ref1ID–ref4ID. These are passed to Draw Things as ControlNet shuffle hints (moodboard) and canvas image.
 
 ## Project Structure
 
 ```
 DrawThingsStoryboard/
-├── App/                    # Entry point, sidebar, routing (ContentView)
+├── App/                    # Entry point, sidebar, ContentView
 ├── Features/
-│   ├── ItemBrowser/        # Queue, looks, configuration, casting views
-│   ├── Library/            # Asset library browser
-│   ├── ModelConfig/        # DTModelConfig browser and editor
+│   ├── Assets/             # Assets browser and detail editor
+│   ├── Styles/             # Styles browser and detail editor
+│   ├── Models/             # Models browser and detail editor
 │   ├── Storyboard/         # Act/Sequence/Scene/Panel views
+│   ├── ProductionQueue/    # Queue browser and job detail with generation
+│   ├── Settings/           # App settings (SettingsContentView)
 │   ├── ImageGeneration/    # ViewModel and generation logic
 │   └── Shared/             # UnifiedThumbnailView and helpers
-├── Models/                 # Data models and mock data
+├── Models/                 # DataModels.swift, GenerationJob, Request/Response
 └── Services/
     ├── DrawThingsClient/   # gRPC, HTTP, and mock clients
-    └── Storage/            # StorageService (file system)
+    └── Storage/            # StorageService, StorageSetupService, StorageLoadService
 ```
 
 ## Dependencies
 
 | Package | Purpose |
-|---------|---------|
+|---------|--------|
 | [euphoriacyberware-ai/DT-gRPC-Swift-Client](https://github.com/euphoriacyberware-ai/DT-gRPC-Swift-Client) | Draw Things gRPC client (grpc-swift, swift-protobuf, flatbuffers) |
 
 > [!NOTE]
