@@ -3,14 +3,9 @@ import Foundation
 
 // MARK: - StorageService
 //
-// Manages persisting generated images to the file system.
-//
-// Structure under ~/Pictures/DrawThings-Storyboard/:
-//   library/
-//     <lookName>.png          ← Look example images (alongside lo-config.json)
-//     assets/                 ← Variant images (<assetID>_v<n>.png)
-//   <EpisodeName>/
-//     panels/                 ← Panel images (<panelID>.png)
+// Manages the root folder and image persistence.
+// All images are stored as <UUID>.png directly in the root folder.
+// The 6 JSON files also live in the root folder.
 
 enum StorageError: LocalizedError {
     case couldNotCreateDirectory(URL)
@@ -40,98 +35,71 @@ final class StorageService {
             .appendingPathComponent("DrawThings-Storyboard")
     }
 
-    // MARK: - Sub-directories
+    // MARK: - JSON file URLs
 
-    var libraryURL: URL { rootURL.appendingPathComponent("library") }
-    var assetsURL: URL  { libraryURL.appendingPathComponent("assets") }
+    var configURL: URL        { rootURL.appendingPathComponent("config.json") }
+    var modelsURL: URL        { rootURL.appendingPathComponent("models.json") }
+    var stylesURL: URL        { rootURL.appendingPathComponent("styles.json") }
+    var storyboardsURL: URL   { rootURL.appendingPathComponent("storyboards.json") }
+    var assetsURL: URL        { rootURL.appendingPathComponent("assets.json") }
+    var productionLogURL: URL { rootURL.appendingPathComponent("production-log.json") }
 
-    /// Look example images live directly in library/, alongside lo-config.json.
-    var looksURL: URL   { libraryURL }
+    // MARK: - Image URLs
 
-    func panelsURL(episodeName: String) -> URL {
-        rootURL
-            .appendingPathComponent(sanitize(episodeName))
-            .appendingPathComponent("panels")
+    /// Returns the URL for a given image ID (UUID string).
+    func imageURL(for imageID: String) -> URL {
+        rootURL.appendingPathComponent("\(imageID).png")
     }
 
-    // MARK: - Save helpers
+    // MARK: - Save image
 
-    /// Save a variant image.
+    /// Saves an NSImage as PNG with a new UUID filename. Returns the UUID string.
     @discardableResult
-    func saveVariantImage(
-        _ image: NSImage,
-        assetID: String,
-        variantIndex: Int
-    ) throws -> URL {
-        let dir = assetsURL
-        try makeDirectory(dir)
-        let url = dir.appendingPathComponent("\(sanitize(assetID))_v\(variantIndex).png")
+    func saveImage(_ image: NSImage) throws -> String {
+        let id = UUID().uuidString
+        let url = imageURL(for: id)
+        try ensureRootExists()
         try writePNG(image, to: url)
-        return url
+        return id
     }
 
-    /// Save a Look example image directly into library/.
-    @discardableResult
-    func saveLookExample(
-        _ image: NSImage,
-        lookName: String
-    ) throws -> URL {
-        let dir = looksURL
-        try makeDirectory(dir)
-        let url = dir.appendingPathComponent("\(sanitize(lookName)).png")
-        try writePNG(image, to: url)
-        return url
+    // MARK: - Load image
+
+    func loadImage(id: String) -> NSImage? {
+        guard !id.isEmpty else { return nil }
+        return NSImage(contentsOf: imageURL(for: id))
     }
 
-    /// Save a storyboard panel image.
-    @discardableResult
-    func savePanelImage(
-        _ image: NSImage,
-        panelID: String,
-        episodeName: String
-    ) throws -> URL {
-        let dir = panelsURL(episodeName: episodeName)
-        try makeDirectory(dir)
-        let url = dir.appendingPathComponent("\(sanitize(panelID)).png")
-        try writePNG(image, to: url)
-        return url
+    // MARK: - JSON read/write helpers
+
+    private let encoder: JSONEncoder = {
+        let e = JSONEncoder()
+        e.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return e
+    }()
+
+    private let decoder = JSONDecoder()
+
+    func read<T: Decodable>(_ url: URL) -> T? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? decoder.decode(T.self, from: data)
     }
 
-    // MARK: - Load helpers
-
-    func loadVariantImage(assetID: String, variantIndex: Int) -> NSImage? {
-        let url = assetsURL.appendingPathComponent("\(sanitize(assetID))_v\(variantIndex).png")
-        return NSImage(contentsOf: url)
-    }
-
-    func loadFirstAvailableVariant(assetID: String) -> NSImage? {
-        for idx in 0..<4 {
-            if let img = loadVariantImage(assetID: assetID, variantIndex: idx) { return img }
-        }
-        return nil
-    }
-
-    /// Load a Look example image from library/<lookName>.png
-    func loadLookExample(lookName: String) -> NSImage? {
-        let url = looksURL.appendingPathComponent("\(sanitize(lookName)).png")
-        return NSImage(contentsOf: url)
-    }
-
-    func loadPanelImage(panelID: String, episodeName: String) -> NSImage? {
-        let url = panelsURL(episodeName: episodeName)
-            .appendingPathComponent("\(sanitize(panelID)).png")
-        return NSImage(contentsOf: url)
+    func write<T: Encodable>(_ value: T, to url: URL) {
+        guard let data = try? encoder.encode(value) else { return }
+        try? data.write(to: url, options: .atomic)
     }
 
     // MARK: - Private helpers
 
-    private func makeDirectory(_ url: URL) throws {
-        do {
-            try FileManager.default.createDirectory(
-                at: url, withIntermediateDirectories: true, attributes: nil
-            )
-        } catch {
-            throw StorageError.couldNotCreateDirectory(url)
+    func ensureRootExists() throws {
+        let fm = FileManager.default
+        if !fm.fileExists(atPath: rootURL.path) {
+            do {
+                try fm.createDirectory(at: rootURL, withIntermediateDirectories: true)
+            } catch {
+                throw StorageError.couldNotCreateDirectory(rootURL)
+            }
         }
     }
 
@@ -146,19 +114,5 @@ final class StorageService {
         } catch {
             throw StorageError.couldNotSaveImage(url)
         }
-    }
-
-    func sanitize(_ name: String) -> String {
-        name
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: "/",  with: "-")
-            .replacingOccurrences(of: ":",  with: "-")
-            .replacingOccurrences(of: "\\", with: "-")
-            .replacingOccurrences(of: "\"", with: "")
-            .replacingOccurrences(of: "*",  with: "")
-            .replacingOccurrences(of: "?",  with: "")
-            .replacingOccurrences(of: "<",  with: "")
-            .replacingOccurrences(of: ">",  with: "")
-            .replacingOccurrences(of: "|",  with: "-")
     }
 }

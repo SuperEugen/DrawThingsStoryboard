@@ -13,15 +13,13 @@ final class ImageGenerationViewModel: ObservableObject {
     // MARK: - Parameters
     @Published var steps: Int = 20
     @Published var guidanceScale: Double = 7.5
-    @Published var seed: Int = -1
+    @Published var seed: Int = 0
     @Published var width: Int = 512
     @Published var height: Int = 512
     @Published var model: String = ""
 
     // MARK: - Moodboard + canvas
-    /// Reference images forwarded to Draw Things as shuffle hints (max 3).
     @Published var moodboardImages: [NSImage] = []
-    /// Optional canvas image for img2img (4th asset for panel jobs).
     @Published var initImage: NSImage? = nil
 
     // MARK: - State
@@ -33,8 +31,6 @@ final class ImageGenerationViewModel: ObservableObject {
     // MARK: - Dependencies
     private let client: DrawThingsClientProtocol
 
-    /// Default init: tries gRPC (port 7859, TLS on), falls back to HTTP (port 7859).
-    /// Inject DrawThingsMockClient for SwiftUI Previews.
     init(client: DrawThingsClientProtocol? = nil) {
         if let client {
             self.client = client
@@ -54,12 +50,15 @@ final class ImageGenerationViewModel: ObservableObject {
         errorMessage = nil
         generatedImage = nil
 
+        // If seed is 0 (unassigned), generate a random one for Draw Things
+        let effectiveSeed = SeedHelper.isUnassigned(seed) ? SeedHelper.randomSeed() : seed
+
         let request = GenerationRequest(
             prompt: prompt,
             negativePrompt: negativePrompt,
             steps: steps,
             guidanceScale: guidanceScale,
-            seed: seed,
+            seed: effectiveSeed,
             width: width,
             height: height,
             model: model
@@ -80,18 +79,5 @@ final class ImageGenerationViewModel: ObservableObject {
 
         isGenerating = false
         generationStage = ""
-    }
-
-    func addMoodboardImage(_ image: NSImage) {
-        moodboardImages.append(image)
-    }
-
-    func removeMoodboardImage(at index: Int) {
-        guard moodboardImages.indices.contains(index) else { return }
-        moodboardImages.remove(at: index)
-    }
-
-    func clearMoodboard() {
-        moodboardImages.removeAll()
     }
 }

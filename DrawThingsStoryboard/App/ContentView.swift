@@ -4,85 +4,58 @@ import SwiftUI
 /// State is loaded from disk via StorageLoadService on appear.
 struct ContentView: View {
 
-    // MARK: - Navigation state
-    @State private var selectedSection: AppSection?      = .projects
-    @State private var selectedItemID: String?           = nil
+    // MARK: - Navigation
+    @State private var selectedSection: AppSection? = .storyboard
 
-    // MARK: - Hierarchy state (Studio → Customer → Episode)
-    @State private var studios: [MockStudio]             = []
-    @State private var selectedStudioID: String?         = nil
-    @State private var selectedCustomerID: String?       = nil
-    @State private var selectedEpisodeID: String?        = nil
-    @State private var selectedProjectsLevel: ProjectsLevel = .episode
+    // MARK: - Data state (loaded from JSON files)
+    @State private var config: AppConfig = AppConfig()
+    @State private var models: ModelsFile = ModelsFile(models: [])
+    @State private var styles: StylesFile = StylesFile(styles: [])
+    @State private var storyboards: StoryboardsFile = StoryboardsFile(storyboards: [])
+    @State private var assets: AssetsFile = AssetsFile(assets: [])
+    @State private var productionLog: ProductionLogFile = ProductionLogFile(generatedImages: [])
 
-    // MARK: - Assets state
-    @State private var selectedAssetItem: CastingItem?   = nil
-    @State private var libraryRefreshToken: UUID         = UUID()
-
-    // MARK: - Looks state
-    @State private var templates: [GenerationTemplate]  = []
-    @State private var selectedTemplateID: String?       = nil
-
-    // MARK: - Model Config state
-    @State private var modelConfigs: [DTModelConfig]     = DTModelConfig.defaultConfigs
-    @State private var selectedModelConfigID: String?    = nil
-
-    // MARK: - Storyboard state
+    // MARK: - Selection state
+    @State private var selectedStoryboardIndex: Int = 0
+    @State private var selectedStyleID: String? = nil
+    @State private var selectedModelID: String? = nil
+    @State private var selectedAssetID: String? = nil
+    @State private var selectedJobID: String? = nil
     @State private var storyboardSelection: StoryboardSelection? = nil
 
-    // MARK: - Production Queue state
-    @State private var generationQueue: [GenerationJob]  = []
-    @State private var selectedJobID: String?            = nil
-    @State private var doneQueue: [GenerationJob]        = []
+    // MARK: - Production Queue
+    @State private var generationQueue: [GenerationJob] = []
+    @State private var doneQueue: [GenerationJob] = []
 
-    // MARK: - Derived selection helpers
+    // MARK: - Current storyboard helpers
 
-    private var selectedStudioIndex: Int? {
-        studios.firstIndex { $0.id == selectedStudioID }
-    }
-    private var selectedCustomerIndex: Int? {
-        guard let si = selectedStudioIndex else { return nil }
-        return studios[si].customers.firstIndex { $0.id == selectedCustomerID }
-    }
-    private var selectedEpisodeIndex: Int? {
-        guard let si = selectedStudioIndex, let ci = selectedCustomerIndex else { return nil }
-        return studios[si].customers[ci].episodes.firstIndex { $0.id == selectedEpisodeID }
+    private var currentStoryboard: StoryboardEntry? {
+        guard storyboards.storyboards.indices.contains(selectedStoryboardIndex) else { return nil }
+        return storyboards.storyboards[selectedStoryboardIndex]
     }
 
-    private var currentEpisodeName: String {
-        guard let si = selectedStudioIndex,
-              let ci = selectedCustomerIndex,
-              let ei = selectedEpisodeIndex else { return "Episode" }
-        return studios[si].customers[ci].episodes[ei].name
-    }
-
-    private var currentEpisodeActsBinding: Binding<[MockAct]> {
-        guard let si = selectedStudioIndex,
-              let ci = selectedCustomerIndex,
-              let ei = selectedEpisodeIndex else { return .constant([]) }
-        return $studios[si].customers[ci].episodes[ei].acts
-    }
-
-    private var resolvedLookName: String? {
-        guard let si = selectedStudioIndex else { return nil }
-        let studio = studios[si]
-        if let ci = selectedCustomerIndex, let ei = selectedEpisodeIndex {
-            let episode = studio.customers[ci].episodes[ei]
-            if let id = episode.preferredLookID,
-               let t = templates.first(where: { $0.id == id }) { return t.name }
+    private var currentActsBinding: Binding<[ActEntry]> {
+        guard storyboards.storyboards.indices.contains(selectedStoryboardIndex) else {
+            return .constant([])
         }
-        if let ci = selectedCustomerIndex {
-            let customer = studio.customers[ci]
-            if let id = customer.preferredLookID,
-               let t = templates.first(where: { $0.id == id }) { return t.name }
-        }
-        if let id = studio.preferredLookID,
-           let t = templates.first(where: { $0.id == id }) { return t.name }
-        return nil
+        return $storyboards.storyboards[selectedStoryboardIndex].acts
+    }
+
+    private var resolvedStyleName: String? {
+        guard let sb = currentStoryboard else { return nil }
+        return styles.styles.first { $0.styleID == sb.styleID }?.name
+    }
+
+    private var resolvedStyleDescription: String {
+        guard let sb = currentStoryboard else { return "" }
+        return styles.styles.first { $0.styleID == sb.styleID }?.style ?? ""
     }
 
     private var windowTitle: String {
-        "Draw Things Storyboard - \(currentEpisodeName)"
+        if let sb = currentStoryboard {
+            return "Draw Things Storyboard — \(sb.name)"
+        }
+        return "Draw Things Storyboard"
     }
 
     // MARK: - Body
@@ -91,213 +64,147 @@ struct ContentView: View {
         NavigationSplitView {
             SidebarView(selectedSection: $selectedSection)
         } content: {
-            switch selectedSection {
-            case .configuration:
-                ConfigurationView()
-            case .assets:
-                AssetDetailPane(
-                    studios: $studios,
-                    selectedItem: $selectedAssetItem,
-                    libraryRefreshToken: $libraryRefreshToken,
-                    generationQueue: $generationQueue,
-                    studioIndex: selectedStudioIndex ?? 0,
-                    customerIndex: selectedCustomerIndex ?? 0,
-                    episodeIndex: selectedEpisodeIndex ?? 0
-                )
-            case .productionQueue:
-                ProductionBrowserView(
-                    queue: $generationQueue,
-                    selectedJobID: $selectedJobID,
-                    doneQueue: $doneQueue,
-                    configs: $modelConfigs,
-                    selectedModelConfigID: $selectedModelConfigID
-                )
-            case .looks:
-                LooksBrowserView(
-                    templates: $templates,
-                    selectedTemplateID: $selectedTemplateID
-                )
-            case .modelConfig:
-                ModelConfigBrowserView(
-                    configs: $modelConfigs,
-                    selectedConfigID: $selectedModelConfigID
-                )
-            case .storyboard:
-                StoryboardBrowserView(
-                    acts: currentEpisodeActsBinding,
-                    selection: $storyboardSelection,
-                    lookName: Binding(
-                        get: { resolvedLookName },
-                        set: { _ in }
-                    )
-                )
-            default:
-                ItemBrowserView(
-                    section: selectedSection,
-                    studios: $studios,
-                    selectedStudioID: $selectedStudioID,
-                    selectedCustomerID: $selectedCustomerID,
-                    selectedEpisodeID: $selectedEpisodeID,
-                    selectedProjectsLevel: $selectedProjectsLevel,
-                    selectedItemID: $selectedItemID
-                )
-            }
+            contentPane
         } detail: {
-            switch selectedSection {
-            case .configuration:
-                EmptyView()
-            case .assets:
-                LibraryBrowserView(
-                    studios: $studios,
-                    selectedItem: $selectedAssetItem
-                )
-                .id(libraryRefreshToken)
-            case .productionQueue:
-                ProductionJobDetailView(
-                    queue: generationQueue,
-                    selectedJobID: selectedJobID,
-                    modelConfigs: modelConfigs,
-                    selectedModelConfigID: selectedModelConfigID,
-                    episodeName: currentEpisodeName,
-                    onJobCompleted: { completedJob in
-                        var done = completedJob
-                        done.completedAt = Date()
-                        doneQueue.insert(done, at: 0)
-                        generationQueue.removeAll { $0.id == completedJob.id }
-                    }
-                )
-            case .looks:
-                LooksDetailView(
-                    templates: $templates,
-                    selectedTemplateID: $selectedTemplateID,
-                    generationQueue: $generationQueue
-                )
-            case .modelConfig:
-                ModelConfigDetailView(
-                    configs: $modelConfigs,
-                    selectedConfigID: $selectedModelConfigID
-                )
-            case .storyboard:
-                StoryboardDetailView(
-                    acts: currentEpisodeActsBinding,
-                    selection: storyboardSelection,
-                    generationQueue: $generationQueue,
-                    studios: studios,
-                    studioIndex: selectedStudioIndex ?? 0,
-                    customerIndex: selectedCustomerIndex ?? 0,
-                    episodeIndex: selectedEpisodeIndex ?? 0,
-                    resolvedLookName: resolvedLookName,
-                    templates: templates
-                )
-            case .projects:
-                ItemDetailView(
-                    section: selectedSection,
-                    studios: $studios,
-                    selectedStudioID: selectedStudioID,
-                    selectedCustomerID: selectedCustomerID,
-                    selectedEpisodeID: selectedEpisodeID,
-                    selectedProjectsLevel: selectedProjectsLevel,
-                    selectedItemID: selectedItemID,
-                    templates: templates
-                )
-            default:
-                ItemDetailView(
-                    section: selectedSection,
-                    studios: $studios,
-                    selectedStudioID: selectedStudioID,
-                    selectedCustomerID: selectedCustomerID,
-                    selectedEpisodeID: selectedEpisodeID,
-                    selectedProjectsLevel: selectedProjectsLevel,
-                    selectedItemID: selectedItemID,
-                    templates: templates
-                )
-            }
+            detailPane
         }
         .onChange(of: selectedSection) { _, _ in
-            selectedItemID = nil
-            selectedAssetItem = nil
-            selectedTemplateID = nil
-            selectedModelConfigID = nil
-            selectedJobID = nil
-            storyboardSelection = nil
+            clearSelections()
         }
         .frame(minWidth: 1100, minHeight: 680)
         .navigationTitle(windowTitle)
         .onAppear {
             loadFromDisk()
         }
-        .onChange(of: selectedEpisodeID) { _, _ in
-            guard let si = selectedStudioIndex,
-                  let ci = selectedCustomerIndex,
-                  let ei = selectedEpisodeIndex else { return }
-            ensureMinimalStoryboard(studioIndex: si, customerIndex: ci, episodeIndex: ei)
+    }
+
+    // MARK: - Content pane
+
+    @ViewBuilder
+    private var contentPane: some View {
+        switch selectedSection {
+        case .storyboard:
+            StoryboardBrowserView(
+                acts: currentActsBinding,
+                selection: $storyboardSelection,
+                styleName: Binding(
+                    get: { resolvedStyleName },
+                    set: { _ in }
+                )
+            )
+        case .assets:
+            AssetsBrowserView(
+                assets: $assets,
+                selectedAssetID: $selectedAssetID
+            )
+        case .styles:
+            StylesBrowserView(
+                styles: $styles,
+                selectedStyleID: $selectedStyleID
+            )
+        case .models:
+            ModelsBrowserView(
+                models: $models,
+                selectedModelID: $selectedModelID
+            )
+        case .productionQueue:
+            ProductionBrowserView(
+                queue: $generationQueue,
+                selectedJobID: $selectedJobID,
+                doneQueue: $doneQueue,
+                models: $models,
+                selectedModelID: $selectedModelID
+            )
+        case .settings:
+            SettingsContentView(config: $config)
+        default:
+            Text("Select a section")
         }
     }
 
-    // MARK: - Load from disk
+    // MARK: - Detail pane
+
+    @ViewBuilder
+    private var detailPane: some View {
+        switch selectedSection {
+        case .storyboard:
+            StoryboardDetailView(
+                acts: currentActsBinding,
+                selection: storyboardSelection,
+                generationQueue: $generationQueue,
+                assets: assets,
+                resolvedStyleName: resolvedStyleName,
+                styleDescription: resolvedStyleDescription,
+                config: config
+            )
+        case .assets:
+            AssetsDetailView(
+                assets: $assets,
+                selectedAssetID: selectedAssetID,
+                generationQueue: $generationQueue,
+                config: config
+            )
+        case .styles:
+            StylesDetailView(
+                styles: $styles,
+                selectedStyleID: $selectedStyleID,
+                generationQueue: $generationQueue,
+                config: config
+            )
+        case .models:
+            ModelsDetailView(
+                models: $models,
+                selectedModelID: $selectedModelID
+            )
+        case .productionQueue:
+            ProductionJobDetailView(
+                queue: generationQueue,
+                selectedJobID: selectedJobID,
+                models: models,
+                selectedModelID: selectedModelID,
+                config: config,
+                assets: assets,
+                onJobCompleted: { completedJob in
+                    var done = completedJob
+                    done.completedAt = Date()
+                    doneQueue.insert(done, at: 0)
+                    generationQueue.removeAll { $0.id == completedJob.id }
+                }
+            )
+        case .settings:
+            EmptyView()
+        default:
+            ContentUnavailableView(
+                "Nothing selected",
+                systemImage: "square.dashed",
+                description: Text("Select a section from the sidebar.")
+            )
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func clearSelections() {
+        selectedAssetID = nil
+        selectedStyleID = nil
+        selectedModelID = nil
+        selectedJobID = nil
+        storyboardSelection = nil
+    }
 
     private func loadFromDisk() {
         let state = StorageLoadService.shared.load()
-        studios      = state.studios
-        templates    = state.templates
-        modelConfigs = state.modelConfigs
-        ensureSelection()
-        if selectedModelConfigID == nil {
-            selectedModelConfigID = modelConfigs.first?.id
-        }
-    }
+        config = state.config
+        models = state.models
+        styles = state.styles
+        storyboards = state.storyboards
+        assets = state.assets
+        productionLog = state.productionLog
 
-    // MARK: - Guarantee at-least-one selection
-
-    private func ensureSelection() {
-        guard !studios.isEmpty else { return }
-        if selectedStudioID == nil || !studios.contains(where: { $0.id == selectedStudioID }) {
-            selectedStudioID = studios[0].id
-        }
-        guard let si = studios.firstIndex(where: { $0.id == selectedStudioID }),
-              !studios[si].customers.isEmpty else { return }
-        if selectedCustomerID == nil || !studios[si].customers.contains(where: { $0.id == selectedCustomerID }) {
-            selectedCustomerID = studios[si].customers[0].id
-        }
-        guard let ci = studios[si].customers.firstIndex(where: { $0.id == selectedCustomerID }),
-              !studios[si].customers[ci].episodes.isEmpty else { return }
-        if selectedEpisodeID == nil || !studios[si].customers[ci].episodes.contains(where: { $0.id == selectedEpisodeID }) {
-            selectedEpisodeID = studios[si].customers[ci].episodes[0].id
-        }
-        guard let ei = studios[si].customers[ci].episodes.firstIndex(where: { $0.id == selectedEpisodeID }) else { return }
-        ensureMinimalStoryboard(studioIndex: si, customerIndex: ci, episodeIndex: ei)
-        if selectedTemplateID == nil {
-            selectedTemplateID = templates.first?.id
-        }
-    }
-
-    private func ensureMinimalStoryboard(studioIndex si: Int, customerIndex ci: Int, episodeIndex ei: Int) {
-        if studios[si].customers[ci].episodes[ei].acts.isEmpty {
-            studios[si].customers[ci].episodes[ei].acts.append(
-                MockAct(id: UUID().uuidString, name: "Act 1", description: "", sequences: [])
-            )
-        }
-        for ai in studios[si].customers[ci].episodes[ei].acts.indices {
-            if studios[si].customers[ci].episodes[ei].acts[ai].sequences.isEmpty {
-                studios[si].customers[ci].episodes[ei].acts[ai].sequences.append(
-                    MockSequence(id: UUID().uuidString, name: "Sequence 1", description: "", scenes: [])
-                )
-            }
-            for seqi in studios[si].customers[ci].episodes[ei].acts[ai].sequences.indices {
-                if studios[si].customers[ci].episodes[ei].acts[ai].sequences[seqi].scenes.isEmpty {
-                    studios[si].customers[ci].episodes[ei].acts[ai].sequences[seqi].scenes.append(
-                        MockScene(id: UUID().uuidString, name: "Scene 1", description: "", panels: [])
-                    )
-                }
-                for sci in studios[si].customers[ci].episodes[ei].acts[ai].sequences[seqi].scenes.indices {
-                    if studios[si].customers[ci].episodes[ei].acts[ai].sequences[seqi].scenes[sci].panels.isEmpty {
-                        studios[si].customers[ci].episodes[ei].acts[ai].sequences[seqi].scenes[sci].panels.append(
-                            MockPanel(id: UUID().uuidString, name: "Panel 1", description: "")
-                        )
-                    }
-                }
-            }
-        }
+        // Ensure default selections
+        if selectedStyleID == nil { selectedStyleID = styles.styles.first?.styleID }
+        if selectedModelID == nil { selectedModelID = models.models.first?.modelID }
+        if selectedAssetID == nil { selectedAssetID = assets.assets.first?.assetID }
     }
 }
 

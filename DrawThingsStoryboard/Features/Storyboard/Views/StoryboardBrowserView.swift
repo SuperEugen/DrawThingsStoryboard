@@ -1,12 +1,21 @@
 import SwiftUI
 
+// MARK: - Storyboard selection
+
+enum StoryboardSelection: Hashable {
+    case act(String)
+    case sequence(String)
+    case scene(String)
+    case panel(String)
+}
+
 // MARK: - StoryboardBrowserView
 
 struct StoryboardBrowserView: View {
 
-    @Binding var acts: [MockAct]
+    @Binding var acts: [ActEntry]
     @Binding var selection: StoryboardSelection?
-    @Binding var lookName: String?
+    @Binding var styleName: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -14,10 +23,8 @@ struct StoryboardBrowserView: View {
                 Image(systemName: "pencil.and.list.clipboard").font(.title2).foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Storyboard").font(.title2.bold())
-                    if let name = lookName {
-                        Text(name)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    if let name = styleName {
+                        Text(name).font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 Spacer()
@@ -48,7 +55,7 @@ struct StoryboardBrowserView: View {
 // MARK: - Act row
 
 private struct ActRow: View {
-    @Binding var act: MockAct
+    @Binding var act: ActEntry
     @Binding var selection: StoryboardSelection?
     @State private var isExpanded = true
 
@@ -60,15 +67,15 @@ private struct ActRow: View {
                         .font(.caption.weight(.medium)).frame(width: 16)
                 }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
-                Image(systemName: StoryboardLevel.act.icon)
-                    .foregroundStyle(StoryboardLevel.act.color).frame(width: 16)
+                Image(systemName: "theatermask.and.paintbrush")
+                    .foregroundStyle(.purple).frame(width: 16)
                 Text(act.name).font(.subheadline.weight(.semibold))
                 Spacer()
             }
             .padding(.horizontal, 12).padding(.vertical, 6)
-            .background(selection == .act(act.id) ? Color.accentColor.opacity(0.1) : Color.clear)
+            .background(selection == .act(act.name) ? Color.accentColor.opacity(0.1) : Color.clear)
             .contentShape(Rectangle())
-            .onTapGesture { selection = .act(act.id) }
+            .onTapGesture { selection = .act(act.name) }
 
             if isExpanded {
                 ForEach(act.sequences.indices, id: \.self) { si in
@@ -83,7 +90,7 @@ private struct ActRow: View {
 // MARK: - Sequence row
 
 private struct SequenceRow: View {
-    @Binding var sequence: MockSequence
+    @Binding var sequence: SequenceEntry
     @Binding var selection: StoryboardSelection?
     @State private var isExpanded = true
 
@@ -95,15 +102,15 @@ private struct SequenceRow: View {
                         .font(.caption.weight(.medium)).frame(width: 16)
                 }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
-                Image(systemName: StoryboardLevel.sequence.icon)
-                    .foregroundStyle(StoryboardLevel.sequence.color).frame(width: 16)
+                Image(systemName: "arrow.triangle.branch")
+                    .foregroundStyle(.orange).frame(width: 16)
                 Text(sequence.name).font(.subheadline)
                 Spacer()
             }
             .padding(.horizontal, 12).padding(.vertical, 5)
-            .background(selection == .sequence(sequence.id) ? Color.accentColor.opacity(0.1) : Color.clear)
+            .background(selection == .sequence(sequence.name) ? Color.accentColor.opacity(0.1) : Color.clear)
             .contentShape(Rectangle())
-            .onTapGesture { selection = .sequence(sequence.id) }
+            .onTapGesture { selection = .sequence(sequence.name) }
 
             if isExpanded {
                 ForEach(sequence.scenes.indices, id: \.self) { sci in
@@ -118,7 +125,7 @@ private struct SequenceRow: View {
 // MARK: - Scene row
 
 private struct SceneRow: View {
-    @Binding var scene: MockScene
+    @Binding var scene: SceneEntry
     @Binding var selection: StoryboardSelection?
     @State private var isExpanded = true
 
@@ -130,15 +137,15 @@ private struct SceneRow: View {
                         .font(.caption.weight(.medium)).frame(width: 16)
                 }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
-                Image(systemName: StoryboardLevel.scene.icon)
-                    .foregroundStyle(StoryboardLevel.scene.color).frame(width: 16)
+                Image(systemName: "rectangle.on.rectangle")
+                    .foregroundStyle(.teal).frame(width: 16)
                 Text(scene.name).font(.subheadline)
                 Spacer()
             }
             .padding(.horizontal, 12).padding(.vertical, 5)
-            .background(selection == .scene(scene.id) ? Color.accentColor.opacity(0.1) : Color.clear)
+            .background(selection == .scene(scene.name) ? Color.accentColor.opacity(0.1) : Color.clear)
             .contentShape(Rectangle())
-            .onTapGesture { selection = .scene(scene.id) }
+            .onTapGesture { selection = .scene(scene.name) }
 
             if isExpanded {
                 ForEach(scene.panels.indices, id: \.self) { pi in
@@ -153,35 +160,27 @@ private struct SceneRow: View {
 // MARK: - Panel row
 
 private struct PanelRow: View {
-    @Binding var panel: MockPanel
+    @Binding var panel: PanelEntry
     @Binding var selection: StoryboardSelection?
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: StoryboardLevel.panel.icon)
-                .foregroundStyle(StoryboardLevel.panel.color).frame(width: 16)
+            Image(systemName: "photo")
+                .foregroundStyle(.blue).frame(width: 16)
             Text(panel.name).font(.subheadline)
             Spacer()
-            if panel.smallPanelAvailable {
+            if panel.hasSmallImage {
                 Text("S").font(.system(size: 9, weight: .bold, design: .monospaced))
                     .foregroundStyle(.orange).padding(2)
             }
-            if panel.largePanelAvailable {
+            if panel.hasLargeImage {
                 Text("L").font(.system(size: 9, weight: .bold, design: .monospaced))
                     .foregroundStyle(.green).padding(2)
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 4)
-        .background(selection == .panel(panel.id) ? Color.accentColor.opacity(0.1) : Color.clear)
+        .background(selection == .panel(panel.panelID) ? Color.accentColor.opacity(0.1) : Color.clear)
         .contentShape(Rectangle())
-        .onTapGesture { selection = .panel(panel.id) }
+        .onTapGesture { selection = .panel(panel.panelID) }
     }
-}
-
-#Preview {
-    @Previewable @State var acts: [MockAct] = []
-    @Previewable @State var sel: StoryboardSelection? = nil
-    @Previewable @State var lookName: String? = "Photorealistic"
-    StoryboardBrowserView(acts: $acts, selection: $sel, lookName: $lookName)
-        .frame(width: 300, height: 600)
 }

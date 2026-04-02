@@ -4,7 +4,6 @@ import SwiftUI
 struct DrawThingsStoryboardApp: App {
 
     init() {
-        // Create default folder structure on first launch
         StorageSetupService.shared.setupIfNeeded()
     }
 
