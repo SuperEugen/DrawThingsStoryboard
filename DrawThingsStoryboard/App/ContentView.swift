@@ -100,7 +100,9 @@ struct ContentView: View {
         case .styles:
             StylesBrowserView(
                 styles: $styles,
-                selectedStyleID: $selectedStyleID
+                selectedStyleID: $selectedStyleID,
+                generationQueue: $generationQueue,
+                config: config
             )
         case .models:
             ModelsBrowserView(
@@ -191,7 +193,6 @@ struct ContentView: View {
 
         switch job.jobType {
         case .generateStyle:
-            // Write the image UUID back into the style
             if let idx = styles.styles.firstIndex(where: { $0.styleID == job.styleID }) {
                 styles.styles[idx].smallImageID = firstImageID
                 styles.styles[idx].isGenerated = true
@@ -227,7 +228,6 @@ struct ContentView: View {
         assets = state.assets
         productionLog = state.productionLog
 
-        // Ensure default selections
         if selectedStyleID == nil { selectedStyleID = styles.styles.first?.styleID }
         if selectedModelID == nil { selectedModelID = models.models.first?.modelID }
         if selectedAssetID == nil { selectedAssetID = assets.assets.first?.assetID }
