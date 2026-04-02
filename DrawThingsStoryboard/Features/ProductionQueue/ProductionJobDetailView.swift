@@ -112,6 +112,7 @@ private struct GeneratePanel: View {
     @State private var startedAt: Date? = nil
     @State private var currentVariant: Int = 0
     @State private var saveError: String? = nil
+    @State private var savedImageIDs: [String] = []
 
     private var totalVariants: Int {
         job.jobType == .generateAsset ? max(1, job.variantCount) : 1
@@ -124,7 +125,7 @@ private struct GeneratePanel: View {
                 Button { startGeneration() } label: {
                     Label(
                         vm.isGenerating
-                            ? "Generating \(currentVariant + 1)/\(totalVariants)…"
+                            ? "Generating \(currentVariant + 1)/\(totalVariants)\u{2026}"
                             : "Generate",
                         systemImage: vm.isGenerating ? "hourglass" : "wand.and.stars"
                     )
@@ -136,7 +137,7 @@ private struct GeneratePanel: View {
 
             if !generatedImages.isEmpty {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    ForEach(Array(generatedImages.enumerated()), id: \.offset) { idx, img in
+                    ForEach(Array(generatedImages.enumerated()), id: \.offset) { _, img in
                         Image(nsImage: img).resizable().scaledToFit()
                             .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
@@ -157,6 +158,7 @@ private struct GeneratePanel: View {
 
     private func startGeneration() {
         generatedImages = []
+        savedImageIDs = []
         saveError = nil
         currentVariant = 0
         startedAt = Date()
@@ -169,6 +171,7 @@ private struct GeneratePanel: View {
             var done = job
             done.startedAt = startedAt
             done.completedAt = Date()
+            done.savedImageIDs = savedImageIDs
             onJobCompleted?(done)
             return
         }
@@ -179,7 +182,8 @@ private struct GeneratePanel: View {
         if let image = vm.generatedImage {
             generatedImages.append(image)
             do {
-                try StorageService.shared.saveImage(image)
+                let imageID = try StorageService.shared.saveImage(image)
+                savedImageIDs.append(imageID)
             } catch {
                 saveError = error.localizedDescription
             }
@@ -190,6 +194,7 @@ private struct GeneratePanel: View {
             var done = job
             done.startedAt = startedAt
             done.completedAt = Date()
+            done.savedImageIDs = savedImageIDs
             onJobCompleted?(done)
         }
     }

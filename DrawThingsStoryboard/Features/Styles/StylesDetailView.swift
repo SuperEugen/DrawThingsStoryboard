@@ -37,16 +37,30 @@ private struct StyleEditorView: View {
     @Binding var generationQueue: [GenerationJob]
     let config: AppConfig
 
+    @State private var exampleImage: NSImage? = nil
+
     private var isQueued: Bool {
-        generationQueue.contains { $0.itemName == style.name && $0.jobType == .generateStyle }
+        generationQueue.contains { $0.styleID == style.styleID && $0.jobType == .generateStyle }
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
 
-                UnifiedThumbnailView(itemType: .style, name: "", sizeMode: .header)
-                    .padding(.bottom, 16)
+                // Header — show generated image or placeholder
+                ZStack {
+                    if let img = exampleImage {
+                        Image(nsImage: img)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 160)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    } else {
+                        UnifiedThumbnailView(itemType: .style, name: "", sizeMode: .header)
+                    }
+                }
+                .padding(.bottom, 16)
 
                 // Status
                 VStack(alignment: .leading, spacing: 6) {
@@ -87,7 +101,7 @@ private struct StyleEditorView: View {
                 // Style prompt
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Style Prompt")
-                    Text("Describe the visual style — this text is appended to every prompt.")
+                    Text("Describe the visual style \u{2014} this text is appended to every prompt.")
                         .font(.caption).foregroundStyle(.secondary)
                     TextEditor(text: $style.style)
                         .font(.callout).frame(minHeight: 100)
@@ -101,6 +115,12 @@ private struct StyleEditorView: View {
             .padding(14)
         }
         .background(Color(NSColor.windowBackgroundColor))
+        .onAppear { loadExampleImage() }
+        .onChange(of: style.smallImageID) { _, _ in loadExampleImage() }
+    }
+
+    private func loadExampleImage() {
+        exampleImage = StorageService.shared.loadImage(id: style.smallImageID)
     }
 
     private func generateExample() {
@@ -119,7 +139,8 @@ private struct StyleEditorView: View {
             seed: SeedHelper.randomSeed(),
             width: config.smallImageWidth,
             height: config.smallImageHeight,
-            combinedPrompt: combined
+            combinedPrompt: combined,
+            styleID: style.styleID
         )
         generationQueue.append(job)
     }

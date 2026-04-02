@@ -67,17 +67,31 @@ struct StyleTile: View {
     let canDelete: Bool
     let onDelete: () -> Void
     let onTap: () -> Void
+    @State private var exampleImage: NSImage? = nil
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
             VStack(spacing: 0) {
-                UnifiedThumbnailView(
-                    itemType: .style, name: "", sizeMode: .standard,
-                    badges: ThumbnailBadges(
-                        showExampleIndicator: true,
-                        exampleAvailable: style.isGenerated
-                    )
-                )
+                ZStack {
+                    if let img = exampleImage {
+                        Image(nsImage: img)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(height: 160)
+                            .clipped()
+                    } else {
+                        UnifiedThumbnailView(
+                            itemType: .style, name: "", sizeMode: .standard,
+                            badges: ThumbnailBadges(
+                                showExampleIndicator: true,
+                                exampleAvailable: style.isGenerated
+                            )
+                        )
+                    }
+                }
+                .frame(height: 160)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+
                 Text(style.name).font(.callout.weight(.medium)).lineLimit(1)
                     .padding(.horizontal, 8).padding(.vertical, 6)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -87,6 +101,20 @@ struct StyleTile: View {
             .overlay(RoundedRectangle(cornerRadius: 10)
                 .stroke(isSelected ? Color.accentColor : Color.secondary.opacity(0.2),
                         lineWidth: isSelected ? 2 : 0.5))
+
+            // E badge overlay (bottom-left)
+            VStack {
+                Spacer()
+                HStack {
+                    Text("E").font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(style.isGenerated ? .green : .gray)
+                        .padding(4)
+                        .background(Circle().fill(Color(NSColor.windowBackgroundColor).opacity(0.8)))
+                        .padding(6)
+                    Spacer()
+                }
+            }
+            .frame(height: 160)
 
             if canDelete {
                 Button(action: onDelete) {
@@ -98,5 +126,12 @@ struct StyleTile: View {
         .background(RoundedRectangle(cornerRadius: 12)
             .fill(isSelected ? Color.accentColor.opacity(0.07) : Color.clear))
         .onTapGesture { onTap() }
+        .onAppear { loadImage() }
+        .onChange(of: style.smallImageID) { _, _ in loadImage() }
+        .onChange(of: style.isGenerated) { _, _ in loadImage() }
+    }
+
+    private func loadImage() {
+        exampleImage = StorageService.shared.loadImage(id: style.smallImageID)
     }
 }

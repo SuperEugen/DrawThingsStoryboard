@@ -58,8 +58,16 @@ struct GenerationJob: Identifiable, Equatable {
     let height: Int
     let combinedPrompt: String
     var variantCount: Int = 0
-    var assetType: String = ""       // "character" or "location"
-    var assetSubType: String = ""    // "male", "female", "interior", "exterior"
+    var assetType: String = ""
+    var assetSubType: String = ""
+    /// The styleID this job belongs to (for style example generation).
+    var styleID: String = ""
+    /// The assetID this job belongs to (for asset generation).
+    var assetID: String = ""
+    /// The panelID this job belongs to (for panel generation).
+    var panelID: String = ""
+    /// Filled after generation: the saved image UUID(s).
+    var savedImageIDs: [String] = []
     var startedAt: Date? = nil
     var completedAt: Date? = nil
 }

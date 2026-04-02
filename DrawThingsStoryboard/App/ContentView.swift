@@ -53,7 +53,7 @@ struct ContentView: View {
 
     private var windowTitle: String {
         if let sb = currentStoryboard {
-            return "Draw Things Storyboard — \(sb.name)"
+            return "Draw Things Storyboard \u{2014} \(sb.name)"
         }
         return "Draw Things Storyboard"
     }
@@ -165,10 +165,7 @@ struct ContentView: View {
                 config: config,
                 assets: assets,
                 onJobCompleted: { completedJob in
-                    var done = completedJob
-                    done.completedAt = Date()
-                    doneQueue.insert(done, at: 0)
-                    generationQueue.removeAll { $0.id == completedJob.id }
+                    handleJobCompleted(completedJob)
                 }
             )
         case .settings:
@@ -179,6 +176,35 @@ struct ContentView: View {
                 systemImage: "square.dashed",
                 description: Text("Select a section from the sidebar.")
             )
+        }
+    }
+
+    // MARK: - Job completion handler
+
+    private func handleJobCompleted(_ job: GenerationJob) {
+        var done = job
+        done.completedAt = Date()
+        doneQueue.insert(done, at: 0)
+        generationQueue.removeAll { $0.id == job.id }
+
+        guard let firstImageID = job.savedImageIDs.first else { return }
+
+        switch job.jobType {
+        case .generateStyle:
+            // Write the image UUID back into the style
+            if let idx = styles.styles.firstIndex(where: { $0.styleID == job.styleID }) {
+                styles.styles[idx].smallImageID = firstImageID
+                styles.styles[idx].isGenerated = true
+                StorageLoadService.shared.saveStyles(styles)
+            }
+
+        case .generateAsset:
+            // TODO: write image UUIDs back into asset variants
+            break
+
+        case .generatePanel:
+            // TODO: write image UUID back into panel
+            break
         }
     }
 
