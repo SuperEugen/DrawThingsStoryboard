@@ -62,11 +62,13 @@ private struct QueueSection: View {
 
             if queue.isEmpty {
                 Spacer()
+                // #35: Actionable empty state
                 ContentUnavailableView("Queue is empty", systemImage: "tray",
-                    description: Text("Jobs appear here when you click Generate."))
+                    description: Text("Queue generation jobs from the Styles, Assets, or Storyboard sections."))
                 Spacer()
             } else {
                 List(queue, selection: $selectedJobID) { job in
+                    // #37: Disclosure chevron on job rows
                     JobRow(job: job, onDelete: { queue.removeAll { $0.id == job.id } })
                         .tag(job.id)
                 }.listStyle(.plain)
@@ -95,7 +97,7 @@ private struct DoneSection: View {
             Divider()
             if doneQueue.isEmpty {
                 Spacer()
-                Text("No completed jobs yet.").font(.caption).foregroundStyle(.tertiary)
+                Text("Completed jobs will appear here.").font(.caption).foregroundStyle(.tertiary)
                 Spacer()
             } else {
                 List(doneQueue) { job in
@@ -124,6 +126,10 @@ private struct JobRow: View {
             }
             Spacer()
             Text("~\(Int(job.estimatedDuration) / 60)m").font(.caption2).foregroundStyle(.tertiary)
+            // #37: Disclosure chevron
+            Image(systemName: "chevron.right")
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.tertiary)
             Button(action: onDelete) {
                 Image(systemName: "xmark.circle.fill").font(.system(size: 14))
                     .symbolRenderingMode(.palette).foregroundStyle(.white, .secondary)

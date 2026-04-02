@@ -47,7 +47,7 @@ private struct StyleEditorView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
 
-                // Header — show generated image or placeholder
+                // Header \u2014 show generated image or placeholder
                 ZStack {
                     if let img = exampleImage {
                         Image(nsImage: img)
@@ -72,15 +72,16 @@ private struct StyleEditorView: View {
                         Text(style.isGenerated ? "available" : "not yet").font(.callout)
                             .foregroundStyle(style.isGenerated ? .green : .secondary)
                         Spacer()
-                        if !style.isGenerated {
-                            if isQueued {
-                                Text("Queued").font(.caption).foregroundStyle(.purple)
-                            } else {
-                                Button { generateExample() } label: {
-                                    Label("Generate Example", systemImage: "eye").font(.caption)
-                                }
-                                .buttonStyle(.bordered).controlSize(.mini)
+                        // #32: Show "Regenerate" when image exists
+                        if isQueued {
+                            Text("Queued").font(.caption).foregroundStyle(.purple)
+                        } else {
+                            Button { generateExample() } label: {
+                                Label(style.isGenerated ? "Regenerate Example" : "Generate Example", systemImage: "eye").font(.caption)
                             }
+                            .buttonStyle(.bordered).controlSize(.mini)
+                            // #34: Cmd+Return shortcut
+                            .keyboardShortcut(.return, modifiers: .command)
                         }
                     }
                     .padding(.vertical, 5).padding(.horizontal, 8)

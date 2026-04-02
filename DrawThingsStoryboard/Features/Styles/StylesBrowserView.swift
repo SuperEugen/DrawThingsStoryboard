@@ -5,14 +5,33 @@ import SwiftUI
 struct StylesBrowserView: View {
     @Binding var styles: StylesFile
     @Binding var selectedStyleID: String?
+    @Binding var generationQueue: [GenerationJob]
+    let config: AppConfig
     private let columns = [GridItem(.adaptive(minimum: 288, maximum: 320), spacing: 12)]
+
+    private var ungeneratedCount: Int {
+        styles.styles.filter { !$0.isGenerated }.count
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "paintpalette").font(.title2).foregroundStyle(.secondary)
-                Text("Styles").font(.title2.bold())
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Styles").font(.title2.bold())
+                    Text("Visual style templates applied to generated images.")
+                        .font(.caption).foregroundStyle(.tertiary)
+                }
                 Spacer()
+                // #7: Generate all missing examples
+                if ungeneratedCount > 0 {
+                    Button { generateAllExamples() } label: {
+                        Label("Generate \(ungeneratedCount) Example\(ungeneratedCount == 1 ? "" : "s")", systemImage: "eye")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.bordered).controlSize(.mini)
+                    .help("Generate all missing example images for all styles")
+                }
                 Button(action: addStyle) { Image(systemName: "plus").frame(width: 22, height: 22) }
                 .buttonStyle(.bordered).controlSize(.mini)
             }
@@ -55,6 +74,33 @@ struct StylesBrowserView: View {
     private func ensureSelection() {
         if selectedStyleID == nil || !styles.styles.contains(where: { $0.styleID == selectedStyleID }) {
             selectedStyleID = styles.styles.first?.styleID
+        }
+    }
+
+    // #7: Generate all missing examples
+    private func generateAllExamples() {
+        for style in styles.styles where !style.isGenerated {
+            // Skip if already queued
+            guard !generationQueue.contains(where: { $0.styleID == style.styleID && $0.jobType == .generateStyle }) else { continue }
+            let combined = [style.style, config.stylePrompt]
+                .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+                .joined(separator: ", ")
+            let job = GenerationJob(
+                id: UUID().uuidString,
+                itemName: style.name,
+                jobType: .generateStyle,
+                size: .small,
+                styleName: style.name,
+                queuedAt: Date(),
+                estimatedDuration: 60,
+                itemIcon: "eye",
+                seed: SeedHelper.randomSeed(),
+                width: config.smallImageWidth,
+                height: config.smallImageHeight,
+                combinedPrompt: combined,
+                styleID: style.styleID
+            )
+            generationQueue.append(job)
         }
     }
 }

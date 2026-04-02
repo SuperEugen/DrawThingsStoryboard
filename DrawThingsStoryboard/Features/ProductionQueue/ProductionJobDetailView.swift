@@ -73,9 +73,10 @@ struct ProductionJobDetailView: View {
             .onChange(of: job.id) { _, _ in syncJob(job) }
             .onAppear { syncJob(job) }
         } else {
+            // #35: Actionable empty state
             ContentUnavailableView(
                 "No job selected", systemImage: "tray",
-                description: Text("Select a job from the queue."))
+                description: Text("Select a job from the queue to see its details and generate."))
         }
     }
 
@@ -120,7 +121,7 @@ private struct GeneratePanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionLabel("Generate (Test)")
+            sectionLabel("Generate")
             HStack(spacing: 10) {
                 Button { startGeneration() } label: {
                     Label(
@@ -133,6 +134,17 @@ private struct GeneratePanel: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(vm.isGenerating || vm.prompt.isEmpty)
+                // #34: Cmd+Return shortcut
+                .keyboardShortcut(.return, modifiers: .command)
+            }
+
+            // #24: ProgressView for generation
+            if vm.isGenerating {
+                ProgressView(value: Double(currentVariant), total: Double(totalVariants))
+                    .progressViewStyle(.linear)
+                if !vm.generationStage.isEmpty {
+                    Text(vm.generationStage).font(.caption).foregroundStyle(.secondary)
+                }
             }
 
             if !generatedImages.isEmpty {

@@ -62,8 +62,9 @@ struct AssetsBrowserView: View {
                     }
 
                     if assets.assets.isEmpty {
+                        // #35: Actionable empty state
                         ContentUnavailableView("No assets yet", systemImage: "photo.stack",
-                            description: Text("Tap + to add a character or location."))
+                            description: Text("Add a character or location using the + button above."))
                             .padding(.top, 40)
                     }
                 }

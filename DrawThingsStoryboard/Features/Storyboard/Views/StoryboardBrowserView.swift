@@ -34,6 +34,7 @@ struct StoryboardBrowserView: View {
 
             if acts.isEmpty {
                 Spacer()
+                // #35: Actionable empty state
                 ContentUnavailableView("No acts yet", systemImage: "pencil.and.list.clipboard",
                     description: Text("Add an act to start building your storyboard."))
                 Spacer()
@@ -41,6 +42,7 @@ struct StoryboardBrowserView: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         ForEach(acts.indices, id: \.self) { ai in
+                            // #29: Background tint for depth
                             ActRow(act: $acts[ai], selection: $selection)
                         }
                     }
@@ -81,6 +83,8 @@ private struct ActRow: View {
                 ForEach(act.sequences.indices, id: \.self) { si in
                     SequenceRow(sequence: $act.sequences[si], selection: $selection)
                         .padding(.leading, 16)
+                        // #29: Subtle depth tint
+                        .background(Color.secondary.opacity(0.02))
                 }
             }
         }
@@ -116,6 +120,8 @@ private struct SequenceRow: View {
                 ForEach(sequence.scenes.indices, id: \.self) { sci in
                     SceneRow(scene: $sequence.scenes[sci], selection: $selection)
                         .padding(.leading, 16)
+                        // #29: Deeper depth tint
+                        .background(Color.secondary.opacity(0.04))
                 }
             }
         }
@@ -151,6 +157,8 @@ private struct SceneRow: View {
                 ForEach(scene.panels.indices, id: \.self) { pi in
                     PanelRow(panel: $scene.panels[pi], selection: $selection)
                         .padding(.leading, 16)
+                        // #29: Deepest depth tint
+                        .background(Color.secondary.opacity(0.06))
                 }
             }
         }
