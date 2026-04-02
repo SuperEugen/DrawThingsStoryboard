@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - config.json
 
-struct AppConfig: Codable {
+struct AppConfig: Codable, Equatable {
     var smallImageWidth: Int = 576
     var smallImageHeight: Int = 320
     var largeImageWidth: Int = 1920
