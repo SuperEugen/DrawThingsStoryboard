@@ -18,6 +18,10 @@ final class ImageGenerationViewModel: ObservableObject {
     @Published var height: Int = 512
     @Published var model: String = ""
 
+    // MARK: - Connection (from AppConfig)
+    @Published var grpcAddress: String = "localhost"
+    @Published var grpcPort: Int = 7859
+
     // MARK: - Moodboard + canvas
     @Published var moodboardImages: [NSImage] = []
     @Published var initImage: NSImage? = nil
@@ -28,17 +32,26 @@ final class ImageGenerationViewModel: ObservableObject {
     @Published var generatedImage: NSImage? = nil
     @Published var errorMessage: String? = nil
 
-    // MARK: - Dependencies
-    private let client: DrawThingsClientProtocol
+    // MARK: - Client (lazy, recreated when address/port changes)
+    private var client: DrawThingsClientProtocol?
+    private var lastAddress: String = ""
+    private var lastPort: Int = 0
 
-    init(client: DrawThingsClientProtocol? = nil) {
-        if let client {
-            self.client = client
-        } else if let grpc = try? DrawThingsGRPCClient(address: "localhost:7859", useTLS: true) {
-            self.client = grpc
-        } else {
-            self.client = DrawThingsHTTPClient()
+    /// Returns a gRPC client, creating a new one if address/port changed.
+    private func getClient() -> DrawThingsClientProtocol {
+        let addr = "\(grpcAddress):\(grpcPort)"
+        if client != nil && lastAddress == grpcAddress && lastPort == grpcPort {
+            return client!
         }
+        lastAddress = grpcAddress
+        lastPort = grpcPort
+        if let grpc = try? DrawThingsGRPCClient(address: addr, useTLS: true) {
+            client = grpc
+            return grpc
+        }
+        let http = DrawThingsHTTPClient()
+        client = http
+        return http
     }
 
     // MARK: - Actions
@@ -50,7 +63,6 @@ final class ImageGenerationViewModel: ObservableObject {
         errorMessage = nil
         generatedImage = nil
 
-        // If seed is 0 (unassigned), generate a random one for Draw Things
         let effectiveSeed = SeedHelper.isUnassigned(seed) ? SeedHelper.randomSeed() : seed
 
         let request = GenerationRequest(
@@ -64,8 +76,10 @@ final class ImageGenerationViewModel: ObservableObject {
             model: model
         )
 
+        let activeClient = getClient()
+
         do {
-            generatedImage = try await client.generateImage(
+            generatedImage = try await activeClient.generateImage(
                 request: request,
                 moodboardImages: moodboardImages,
                 initImage: initImage,

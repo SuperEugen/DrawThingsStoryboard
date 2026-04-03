@@ -22,7 +22,6 @@ struct ProductionJobDetailView: View {
         if let job = selectedJob {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    // Meta
                     VStack(alignment: .leading, spacing: 6) {
                         sectionLabel("Job")
                         infoRow("Type", job.jobType.rawValue)
@@ -36,7 +35,6 @@ struct ProductionJobDetailView: View {
 
                     Divider().padding(.vertical, 8)
 
-                    // Prompt
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
                             sectionLabel("Combined Prompt")
@@ -58,7 +56,6 @@ struct ProductionJobDetailView: View {
 
                     Divider().padding(.vertical, 8)
 
-                    // Generate button
                     GeneratePanel(
                         job: job,
                         vm: vm,
@@ -73,7 +70,6 @@ struct ProductionJobDetailView: View {
             .onChange(of: job.id) { _, _ in syncJob(job) }
             .onAppear { syncJob(job) }
         } else {
-            // #35: Actionable empty state
             ContentUnavailableView(
                 "No job selected", systemImage: "tray",
                 description: Text("Select a job from the queue to see its details and generate."))
@@ -93,6 +89,9 @@ struct ProductionJobDetailView: View {
         vm.seed    = job.seed
         vm.width   = job.width
         vm.height  = job.height
+        // #19: Pass gRPC connection settings from config
+        vm.grpcAddress = config.grpcAddress
+        vm.grpcPort    = config.grpcPort
         let model = models.models.first { $0.modelID == selectedModelID } ?? models.models.first
         if let model {
             vm.steps         = model.steps
@@ -134,11 +133,9 @@ private struct GeneratePanel: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(vm.isGenerating || vm.prompt.isEmpty)
-                // #34: Cmd+Return shortcut
                 .keyboardShortcut(.return, modifiers: .command)
             }
 
-            // #24: ProgressView for generation
             if vm.isGenerating {
                 ProgressView(value: Double(currentVariant), total: Double(totalVariants))
                     .progressViewStyle(.linear)

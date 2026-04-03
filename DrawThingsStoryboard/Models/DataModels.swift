@@ -10,6 +10,9 @@ struct AppConfig: Codable, Equatable {
     var defaultPanelDuration: Int = 30
     var stylePrompt: String = "An astronaut riding a horse."
     var sharedSecret: String = ""
+    // #19: gRPC server settings
+    var grpcAddress: String = "localhost"
+    var grpcPort: Int = 7859
     var version: Int = 1
 }
 
@@ -121,8 +124,8 @@ struct AssetsFile: Codable {
 struct AssetEntry: Codable, Identifiable {
     var assetID: String
     var name: String
-    var type: String          // "character" or "location"
-    var subType: String       // "male", "female", "interior", "exterior"
+    var type: String
+    var subType: String
     var description: String
     var smallImageID: String = ""
     var largeImageID: String = ""
@@ -140,19 +143,16 @@ struct AssetEntry: Codable, Identifiable {
     var hasSmallImage: Bool { !smallImageID.isEmpty }
     var hasLargeImage: Bool { !largeImageID.isEmpty }
 
-    /// Returns all 4 variants as an array for iteration.
     var variants: [AssetVariant] {
         [variant1, variant2, variant3, variant4]
     }
 
-    /// Returns the index (0-based) of the first approved variant, or nil.
     var approvedVariantIndex: Int? {
         variants.firstIndex { $0.isApproved }
     }
 
     var hasApprovedVariant: Bool { approvedVariantIndex != nil }
 
-    /// Mutates a variant at the given index (0–3).
     mutating func setVariant(at index: Int, _ variant: AssetVariant) {
         switch index {
         case 0: variant1 = variant
@@ -163,7 +163,6 @@ struct AssetEntry: Codable, Identifiable {
         }
     }
 
-    /// Returns the variant at the given index (0–3).
     func variant(at index: Int) -> AssetVariant {
         switch index {
         case 0: return variant1
@@ -211,13 +210,37 @@ struct GeneratedImageEntry: Codable, Identifiable {
 // MARK: - Seed Helper
 
 enum SeedHelper {
-    /// Generate a random seed for Draw Things (1 ... 999_999).
     static func randomSeed() -> Int {
         Int.random(in: 1...999_999)
     }
 
-    /// Returns true if the seed is unassigned (0 = not yet generated).
     static func isUnassigned(_ seed: Int) -> Bool {
         seed == 0
+    }
+}
+
+// MARK: - Validation Helpers
+
+enum ValidationHelper {
+    /// Check if image dimension is valid (positive, multiple of 64).
+    static func isValidDimension(_ value: Int) -> Bool {
+        value > 0 && value % 64 == 0
+    }
+
+    /// Check if guidance scale is in valid range.
+    static func isValidGuidanceScale(_ value: Double) -> Bool {
+        value >= 0 && value <= 30
+    }
+
+    /// Check if model filename looks valid.
+    static func isValidModelFilename(_ name: String) -> Bool {
+        guard !name.isEmpty else { return false }
+        let lower = name.lowercased()
+        return lower.hasSuffix(".ckpt") || lower.hasSuffix(".safetensors")
+    }
+
+    /// Check if port number is valid.
+    static func isValidPort(_ port: Int) -> Bool {
+        port >= 1 && port <= 65535
     }
 }

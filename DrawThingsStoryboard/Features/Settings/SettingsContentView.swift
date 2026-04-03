@@ -6,31 +6,83 @@ struct SettingsContentView: View {
     @Binding var config: AppConfig
     @State private var showSavedFlash: Bool = false
 
+    // #30: Validation errors
+    private var smallWidthError: String? {
+        ValidationHelper.isValidDimension(config.smallImageWidth) ? nil : "Must be a multiple of 64"
+    }
+    private var smallHeightError: String? {
+        ValidationHelper.isValidDimension(config.smallImageHeight) ? nil : "Must be a multiple of 64"
+    }
+    private var largeWidthError: String? {
+        ValidationHelper.isValidDimension(config.largeImageWidth) ? nil : "Must be a multiple of 64"
+    }
+    private var largeHeightError: String? {
+        ValidationHelper.isValidDimension(config.largeImageHeight) ? nil : "Must be a multiple of 64"
+    }
+    private var portError: String? {
+        ValidationHelper.isValidPort(config.grpcPort) ? nil : "Must be 1\u{2013}65535"
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
             Form {
+                // #19: Draw Things connection settings
                 Section("Draw Things") {
+                    LabeledContent("Server Address") {
+                        TextField("Address", text: $config.grpcAddress)
+                            .textFieldStyle(.roundedBorder).frame(maxWidth: 200)
+                    }
+                    LabeledContent("Port") {
+                        VStack(alignment: .leading, spacing: 2) {
+                            TextField("Port", value: $config.grpcPort, format: .number)
+                                .textFieldStyle(.roundedBorder).frame(maxWidth: 100)
+                            if let err = portError {
+                                Text(err).font(.caption2).foregroundStyle(.red)
+                            }
+                        }
+                    }
                     LabeledContent("Shared Secret") {
                         TextField("Shared Secret", text: $config.sharedSecret)
                             .textFieldStyle(.roundedBorder).frame(maxWidth: 260)
                     }
                 }
+                // #30: Image sizes with validation
                 Section("Image Sizes") {
                     LabeledContent("Small Width") {
-                        TextField("Width", value: $config.smallImageWidth, format: .number)
-                            .textFieldStyle(.roundedBorder).frame(maxWidth: 120)
+                        VStack(alignment: .leading, spacing: 2) {
+                            TextField("Width", value: $config.smallImageWidth, format: .number)
+                                .textFieldStyle(.roundedBorder).frame(maxWidth: 120)
+                            if let err = smallWidthError {
+                                Text(err).font(.caption2).foregroundStyle(.red)
+                            }
+                        }
                     }
                     LabeledContent("Small Height") {
-                        TextField("Height", value: $config.smallImageHeight, format: .number)
-                            .textFieldStyle(.roundedBorder).frame(maxWidth: 120)
+                        VStack(alignment: .leading, spacing: 2) {
+                            TextField("Height", value: $config.smallImageHeight, format: .number)
+                                .textFieldStyle(.roundedBorder).frame(maxWidth: 120)
+                            if let err = smallHeightError {
+                                Text(err).font(.caption2).foregroundStyle(.red)
+                            }
+                        }
                     }
                     LabeledContent("Large Width") {
-                        TextField("Width", value: $config.largeImageWidth, format: .number)
-                            .textFieldStyle(.roundedBorder).frame(maxWidth: 120)
+                        VStack(alignment: .leading, spacing: 2) {
+                            TextField("Width", value: $config.largeImageWidth, format: .number)
+                                .textFieldStyle(.roundedBorder).frame(maxWidth: 120)
+                            if let err = largeWidthError {
+                                Text(err).font(.caption2).foregroundStyle(.red)
+                            }
+                        }
                     }
                     LabeledContent("Large Height") {
-                        TextField("Height", value: $config.largeImageHeight, format: .number)
-                            .textFieldStyle(.roundedBorder).frame(maxWidth: 120)
+                        VStack(alignment: .leading, spacing: 2) {
+                            TextField("Height", value: $config.largeImageHeight, format: .number)
+                                .textFieldStyle(.roundedBorder).frame(maxWidth: 120)
+                            if let err = largeHeightError {
+                                Text(err).font(.caption2).foregroundStyle(.red)
+                            }
+                        }
                     }
                 }
                 Section("Style Preview") {
@@ -53,14 +105,12 @@ struct SettingsContentView: View {
             .formStyle(.grouped)
             .onChange(of: config) { _, newConfig in
                 StorageLoadService.shared.saveConfig(newConfig)
-                // #38: Brief saved flash
                 showSavedFlash = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                     withAnimation { showSavedFlash = false }
                 }
             }
 
-            // #38: Saved confirmation overlay
             if showSavedFlash {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
