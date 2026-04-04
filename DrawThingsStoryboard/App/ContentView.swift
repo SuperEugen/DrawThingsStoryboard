@@ -5,9 +5,6 @@ struct ContentView: View {
 
     // MARK: - Navigation
     @State private var selectedSection: AppSection? = .storyboard
-    // #28: Persist column widths
-    @SceneStorage("sidebar.width") private var sidebarWidth: Double = 200
-    @SceneStorage("content.width") private var contentWidth: Double = 350
 
     // MARK: - Data state
     @State private var config: AppConfig = AppConfig()
@@ -65,12 +62,8 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             SidebarView(selectedSection: $selectedSection)
-                // #28: Set preferred sidebar width
-                .navigationSplitViewColumnWidth(min: 160, ideal: CGFloat(sidebarWidth), max: 300)
         } content: {
             contentPane
-                // #28: Set preferred content width
-                .navigationSplitViewColumnWidth(min: 280, ideal: CGFloat(contentWidth), max: 600)
         } detail: {
             detailPane
         }
@@ -79,6 +72,15 @@ struct ContentView: View {
         }
         .frame(minWidth: 1100, minHeight: 680)
         .navigationTitle(windowTitle)
+        // #15: Connection status in toolbar
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                ConnectionStatusView(
+                    address: config.grpcAddress,
+                    port: config.grpcPort
+                )
+            }
+        }
         .onAppear {
             loadFromDisk()
         }
