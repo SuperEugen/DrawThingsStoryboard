@@ -40,18 +40,18 @@ private struct AssetEditorView: View {
     @Binding var generationQueue: [GenerationJob]
     let config: AppConfig
     let onDelete: () -> Void
+    // #31: Delete confirmation
+    @State private var showDeleteConfirmation = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                // Header
                 let thumbType: ThumbnailItemType = asset.isCharacter
                     ? .character(subType: asset.subType)
                     : .location(subType: asset.subType)
                 UnifiedThumbnailView(itemType: thumbType, name: "", sizeMode: .header)
                     .padding(.bottom, 16)
 
-                // Status
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Status")
                     statusRow("V", "Variants", asset.hasApprovedVariant)
@@ -62,21 +62,19 @@ private struct AssetEditorView: View {
 
                 Divider().padding(.vertical, 8)
 
-                // Type
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Type")
                     HStack(spacing: 6) {
                         Image(systemName: asset.isCharacter ? "person.fill" : "map")
                             .foregroundStyle(asset.isCharacter ? .blue : .teal)
                         Text(asset.isCharacter ? "Character" : "Location").font(.callout)
-                        Text("— \(asset.subType)").font(.callout).foregroundStyle(.secondary)
+                        Text("\u{2014} \(asset.subType)").font(.callout).foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 5).padding(.horizontal, 8)
                     .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
                 }
                 .padding(.bottom, 12)
 
-                // SubType picker
                 if asset.isCharacter {
                     VStack(alignment: .leading, spacing: 6) {
                         sectionLabel("Gender")
@@ -99,14 +97,12 @@ private struct AssetEditorView: View {
                     .padding(.bottom, 12)
                 }
 
-                // Name
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Name")
                     TextField("Name", text: $asset.name).textFieldStyle(.roundedBorder)
                 }
                 .padding(.bottom, 12)
 
-                // Description
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Description")
                     TextEditor(text: $asset.description).font(.callout).frame(minHeight: 72)
@@ -117,7 +113,6 @@ private struct AssetEditorView: View {
 
                 Divider().padding(.vertical, 8)
 
-                // Variants
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Variants")
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
@@ -130,11 +125,19 @@ private struct AssetEditorView: View {
 
                 Divider().padding(.vertical, 8)
 
-                // Delete button
-                Button(role: .destructive, action: onDelete) {
+                // #31: Delete with confirmation
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
                     Label("Delete Asset", systemImage: "trash")
                 }
                 .buttonStyle(.bordered)
+                .alert("Delete \(asset.name)?", isPresented: $showDeleteConfirmation) {
+                    Button("Delete", role: .destructive, action: onDelete)
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("This will permanently remove the asset. This action cannot be undone.")
+                }
 
                 Spacer(minLength: 20)
             }
@@ -191,7 +194,6 @@ private struct AssetEditorView: View {
     }
 
     private func approveVariant(at idx: Int) {
-        // Clear all approvals first
         for i in 0..<4 {
             var v = asset.variant(at: i)
             v.isApproved = false

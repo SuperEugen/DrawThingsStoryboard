@@ -39,6 +39,7 @@ private struct StyleEditorView: View {
 
     @State private var exampleImage: NSImage? = nil
 
+    // #26: Check if already queued
     private var isQueued: Bool {
         generationQueue.contains { $0.styleID == style.styleID && $0.jobType == .generateStyle }
     }
@@ -47,7 +48,6 @@ private struct StyleEditorView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
 
-                // Header \u2014 show generated image or placeholder
                 ZStack {
                     if let img = exampleImage {
                         Image(nsImage: img)
@@ -62,7 +62,6 @@ private struct StyleEditorView: View {
                 }
                 .padding(.bottom, 16)
 
-                // Status
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Status")
                     HStack(spacing: 8) {
@@ -72,7 +71,6 @@ private struct StyleEditorView: View {
                         Text(style.isGenerated ? "available" : "not yet").font(.callout)
                             .foregroundStyle(style.isGenerated ? .green : .secondary)
                         Spacer()
-                        // #32: Show "Regenerate" when image exists
                         if isQueued {
                             Text("Queued").font(.caption).foregroundStyle(.purple)
                         } else {
@@ -80,7 +78,6 @@ private struct StyleEditorView: View {
                                 Label(style.isGenerated ? "Regenerate Example" : "Generate Example", systemImage: "eye").font(.caption)
                             }
                             .buttonStyle(.bordered).controlSize(.mini)
-                            // #34: Cmd+Return shortcut
                             .keyboardShortcut(.return, modifiers: .command)
                         }
                     }
@@ -89,7 +86,6 @@ private struct StyleEditorView: View {
                 }
                 .padding(.bottom, 12)
 
-                // Name
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Name")
                     TextField("Style name", text: $style.name)
@@ -99,7 +95,6 @@ private struct StyleEditorView: View {
 
                 Divider().padding(.vertical, 8)
 
-                // Style prompt
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Style Prompt")
                     Text("Describe the visual style \u{2014} this text is appended to every prompt.")
@@ -125,6 +120,8 @@ private struct StyleEditorView: View {
     }
 
     private func generateExample() {
+        // #26: Prevent duplicate queue entries
+        guard !isQueued else { return }
         let combined = [style.style, config.stylePrompt]
             .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
             .joined(separator: ", ")

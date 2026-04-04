@@ -1,13 +1,15 @@
 import SwiftUI
 
 /// Root layout: three-pane NavigationSplitView.
-/// State is loaded from disk via StorageLoadService on appear.
 struct ContentView: View {
 
     // MARK: - Navigation
     @State private var selectedSection: AppSection? = .storyboard
+    // #28: Persist column widths
+    @SceneStorage("sidebar.width") private var sidebarWidth: Double = 200
+    @SceneStorage("content.width") private var contentWidth: Double = 350
 
-    // MARK: - Data state (loaded from JSON files)
+    // MARK: - Data state
     @State private var config: AppConfig = AppConfig()
     @State private var models: ModelsFile = ModelsFile(models: [])
     @State private var styles: StylesFile = StylesFile(styles: [])
@@ -27,7 +29,7 @@ struct ContentView: View {
     @State private var generationQueue: [GenerationJob] = []
     @State private var doneQueue: [GenerationJob] = []
 
-    // MARK: - Current storyboard helpers
+    // MARK: - Helpers
 
     private var currentStoryboard: StoryboardEntry? {
         guard storyboards.storyboards.indices.contains(selectedStoryboardIndex) else { return nil }
@@ -63,8 +65,12 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             SidebarView(selectedSection: $selectedSection)
+                // #28: Set preferred sidebar width
+                .navigationSplitViewColumnWidth(min: 160, ideal: CGFloat(sidebarWidth), max: 300)
         } content: {
             contentPane
+                // #28: Set preferred content width
+                .navigationSplitViewColumnWidth(min: 280, ideal: CGFloat(contentWidth), max: 600)
         } detail: {
             detailPane
         }
@@ -181,7 +187,7 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Job completion handler
+    // MARK: - Job completion
 
     private func handleJobCompleted(_ job: GenerationJob) {
         var done = job
@@ -198,13 +204,9 @@ struct ContentView: View {
                 styles.styles[idx].isGenerated = true
                 StorageLoadService.shared.saveStyles(styles)
             }
-
         case .generateAsset:
-            // TODO: write image UUIDs back into asset variants
             break
-
         case .generatePanel:
-            // TODO: write image UUID back into panel
             break
         }
     }

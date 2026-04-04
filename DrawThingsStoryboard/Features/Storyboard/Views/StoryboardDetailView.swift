@@ -143,14 +143,16 @@ private struct PanelDetailView: View {
         }
     }
 
+    // #33: Asset limit info
+    private var refCount: Int { panel.refIDs.count }
+    private var canAddMoreRefs: Bool { refCount < 4 }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                // Header
                 UnifiedThumbnailView(itemType: .panel, name: "", sizeMode: .header)
                     .padding(.bottom, 16)
 
-                // Status
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Status")
                     statusRow(label: "Small Image", available: panel.hasSmallImage, letter: "S")
@@ -160,14 +162,12 @@ private struct PanelDetailView: View {
 
                 Divider().padding(.vertical, 8)
 
-                // Name
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Name")
                     TextField("Name", text: $panel.name).textFieldStyle(.roundedBorder)
                 }
                 .padding(.bottom, 12)
 
-                // Description
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Description")
                     TextEditor(text: $panel.description).font(.callout).frame(minHeight: 80)
@@ -176,7 +176,6 @@ private struct PanelDetailView: View {
                 }
                 .padding(.bottom, 12)
 
-                // Camera Movement
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Camera Movement")
                     TextField("e.g. Pan left, Zoom in", text: $panel.cameraMovement)
@@ -184,7 +183,6 @@ private struct PanelDetailView: View {
                 }
                 .padding(.bottom, 12)
 
-                // Dialogue
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Dialogue")
                     TextEditor(text: $panel.dialogue).font(.callout).frame(minHeight: 60)
@@ -193,7 +191,6 @@ private struct PanelDetailView: View {
                 }
                 .padding(.bottom, 12)
 
-                // Duration
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Duration")
                     HStack {
@@ -206,11 +203,16 @@ private struct PanelDetailView: View {
 
                 Divider().padding(.vertical, 8)
 
-                // Referenced Assets
+                // #33: Referenced Assets with limit explanation
                 VStack(alignment: .leading, spacing: 6) {
-                    sectionLabel("Referenced Assets (\(attachedAssets.count)/4)")
+                    sectionLabel("Referenced Assets (\(refCount)/4)")
+                    if !canAddMoreRefs {
+                        Text("Maximum 4 asset references reached (Draw Things limit).")
+                            .font(.caption2).foregroundStyle(.orange)
+                    }
                     if attachedAssets.isEmpty {
-                        Text("No assets referenced.").font(.caption).foregroundStyle(.tertiary)
+                        Text("No assets referenced. Edit ref1ID\u{2013}ref4ID in the JSON to assign assets.")
+                            .font(.caption).foregroundStyle(.tertiary)
                             .padding(.vertical, 8)
                     } else {
                         ForEach(attachedAssets) { asset in
@@ -227,6 +229,7 @@ private struct PanelDetailView: View {
                     }
                 }
                 .padding(.bottom, 12)
+                .help("Maximum 4 asset references per panel (Draw Things limitation)")
 
                 Spacer(minLength: 20)
             }
