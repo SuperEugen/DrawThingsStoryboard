@@ -153,7 +153,8 @@ struct ContentView: View {
                 doneQueue: $doneQueue,
                 models: $models,
                 selectedModelID: $selectedModelID,
-                queueRunner: queueRunner
+                queueRunner: queueRunner,
+                productionLog: productionLog
             )
         case .settings:
             SettingsContentView(config: $config)
@@ -217,7 +218,7 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Job completion (#6, #17, #18)
+    // MARK: - Job completion
 
     private func handleJobCompleted(_ job: GenerationJob) {
         var done = job
@@ -225,6 +226,36 @@ struct ContentView: View {
         doneQueue.insert(done, at: 0)
         generationQueue.removeAll { $0.id == job.id }
 
+        // Write production log entries for each generated image
+        let isoFormatter = ISO8601DateFormatter()
+        let startTimeStr = job.startedAt.map { isoFormatter.string(from: $0) } ?? ""
+        let endTimeStr = isoFormatter.string(from: done.completedAt ?? Date())
+        let resolvedModelID = selectedModelID ?? models.models.first?.modelID ?? ""
+        let resolvedStyleID: String = {
+            if !job.styleID.isEmpty { return job.styleID }
+            if let sb = currentStoryboard {
+                return sb.styleID
+            }
+            return ""
+        }()
+
+        for imgID in job.savedImageIDs {
+            let entry = GeneratedImageEntry(
+                imageID: imgID,
+                type: job.jobType.rawValue,
+                modelID: resolvedModelID,
+                styleID: resolvedStyleID,
+                startTime: startTimeStr,
+                endTime: endTimeStr,
+                size: job.size.rawValue,
+                seed: job.seed,
+                combinedPrompt: job.combinedPrompt
+            )
+            productionLog.generatedImages.append(entry)
+        }
+        StorageLoadService.shared.saveProductionLog(productionLog)
+
+        // Wire images back to data
         guard let firstImageID = job.savedImageIDs.first else { return }
 
         switch job.jobType {

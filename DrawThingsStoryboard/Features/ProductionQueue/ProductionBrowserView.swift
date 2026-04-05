@@ -10,6 +10,7 @@ struct ProductionBrowserView: View {
     @Binding var models: ModelsFile
     @Binding var selectedModelID: String?
     @ObservedObject var queueRunner: QueueRunnerService
+    let productionLog: ProductionLogFile
 
     var body: some View {
         VSplitView {
@@ -19,7 +20,8 @@ struct ProductionBrowserView: View {
                 doneQueue: $doneQueue,
                 models: $models,
                 selectedModelID: $selectedModelID,
-                queueRunner: queueRunner
+                queueRunner: queueRunner,
+                productionLog: productionLog
             )
             .frame(minHeight: 120)
 
@@ -48,23 +50,31 @@ private struct QueueSection: View {
     @Binding var models: ModelsFile
     @Binding var selectedModelID: String?
     @ObservedObject var queueRunner: QueueRunnerService
+    let productionLog: ProductionLogFile
     // #27: Timer for live finish time updates
     @State private var timerTick: Int = 0
     let timer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
-    // #22: Estimated finish time from past jobs
+    /// Estimate seconds per image from production log (last 3 entries of matching size).
+    /// Falls back to 60s for small, 180s for large if no log data.
     private func estimatedPerImage(size: GenerationSize) -> TimeInterval {
-        let relevantDone = doneQueue.filter { $0.size == size && $0.startedAt != nil && $0.completedAt != nil }
-        let recent = relevantDone.prefix(3)
+        let sizeStr = size.rawValue
+        let isoFormatter = ISO8601DateFormatter()
+        // Filter log entries with matching size and valid timestamps
+        let matching = productionLog.generatedImages.filter { entry in
+            entry.size == sizeStr && !entry.startTime.isEmpty && !entry.endTime.isEmpty
+        }
+        // Take the last 3 entries (most recent)
+        let recent = matching.suffix(3)
         guard !recent.isEmpty else {
             return size == .large ? 180 : 60
         }
-        let totalPerImage = recent.reduce(0.0) { acc, job in
-            let duration = job.completedAt!.timeIntervalSince(job.startedAt!)
-            let images = max(1, job.variantCount > 0 ? job.variantCount : 1)
-            return acc + duration / Double(images)
+        let totalDuration = recent.reduce(0.0) { acc, entry in
+            guard let start = isoFormatter.date(from: entry.startTime),
+                  let end = isoFormatter.date(from: entry.endTime) else { return acc }
+            return acc + end.timeIntervalSince(start)
         }
-        return totalPerImage / Double(recent.count)
+        return totalDuration / Double(recent.count)
     }
 
     private var estimatedFinishString: String {
@@ -117,6 +127,7 @@ private struct QueueSection: View {
                     JobRow(
                         job: job,
                         isRunning: queueRunner.currentJobID == job.id,
+                        estimatedDuration: estimatedPerImage(size: job.size) * Double(max(1, job.variantCount)),
                         onDelete: {
                             guard queueRunner.currentJobID != job.id else { return }
                             queue.removeAll { $0.id == job.id }
@@ -168,6 +179,7 @@ private struct DoneSection: View {
 private struct JobRow: View {
     let job: GenerationJob
     let isRunning: Bool
+    let estimatedDuration: TimeInterval
     let onDelete: () -> Void
 
     var body: some View {
@@ -189,7 +201,7 @@ private struct JobRow: View {
             if isRunning {
                 Text("Running").font(.caption2).foregroundStyle(.blue)
             } else {
-                Text("~\(Int(job.estimatedDuration) / 60)m").font(.caption2).foregroundStyle(.tertiary)
+                Text("~\(Int(estimatedDuration) / 60)m").font(.caption2).foregroundStyle(.tertiary)
             }
             Image(systemName: "chevron.right")
                 .font(.caption2.weight(.medium))
