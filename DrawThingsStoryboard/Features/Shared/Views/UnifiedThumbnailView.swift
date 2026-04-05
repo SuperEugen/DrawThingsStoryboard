@@ -86,21 +86,37 @@ struct ThumbnailBadges {
 }
 
 // MARK: - Unified thumbnail view
+/// #18, #17: Now supports displaying real generated images via imageID.
 
 struct UnifiedThumbnailView: View {
     let itemType: ThumbnailItemType
     let name: String
     let sizeMode: ThumbnailSizeMode
     var badges: ThumbnailBadges = ThumbnailBadges()
+    /// Optional image ID — if set and image exists on disk, it is shown instead of the placeholder icon.
+    var imageID: String = ""
+
+    private var loadedImage: NSImage? {
+        guard !imageID.isEmpty else { return nil }
+        return StorageService.shared.loadImage(id: imageID)
+    }
 
     var body: some View {
         VStack(spacing: sizeMode == .compact ? 2 : 4) {
             ZStack {
                 thumbnailBackground
 
-                Image(systemName: itemType.icon)
-                    .font(.system(size: sizeMode.iconSize))
-                    .foregroundStyle(itemType.iconColor)
+                if let img = loadedImage {
+                    Image(nsImage: img)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: sizeMode.width, height: sizeMode.height)
+                        .clipShape(RoundedRectangle(cornerRadius: sizeMode.cornerRadius))
+                } else {
+                    Image(systemName: itemType.icon)
+                        .font(.system(size: sizeMode.iconSize))
+                        .foregroundStyle(itemType.iconColor)
+                }
 
                 badgeOverlays
             }

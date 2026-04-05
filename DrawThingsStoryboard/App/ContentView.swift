@@ -103,7 +103,11 @@ struct ContentView: View {
         case .assets:
             AssetsBrowserView(
                 assets: $assets,
-                selectedAssetID: $selectedAssetID
+                selectedAssetID: $selectedAssetID,
+                generationQueue: $generationQueue,
+                config: config,
+                styles: styles,
+                storyboards: storyboards
             )
         case .styles:
             StylesBrowserView(
@@ -189,7 +193,7 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Job completion
+    // MARK: - Job completion (#6, #17, #18)
 
     private func handleJobCompleted(_ job: GenerationJob) {
         var done = job
@@ -206,10 +210,60 @@ struct ContentView: View {
                 styles.styles[idx].isGenerated = true
                 StorageLoadService.shared.saveStyles(styles)
             }
+
         case .generateAsset:
-            break
+            // #18: Wire generated variant/large images back to asset
+            if let idx = assets.assets.firstIndex(where: { $0.assetID == job.assetID }) {
+                if job.size == .large {
+                    // Large image generation → store as largeImageID
+                    assets.assets[idx].largeImageID = firstImageID
+                } else {
+                    // Small (variant) generation → fill next empty variant slot
+                    let imageIDs = job.savedImageIDs
+                    var filled = 0
+                    for imgID in imageIDs {
+                        // Find next empty variant slot
+                        for vi in 0..<4 {
+                            let existing = assets.assets[idx].variant(at: vi)
+                            if !existing.hasImage {
+                                let effectiveSeed = job.seed == 0 ? SeedHelper.randomSeed() : job.seed + filled
+                                let newVariant = AssetVariant(
+                                    smallImageID: imgID,
+                                    seed: effectiveSeed,
+                                    isApproved: false
+                                )
+                                assets.assets[idx].setVariant(at: vi, newVariant)
+                                filled += 1
+                                break
+                            }
+                        }
+                    }
+                }
+                StorageLoadService.shared.saveAssets(assets)
+            }
+
         case .generatePanel:
-            break
+            // #17: Wire generated panel image back to storyboard
+            for si in storyboards.storyboards.indices {
+                for ai in storyboards.storyboards[si].acts.indices {
+                    for seqi in storyboards.storyboards[si].acts[ai].sequences.indices {
+                        for sci in storyboards.storyboards[si].acts[ai].sequences[seqi].scenes.indices {
+                            for pi in storyboards.storyboards[si].acts[ai].sequences[seqi].scenes[sci].panels.indices {
+                                let panel = storyboards.storyboards[si].acts[ai].sequences[seqi].scenes[sci].panels[pi]
+                                if panel.panelID == job.panelID {
+                                    if job.size == .large {
+                                        storyboards.storyboards[si].acts[ai].sequences[seqi].scenes[sci].panels[pi].largeImageID = firstImageID
+                                    } else {
+                                        storyboards.storyboards[si].acts[ai].sequences[seqi].scenes[sci].panels[pi].smallImageID = firstImageID
+                                    }
+                                    StorageLoadService.shared.saveStoryboards(storyboards)
+                                    return
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 

@@ -1,10 +1,16 @@
 import SwiftUI
 
 // MARK: - Assets browser
+/// #4: "Generate all Variants" button
+/// #5: "Generate all Large Images" button
 
 struct AssetsBrowserView: View {
     @Binding var assets: AssetsFile
     @Binding var selectedAssetID: String?
+    @Binding var generationQueue: [GenerationJob]
+    let config: AppConfig
+    let styles: StylesFile
+    let storyboards: StoryboardsFile
 
     private var characters: [AssetEntry] {
         assets.assets.filter { $0.isCharacter }
@@ -15,12 +21,57 @@ struct AssetsBrowserView: View {
 
     private let columns = [GridItem(.adaptive(minimum: 288, maximum: 320), spacing: 12)]
 
+    /// Resolved style description for the first storyboard's style.
+    private var resolvedStyleDescription: String {
+        guard let sb = storyboards.storyboards.first,
+              let style = styles.styles.first(where: { $0.styleID == sb.styleID }) else { return "" }
+        return style.style
+    }
+
+    /// How many empty variant slots does an asset have?
+    private func emptyVariantCount(for asset: AssetEntry) -> Int {
+        (0..<4).filter { !asset.variant(at: $0).hasImage }.count
+    }
+
+    /// Assets that need variant generation (have at least one empty slot and no approved variant).
+    private var assetsNeedingVariants: [AssetEntry] {
+        assets.assets.filter { !$0.hasApprovedVariant && emptyVariantCount(for: $0) > 0 }
+    }
+
+    /// Assets that have an approved variant but no large image.
+    private var assetsNeedingLargeImage: [AssetEntry] {
+        assets.assets.filter { $0.hasApprovedVariant && !$0.hasLargeImage }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "photo.stack").font(.title2).foregroundStyle(.secondary)
                 Text("Assets").font(.title2.bold())
                 Spacer()
+
+                // #4: Generate all Variants
+                Button {
+                    generateAllVariants()
+                } label: {
+                    Image(systemName: "square.grid.2x2")
+                        .frame(width: 22, height: 22)
+                }
+                .buttonStyle(.borderless)
+                .help("Generate all missing variants for all assets")
+                .disabled(assetsNeedingVariants.isEmpty)
+
+                // #5: Generate all Large Images
+                Button {
+                    generateAllLargeImages()
+                } label: {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .frame(width: 22, height: 22)
+                }
+                .buttonStyle(.borderless)
+                .help("Generate all missing large images of approved variants")
+                .disabled(assetsNeedingLargeImage.isEmpty)
+
                 Menu {
                     Button { addAsset(type: "character", subType: "male") } label: {
                         Label("New Character", systemImage: "person.fill.badge.plus")
@@ -75,23 +126,39 @@ struct AssetsBrowserView: View {
         .onAppear { ensureSelection() }
     }
 
+    // #18: Show approved variant image in tile if available
     private func assetTile(_ asset: AssetEntry) -> some View {
         let isSelected = selectedAssetID == asset.assetID
         let thumbType: ThumbnailItemType = asset.isCharacter
             ? .character(subType: asset.subType)
             : .location(subType: asset.subType)
+        // Find the approved variant's image, or fall back to first variant with an image
+        let displayImageID: String = {
+            if let approvedIdx = asset.approvedVariantIndex {
+                return asset.variant(at: approvedIdx).smallImageID
+            }
+            for i in 0..<4 {
+                if asset.variant(at: i).hasImage {
+                    return asset.variant(at: i).smallImageID
+                }
+            }
+            return ""
+        }()
         return UnifiedThumbnailView(
             itemType: thumbType,
             name: asset.name,
             sizeMode: .standard,
             badges: ThumbnailBadges(
                 showSelectionStroke: isSelected
-            )
+            ),
+            imageID: displayImageID
         )
         .padding(3)
         .background(RoundedRectangle(cornerRadius: 12).fill(isSelected ? Color.accentColor.opacity(0.07) : Color.clear))
         .onTapGesture { selectedAssetID = asset.assetID }
     }
+
+    // MARK: - Actions
 
     private func addAsset(type: String, subType: String) {
         let id = UUID().uuidString
@@ -104,6 +171,72 @@ struct AssetsBrowserView: View {
         )
         assets.assets.append(new)
         selectedAssetID = id
+    }
+
+    // #4: Generate all Variants
+    private func generateAllVariants() {
+        for asset in assetsNeedingVariants {
+            let count = emptyVariantCount(for: asset)
+            let prompt = buildAssetPrompt(asset)
+            let job = GenerationJob(
+                id: UUID().uuidString,
+                itemName: asset.name,
+                jobType: .generateAsset,
+                size: .small,
+                styleName: resolvedStyleDescription,
+                queuedAt: Date(),
+                estimatedDuration: TimeInterval(count * 60),
+                itemIcon: asset.isCharacter ? "person.fill" : "map",
+                seed: 0,
+                width: config.smallImageWidth,
+                height: config.smallImageHeight,
+                combinedPrompt: prompt,
+                variantCount: count,
+                assetType: asset.type,
+                assetSubType: asset.subType,
+                assetID: asset.assetID
+            )
+            generationQueue.append(job)
+        }
+    }
+
+    // #5: Generate all Large Images (#6: uses seed from approved variant)
+    private func generateAllLargeImages() {
+        for asset in assetsNeedingLargeImage {
+            let approvedSeed: Int = {
+                if let idx = asset.approvedVariantIndex {
+                    return asset.variant(at: idx).seed
+                }
+                return 0
+            }()
+            let prompt = buildAssetPrompt(asset)
+            let job = GenerationJob(
+                id: UUID().uuidString,
+                itemName: asset.name,
+                jobType: .generateAsset,
+                size: .large,
+                styleName: resolvedStyleDescription,
+                queuedAt: Date(),
+                estimatedDuration: 180,
+                itemIcon: asset.isCharacter ? "person.fill" : "map",
+                seed: approvedSeed,
+                width: config.largeImageWidth,
+                height: config.largeImageHeight,
+                combinedPrompt: prompt,
+                variantCount: 1,
+                assetType: asset.type,
+                assetSubType: asset.subType,
+                assetID: asset.assetID
+            )
+            generationQueue.append(job)
+        }
+    }
+
+    private func buildAssetPrompt(_ asset: AssetEntry) -> String {
+        var parts: [String] = []
+        if !resolvedStyleDescription.isEmpty { parts.append(resolvedStyleDescription) }
+        parts.append(asset.description)
+        return parts.joined(separator: ", ")
     }
 
     private func ensureSelection() {

@@ -46,11 +46,23 @@ private struct AssetEditorView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                // #18: Show approved variant or first available image in header
+                let headerImageID: String = {
+                    if let idx = asset.approvedVariantIndex {
+                        return asset.variant(at: idx).smallImageID
+                    }
+                    return asset.largeImageID.isEmpty ? asset.smallImageID : asset.largeImageID
+                }()
                 let thumbType: ThumbnailItemType = asset.isCharacter
                     ? .character(subType: asset.subType)
                     : .location(subType: asset.subType)
-                UnifiedThumbnailView(itemType: thumbType, name: "", sizeMode: .header)
-                    .padding(.bottom, 16)
+                UnifiedThumbnailView(
+                    itemType: thumbType,
+                    name: "",
+                    sizeMode: .header,
+                    imageID: headerImageID
+                )
+                .padding(.bottom, 16)
 
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Status")
@@ -115,6 +127,7 @@ private struct AssetEditorView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Variants")
+                    // #18: Show generated variant images
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                         ForEach(0..<4, id: \.self) { idx in
                             variantTile(index: idx)
@@ -160,6 +173,7 @@ private struct AssetEditorView: View {
         .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
     }
 
+    // #18: Variant tiles now show real generated images
     private func variantTile(index idx: Int) -> some View {
         let variant = asset.variant(at: idx)
         return VStack(spacing: 4) {
@@ -168,7 +182,8 @@ private struct AssetEditorView: View {
                 : .location(subType: asset.subType)
             UnifiedThumbnailView(
                 itemType: thumbType, name: "", sizeMode: .standard,
-                badges: ThumbnailBadges(showApprovedBadge: variant.isApproved)
+                badges: ThumbnailBadges(showApprovedBadge: variant.isApproved),
+                imageID: variant.smallImageID
             )
             .opacity(variant.hasImage ? 1.0 : 0.4)
             .overlay(
@@ -186,6 +201,10 @@ private struct AssetEditorView: View {
                             .foregroundStyle(variant.isApproved ? .green : .secondary)
                     }
                     .buttonStyle(.plain)
+
+                    Text("Seed: \(variant.seed)")
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundStyle(.tertiary)
                 }
             } else {
                 Text("Empty").font(.caption2).foregroundStyle(.quaternary)

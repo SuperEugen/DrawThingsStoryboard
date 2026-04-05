@@ -166,6 +166,7 @@ private struct SceneRow: View {
 }
 
 // MARK: - Panel row
+/// #17: Panel rows now show a small thumbnail if the panel has a generated image.
 
 private struct PanelRow: View {
     @Binding var panel: PanelEntry
@@ -173,8 +174,21 @@ private struct PanelRow: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "photo")
-                .foregroundStyle(.blue).frame(width: 16)
+            // #17: Show tiny thumbnail if panel has an image
+            if panel.hasSmallImage {
+                let img = StorageService.shared.loadImage(id: panel.smallImageID)
+                if let img {
+                    Image(nsImage: img)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 36, height: 20)
+                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                } else {
+                    panelIcon
+                }
+            } else {
+                panelIcon
+            }
             Text(panel.name).font(.subheadline)
             Spacer()
             if panel.hasSmallImage {
@@ -190,5 +204,10 @@ private struct PanelRow: View {
         .background(selection == .panel(panel.panelID) ? Color.accentColor.opacity(0.1) : Color.clear)
         .contentShape(Rectangle())
         .onTapGesture { selection = .panel(panel.panelID) }
+    }
+
+    private var panelIcon: some View {
+        Image(systemName: "photo")
+            .foregroundStyle(.blue).frame(width: 16)
     }
 }
