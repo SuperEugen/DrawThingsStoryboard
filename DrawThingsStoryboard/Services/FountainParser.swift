@@ -107,9 +107,11 @@ enum FountainParser {
         // Remove /* ... */ blocks (Beat metadata)
         guard let startRange = text.range(of: "/*") else { return text }
         if let endRange = text.range(of: "*/", range: startRange.upperBound..<text.endIndex) {
-            var cleaned = text
-            cleaned.removeSubrange(startRange.lowerBound...endRange.upperBound)
-            return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+            // Take everything before /* and everything after */
+            let before = text[text.startIndex..<startRange.lowerBound]
+            let afterIdx = endRange.upperBound
+            let after = afterIdx < text.endIndex ? text[afterIdx...] : ""
+            return (String(before) + String(after)).trimmingCharacters(in: .whitespacesAndNewlines)
         }
         // No closing */ — strip from /* to end
         return String(text[text.startIndex..<startRange.lowerBound])
