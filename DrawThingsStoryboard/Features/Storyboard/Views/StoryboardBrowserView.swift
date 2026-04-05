@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 // MARK: - Storyboard selection
 
@@ -68,13 +69,11 @@ struct StoryboardBrowserView: View {
     private func importFountainFile() {
         let panel = NSOpenPanel()
         panel.title = "Import Fountain Screenplay"
-        panel.allowedContentTypes = [.plainText]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        // Also accept .fountain extension explicitly
-        panel.allowedContentTypes = [
-            .init(filenameExtension: "fountain") ?? .plainText
-        ]
+        // Accept .fountain files (falls back to plain text if UTType not registered)
+        let fountainType = UTType(filenameExtension: "fountain") ?? UTType.plainText
+        panel.allowedContentTypes = [fountainType, .plainText]
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
