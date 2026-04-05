@@ -1,0 +1,104 @@
+---
+title: DrawThingsStoryboard Data Model
+---
+erDiagram
+    CONFIG {
+        int smallImageWidth
+        int smallImageHeight
+        int largeImageWidth
+        int largeImageHeight
+        string stylePrompt
+        string grpcAddress
+        int grpcPort
+        int version
+    }
+
+    STORYBOARD {
+        string name
+        string modelID
+        string styleID
+    }
+
+    ACT {
+        string name
+    }
+
+    SEQUENCE {
+        string name
+    }
+
+    SCENE {
+        string name
+    }
+
+    PANEL {
+        string panelID
+        string name
+        string description
+        string cameraMovement
+        string dialogue
+        int duration
+        string smallImageID
+        string largeImageID
+        string ref1ID
+        string ref2ID
+        string ref3ID
+        string ref4ID
+        int seed
+    }
+
+    ASSET {
+        string assetID
+        string name
+        string type
+        string subType
+        string description
+        string smallImageID
+        string largeImageID
+        int seed
+    }
+
+    ASSET_VARIANT {
+        string smallImageID
+        int seed
+        bool isApproved
+    }
+
+    STYLE {
+        string styleID
+        string name
+        string smallImageID
+        bool isGenerated
+        string style
+    }
+
+    MODEL {
+        string modelID
+        string name
+        double guidanceScale
+        string model
+        int steps
+        int defaultGenTimeSmall
+        int defaultGenTimeLarge
+    }
+
+    GENERATED_IMAGE {
+        string imageID
+        string type
+        string modelID
+        string styleID
+        string startTime
+        string endTime
+        string size
+        int seed
+        string combinedPrompt
+    }
+
+    STORYBOARD ||--o{ ACT : contains
+    ACT ||--o{ SEQUENCE : contains
+    SEQUENCE ||--o{ SCENE : contains
+    SCENE ||--o{ PANEL : contains
+    STORYBOARD }o--|| STYLE : uses
+    STORYBOARD }o--|| MODEL : uses
+    PANEL }o--o| ASSET : references
+    ASSET ||--|{ ASSET_VARIANT : has-4-of
