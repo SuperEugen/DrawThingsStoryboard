@@ -120,7 +120,10 @@ struct ContentView: View {
                 styleName: Binding(
                     get: { resolvedStyleName },
                     set: { _ in }
-                )
+                ),
+                onFountainImport: { importedActs, name in
+                    handleFountainImport(acts: importedActs, name: name)
+                }
             )
         case .assets:
             AssetsBrowserView(
@@ -176,7 +179,6 @@ struct ContentView: View {
                 config: config
             )
         case .assets:
-            // #40: Pass styles + storyboards for prompt building
             AssetsDetailView(
                 assets: $assets,
                 selectedAssetID: selectedAssetID,
@@ -216,6 +218,25 @@ struct ContentView: View {
                 description: Text("Select a section from the sidebar.")
             )
         }
+    }
+
+    // MARK: - Fountain import (#41)
+
+    private func handleFountainImport(acts: [ActEntry], name: String) {
+        // Replace the current storyboard's acts with the imported structure
+        if storyboards.storyboards.indices.contains(selectedStoryboardIndex) {
+            storyboards.storyboards[selectedStoryboardIndex].acts = acts
+            storyboards.storyboards[selectedStoryboardIndex].name = name
+        } else {
+            // No storyboard exists — create one
+            let modelID = models.models.first?.modelID ?? "M1"
+            let styleID = styles.styles.first?.styleID ?? "S1"
+            let sb = StoryboardEntry(name: name, acts: acts, modelID: modelID, styleID: styleID)
+            storyboards.storyboards.append(sb)
+            selectedStoryboardIndex = storyboards.storyboards.count - 1
+        }
+        StorageLoadService.shared.saveStoryboards(storyboards)
+        storyboardSelection = nil
     }
 
     // MARK: - Job completion

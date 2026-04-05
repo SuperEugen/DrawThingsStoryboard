@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 // MARK: - Storyboard selection
 
@@ -16,6 +17,8 @@ struct StoryboardBrowserView: View {
     @Binding var acts: [ActEntry]
     @Binding var selection: StoryboardSelection?
     @Binding var styleName: String?
+    /// #41: Callback to replace entire storyboard from Fountain import.
+    var onFountainImport: (([ActEntry], String) -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 0) {
@@ -28,21 +31,28 @@ struct StoryboardBrowserView: View {
                     }
                 }
                 Spacer()
+                // #41: Import Fountain file
+                Button {
+                    importFountainFile()
+                } label: {
+                    Image(systemName: "doc.badge.arrow.up")
+                        .frame(width: 22, height: 22)
+                }
+                .buttonStyle(.borderless)
+                .help("Import Fountain screenplay (.fountain)")
             }
             .padding(.horizontal, 16).padding(.vertical, 12)
             Divider()
 
             if acts.isEmpty {
                 Spacer()
-                // #35: Actionable empty state
                 ContentUnavailableView("No acts yet", systemImage: "pencil.and.list.clipboard",
-                    description: Text("Add an act to start building your storyboard."))
+                    description: Text("Import a Fountain file or add an act to start building your storyboard."))
                 Spacer()
             } else {
                 ScrollView {
                     VStack(spacing: 0) {
                         ForEach(acts.indices, id: \.self) { ai in
-                            // #29: Background tint for depth
                             ActRow(act: $acts[ai], selection: $selection)
                         }
                     }
@@ -51,6 +61,34 @@ struct StoryboardBrowserView: View {
             }
         }
         .background(Color(NSColor.windowBackgroundColor))
+    }
+
+    // MARK: - Fountain import
+
+    private func importFountainFile() {
+        let panel = NSOpenPanel()
+        panel.title = "Import Fountain Screenplay"
+        panel.allowedContentTypes = [.plainText]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        // Also accept .fountain extension explicitly
+        panel.allowedContentTypes = [
+            .init(filenameExtension: "fountain") ?? .plainText
+        ]
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            let importedActs = try FountainParser.parse(contentsOf: url)
+            guard !importedActs.isEmpty else {
+                print("[FountainImport] No acts found in file.")
+                return
+            }
+            let name = FountainParser.storyboardName(from: url)
+            onFountainImport?(importedActs, name)
+        } catch {
+            print("[FountainImport] Error reading file: \(error)")
+        }
     }
 }
 
@@ -83,7 +121,6 @@ private struct ActRow: View {
                 ForEach(act.sequences.indices, id: \.self) { si in
                     SequenceRow(sequence: $act.sequences[si], selection: $selection)
                         .padding(.leading, 16)
-                        // #29: Subtle depth tint
                         .background(Color.secondary.opacity(0.02))
                 }
             }
@@ -120,7 +157,6 @@ private struct SequenceRow: View {
                 ForEach(sequence.scenes.indices, id: \.self) { sci in
                     SceneRow(scene: $sequence.scenes[sci], selection: $selection)
                         .padding(.leading, 16)
-                        // #29: Deeper depth tint
                         .background(Color.secondary.opacity(0.04))
                 }
             }
@@ -157,7 +193,6 @@ private struct SceneRow: View {
                 ForEach(scene.panels.indices, id: \.self) { pi in
                     PanelRow(panel: $scene.panels[pi], selection: $selection)
                         .padding(.leading, 16)
-                        // #29: Deepest depth tint
                         .background(Color.secondary.opacity(0.06))
                 }
             }
@@ -166,7 +201,6 @@ private struct SceneRow: View {
 }
 
 // MARK: - Panel row
-/// #17: Panel rows now show a small thumbnail if the panel has a generated image.
 
 private struct PanelRow: View {
     @Binding var panel: PanelEntry
@@ -174,7 +208,6 @@ private struct PanelRow: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            // #17: Show tiny thumbnail if panel has an image
             if panel.hasSmallImage {
                 let img = StorageService.shared.loadImage(id: panel.smallImageID)
                 if let img {
