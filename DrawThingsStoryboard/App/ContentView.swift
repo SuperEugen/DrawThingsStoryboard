@@ -26,6 +26,9 @@ struct ContentView: View {
     @State private var generationQueue: [GenerationJob] = []
     @State private var doneQueue: [GenerationJob] = []
 
+    // MARK: - Queue Runner (auto-processes queue)
+    @StateObject private var queueRunner = QueueRunnerService()
+
     // MARK: - Helpers
 
     private var currentStoryboard: StoryboardEntry? {
@@ -70,6 +73,14 @@ struct ContentView: View {
         .onChange(of: selectedSection) { _, _ in
             clearSelections()
         }
+        // Auto-start queue when jobs are added
+        .onChange(of: generationQueue.count) { _, _ in
+            triggerQueueRunner()
+        }
+        // Also restart after a job completes (runner sets isRunning = false)
+        .onChange(of: queueRunner.isRunning) { _, running in
+            if !running { triggerQueueRunner() }
+        }
         .frame(minWidth: 1100, minHeight: 680)
         .navigationTitle(windowTitle)
         // #15: Connection status in toolbar
@@ -83,7 +94,21 @@ struct ContentView: View {
         }
         .onAppear {
             loadFromDisk()
+            queueRunner.configure { completedJob in
+                handleJobCompleted(completedJob)
+            }
         }
+    }
+
+    // MARK: - Queue runner trigger
+
+    private func triggerQueueRunner() {
+        queueRunner.queueDidChange(
+            queue: generationQueue,
+            config: config,
+            models: models,
+            selectedModelID: selectedModelID
+        )
     }
 
     // MARK: - Content pane
@@ -127,7 +152,8 @@ struct ContentView: View {
                 selectedJobID: $selectedJobID,
                 doneQueue: $doneQueue,
                 models: $models,
-                selectedModelID: $selectedModelID
+                selectedModelID: $selectedModelID,
+                queueRunner: queueRunner
             )
         case .settings:
             SettingsContentView(config: $config)
@@ -178,9 +204,7 @@ struct ContentView: View {
                 selectedModelID: selectedModelID,
                 config: config,
                 assets: assets,
-                onJobCompleted: { completedJob in
-                    handleJobCompleted(completedJob)
-                }
+                queueRunner: queueRunner
             )
         case .settings:
             EmptyView()
@@ -212,17 +236,13 @@ struct ContentView: View {
             }
 
         case .generateAsset:
-            // #18: Wire generated variant/large images back to asset
             if let idx = assets.assets.firstIndex(where: { $0.assetID == job.assetID }) {
                 if job.size == .large {
-                    // Large image generation → store as largeImageID
                     assets.assets[idx].largeImageID = firstImageID
                 } else {
-                    // Small (variant) generation → fill next empty variant slot
                     let imageIDs = job.savedImageIDs
                     var filled = 0
                     for imgID in imageIDs {
-                        // Find next empty variant slot
                         for vi in 0..<4 {
                             let existing = assets.assets[idx].variant(at: vi)
                             if !existing.hasImage {
@@ -243,7 +263,6 @@ struct ContentView: View {
             }
 
         case .generatePanel:
-            // #17: Wire generated panel image back to storyboard
             for si in storyboards.storyboards.indices {
                 for ai in storyboards.storyboards[si].acts.indices {
                     for seqi in storyboards.storyboards[si].acts[ai].sequences.indices {

@@ -1,6 +1,7 @@
 import SwiftUI
 
 // MARK: - Production job detail
+/// Now shows live progress from QueueRunnerService instead of a manual Generate button.
 
 struct ProductionJobDetailView: View {
     let queue: [GenerationJob]
@@ -9,13 +10,16 @@ struct ProductionJobDetailView: View {
     let selectedModelID: String?
     let config: AppConfig
     let assets: AssetsFile
-    var onJobCompleted: ((GenerationJob) -> Void)? = nil
-
-    @StateObject private var vm = ImageGenerationViewModel()
+    @ObservedObject var queueRunner: QueueRunnerService
 
     private var selectedJob: GenerationJob? {
         guard let id = selectedJobID else { return nil }
         return queue.first { $0.id == id }
+    }
+
+    private var isCurrentlyRunning: Bool {
+        guard let job = selectedJob else { return false }
+        return queueRunner.currentJobID == job.id
     }
 
     var body: some View {
@@ -56,10 +60,11 @@ struct ProductionJobDetailView: View {
 
                     Divider().padding(.vertical, 8)
 
-                    GeneratePanel(
-                        job: job,
-                        vm: vm,
-                        onJobCompleted: onJobCompleted
+                    // Live progress from QueueRunner
+                    GenerationProgressPanel(
+                        isCurrentJob: isCurrentlyRunning,
+                        queueRunner: queueRunner,
+                        queuePosition: queuePosition(for: job)
                     )
 
                     Spacer(minLength: 20)
@@ -67,13 +72,16 @@ struct ProductionJobDetailView: View {
                 .padding(14)
             }
             .background(Color(NSColor.windowBackgroundColor))
-            .onChange(of: job.id) { _, _ in syncJob(job) }
-            .onAppear { syncJob(job) }
         } else {
             ContentUnavailableView(
                 "No job selected", systemImage: "tray",
-                description: Text("Select a job from the queue to see its details and generate."))
+                description: Text("Select a job from the queue to see its details."))
         }
+    }
+
+    private func queuePosition(for job: GenerationJob) -> Int {
+        guard let idx = queue.firstIndex(where: { $0.id == job.id }) else { return 0 }
+        return idx + 1
     }
 
     private func infoRow(_ label: String, _ value: String) -> some View {
@@ -83,128 +91,62 @@ struct ProductionJobDetailView: View {
         }
         .padding(.vertical, 2)
     }
-
-    private func syncJob(_ job: GenerationJob) {
-        vm.prompt  = job.combinedPrompt
-        vm.seed    = job.seed
-        vm.width   = job.width
-        vm.height  = job.height
-        // #19: Pass gRPC connection settings from config
-        vm.grpcAddress = config.grpcAddress
-        vm.grpcPort    = config.grpcPort
-        let model = models.models.first { $0.modelID == selectedModelID } ?? models.models.first
-        if let model {
-            vm.steps         = model.steps
-            vm.guidanceScale = model.guidanceScale
-            vm.model         = model.model
-        }
-    }
 }
 
-// MARK: - Generate panel
+// MARK: - Generation progress panel
 
-private struct GeneratePanel: View {
-    let job: GenerationJob
-    @ObservedObject var vm: ImageGenerationViewModel
-    var onJobCompleted: ((GenerationJob) -> Void)? = nil
-
-    @State private var generatedImages: [NSImage] = []
-    @State private var startedAt: Date? = nil
-    @State private var currentVariant: Int = 0
-    @State private var saveError: String? = nil
-    @State private var savedImageIDs: [String] = []
-
-    private var totalVariants: Int {
-        job.jobType == .generateAsset ? max(1, job.variantCount) : 1
-    }
+private struct GenerationProgressPanel: View {
+    let isCurrentJob: Bool
+    @ObservedObject var queueRunner: QueueRunnerService
+    let queuePosition: Int
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionLabel("Generate")
-            HStack(spacing: 10) {
-                Button { startGeneration() } label: {
-                    Label(
-                        vm.isGenerating
-                            ? "Generating \(currentVariant + 1)/\(totalVariants)\u{2026}"
-                            : "Generate",
-                        systemImage: vm.isGenerating ? "hourglass" : "wand.and.stars"
-                    )
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(vm.isGenerating || vm.prompt.isEmpty)
-                .keyboardShortcut(.return, modifiers: .command)
-            }
+            sectionLabel("Progress")
 
-            if vm.isGenerating {
-                ProgressView(value: Double(currentVariant), total: Double(totalVariants))
+            if isCurrentJob {
+                // This job is currently being generated
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Generating \(queueRunner.currentVariant + 1)/\(queueRunner.totalVariants)\u{2026}")
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(.blue)
+                }
+
+                ProgressView(value: Double(queueRunner.currentVariant), total: Double(queueRunner.totalVariants))
                     .progressViewStyle(.linear)
-                if !vm.generationStage.isEmpty {
-                    Text(vm.generationStage).font(.caption).foregroundStyle(.secondary)
-                }
-            }
 
-            if !generatedImages.isEmpty {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    ForEach(Array(generatedImages.enumerated()), id: \.offset) { _, img in
-                        Image(nsImage: img).resizable().scaledToFit()
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                if !queueRunner.generationStage.isEmpty {
+                    Text(queueRunner.generationStage)
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+
+                // Show generated images so far
+                if !queueRunner.generatedImages.isEmpty {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                        ForEach(Array(queueRunner.generatedImages.enumerated()), id: \.offset) { _, img in
+                            Image(nsImage: img).resizable().scaledToFit()
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                        }
                     }
                 }
-            }
 
-            if let err = saveError {
-                Label(err, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption).foregroundStyle(.orange)
-            }
-            if let error = vm.errorMessage {
-                Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption).foregroundStyle(.red)
+                if let err = queueRunner.errorMessage {
+                    Label(err, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption).foregroundStyle(.red)
+                }
+            } else {
+                // Waiting in queue
+                HStack(spacing: 8) {
+                    Image(systemName: "clock")
+                        .foregroundStyle(.secondary)
+                    Text("Waiting \u{2014} position \(queuePosition) in queue")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .padding(.bottom, 12)
-    }
-
-    private func startGeneration() {
-        generatedImages = []
-        savedImageIDs = []
-        saveError = nil
-        currentVariant = 0
-        startedAt = Date()
-        Task { await generateNext() }
-    }
-
-    @MainActor
-    private func generateNext() async {
-        guard currentVariant < totalVariants else {
-            var done = job
-            done.startedAt = startedAt
-            done.completedAt = Date()
-            done.savedImageIDs = savedImageIDs
-            onJobCompleted?(done)
-            return
-        }
-
-        vm.seed = job.seed == 0 ? SeedHelper.randomSeed() : job.seed + currentVariant
-        await vm.generate()
-
-        if let image = vm.generatedImage {
-            generatedImages.append(image)
-            do {
-                let imageID = try StorageService.shared.saveImage(image)
-                savedImageIDs.append(imageID)
-            } catch {
-                saveError = error.localizedDescription
-            }
-            currentVariant += 1
-            await generateNext()
-        } else {
-            saveError = vm.errorMessage ?? "No image returned"
-            var done = job
-            done.startedAt = startedAt
-            done.completedAt = Date()
-            done.savedImageIDs = savedImageIDs
-            onJobCompleted?(done)
-        }
     }
 }

@@ -9,6 +9,7 @@ struct ProductionBrowserView: View {
     @Binding var doneQueue: [GenerationJob]
     @Binding var models: ModelsFile
     @Binding var selectedModelID: String?
+    @ObservedObject var queueRunner: QueueRunnerService
 
     var body: some View {
         VSplitView {
@@ -17,7 +18,8 @@ struct ProductionBrowserView: View {
                 selectedJobID: $selectedJobID,
                 doneQueue: $doneQueue,
                 models: $models,
-                selectedModelID: $selectedModelID
+                selectedModelID: $selectedModelID,
+                queueRunner: queueRunner
             )
             .frame(minHeight: 120)
 
@@ -45,6 +47,7 @@ private struct QueueSection: View {
     @Binding var doneQueue: [GenerationJob]
     @Binding var models: ModelsFile
     @Binding var selectedModelID: String?
+    @ObservedObject var queueRunner: QueueRunnerService
     // #27: Timer for live finish time updates
     @State private var timerTick: Int = 0
     let timer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
@@ -66,7 +69,6 @@ private struct QueueSection: View {
 
     private var estimatedFinishString: String {
         guard !queue.isEmpty else { return "\u{2014}" }
-        // Use timerTick to force recomputation
         _ = timerTick
         var total: TimeInterval = 0
         for job in queue {
@@ -86,6 +88,9 @@ private struct QueueSection: View {
                     Image(systemName: "film.stack").font(.title2).foregroundStyle(.secondary)
                     Text("Production Queue").font(.title2.bold())
                     Spacer()
+                    if queueRunner.isRunning {
+                        ProgressView().controlSize(.small)
+                    }
                     Picker("Model", selection: Binding(
                         get: { selectedModelID ?? models.models.first?.modelID ?? "" },
                         set: { selectedModelID = $0 }
@@ -109,8 +114,15 @@ private struct QueueSection: View {
                 Spacer()
             } else {
                 List(queue, selection: $selectedJobID) { job in
-                    JobRow(job: job, onDelete: { queue.removeAll { $0.id == job.id } })
-                        .tag(job.id)
+                    JobRow(
+                        job: job,
+                        isRunning: queueRunner.currentJobID == job.id,
+                        onDelete: {
+                            guard queueRunner.currentJobID != job.id else { return }
+                            queue.removeAll { $0.id == job.id }
+                        }
+                    )
+                    .tag(job.id)
                 }.listStyle(.plain)
             }
         }
@@ -155,12 +167,18 @@ private struct DoneSection: View {
 
 private struct JobRow: View {
     let job: GenerationJob
+    let isRunning: Bool
     let onDelete: () -> Void
 
     var body: some View {
         HStack(spacing: 6) {
-            Text(job.jobType.letter).font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundStyle(job.jobType.color).frame(width: 14)
+            if isRunning {
+                ProgressView().controlSize(.mini)
+                    .frame(width: 14)
+            } else {
+                Text(job.jobType.letter).font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(job.jobType.color).frame(width: 14)
+            }
             Text(job.size.letter).font(.system(size: 11, weight: .bold, design: .monospaced))
                 .foregroundStyle(job.size == .large ? .green : .orange).frame(width: 14)
             VStack(alignment: .leading, spacing: 1) {
@@ -168,14 +186,20 @@ private struct JobRow: View {
                 Text(job.styleName).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
-            Text("~\(Int(job.estimatedDuration) / 60)m").font(.caption2).foregroundStyle(.tertiary)
+            if isRunning {
+                Text("Running").font(.caption2).foregroundStyle(.blue)
+            } else {
+                Text("~\(Int(job.estimatedDuration) / 60)m").font(.caption2).foregroundStyle(.tertiary)
+            }
             Image(systemName: "chevron.right")
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(.tertiary)
-            Button(action: onDelete) {
-                Image(systemName: "xmark.circle.fill").font(.system(size: 14))
-                    .symbolRenderingMode(.palette).foregroundStyle(.white, .secondary)
-            }.buttonStyle(.plain)
+            if !isRunning {
+                Button(action: onDelete) {
+                    Image(systemName: "xmark.circle.fill").font(.system(size: 14))
+                        .symbolRenderingMode(.palette).foregroundStyle(.white, .secondary)
+                }.buttonStyle(.plain)
+            }
         }
         .padding(.vertical, 6)
     }
