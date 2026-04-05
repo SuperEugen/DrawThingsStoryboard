@@ -1,12 +1,15 @@
 import SwiftUI
 
 // MARK: - Assets detail
+/// #40: Generate Large Image button + Large Image preview
 
 struct AssetsDetailView: View {
     @Binding var assets: AssetsFile
     let selectedAssetID: String?
     @Binding var generationQueue: [GenerationJob]
     let config: AppConfig
+    let styles: StylesFile
+    let storyboards: StoryboardsFile
 
     private var selectedIndex: Int? {
         guard let id = selectedAssetID else { return nil }
@@ -19,6 +22,8 @@ struct AssetsDetailView: View {
                 asset: $assets.assets[idx],
                 generationQueue: $generationQueue,
                 config: config,
+                styles: styles,
+                storyboards: storyboards,
                 onDelete: {
                     assets.assets.remove(at: idx)
                 }
@@ -39,19 +44,42 @@ private struct AssetEditorView: View {
     @Binding var asset: AssetEntry
     @Binding var generationQueue: [GenerationJob]
     let config: AppConfig
+    let styles: StylesFile
+    let storyboards: StoryboardsFile
     let onDelete: () -> Void
-    // #31: Delete confirmation
     @State private var showDeleteConfirmation = false
+    @State private var showLargeImageSheet = false
+
+    /// Resolved style description from first storyboard's style.
+    private var resolvedStyleDescription: String {
+        guard let sb = storyboards.storyboards.first,
+              let style = styles.styles.first(where: { $0.styleID == sb.styleID }) else { return "" }
+        return style.style
+    }
+
+    /// Check if a large image job is already queued for this asset.
+    private var isLargeQueued: Bool {
+        generationQueue.contains {
+            $0.assetID == asset.assetID && $0.jobType == .generateAsset && $0.size == .large
+        }
+    }
+
+    /// Load the large image from disk if available.
+    private var largeImage: NSImage? {
+        guard asset.hasLargeImage else { return nil }
+        return StorageService.shared.loadImage(id: asset.largeImageID)
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                // #18: Show approved variant or first available image in header
+                // Header: show large image if available, else approved variant, else placeholder
                 let headerImageID: String = {
+                    if asset.hasLargeImage { return asset.largeImageID }
                     if let idx = asset.approvedVariantIndex {
                         return asset.variant(at: idx).smallImageID
                     }
-                    return asset.largeImageID.isEmpty ? asset.smallImageID : asset.largeImageID
+                    return asset.smallImageID
                 }()
                 let thumbType: ThumbnailItemType = asset.isCharacter
                     ? .character(subType: asset.subType)
@@ -64,11 +92,12 @@ private struct AssetEditorView: View {
                 )
                 .padding(.bottom, 16)
 
+                // Status section
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Status")
                     statusRow("V", "Variants", asset.hasApprovedVariant)
                     statusRow("S", "Small Image", asset.hasSmallImage)
-                    statusRow("L", "Large Image", asset.hasLargeImage)
+                    largeImageStatusRow
                 }
                 .padding(.bottom, 12)
 
@@ -125,9 +154,32 @@ private struct AssetEditorView: View {
 
                 Divider().padding(.vertical, 8)
 
+                // Large Image section
+                if asset.hasLargeImage {
+                    VStack(alignment: .leading, spacing: 6) {
+                        sectionLabel("Large Image")
+                        if let img = largeImage {
+                            Button {
+                                showLargeImageSheet = true
+                            } label: {
+                                Image(nsImage: img)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(maxWidth: .infinity)
+                                    .frame(maxHeight: 200)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            .buttonStyle(.plain)
+                            .help("Click to view full size")
+                        }
+                    }
+                    .padding(.bottom, 12)
+
+                    Divider().padding(.vertical, 8)
+                }
+
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Variants")
-                    // #18: Show generated variant images
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                         ForEach(0..<4, id: \.self) { idx in
                             variantTile(index: idx)
@@ -138,7 +190,6 @@ private struct AssetEditorView: View {
 
                 Divider().padding(.vertical, 8)
 
-                // #31: Delete with confirmation
                 Button(role: .destructive) {
                     showDeleteConfirmation = true
                 } label: {
@@ -157,6 +208,50 @@ private struct AssetEditorView: View {
             .padding(14)
         }
         .background(Color(NSColor.windowBackgroundColor))
+        // #40: Large image sheet
+        .sheet(isPresented: $showLargeImageSheet) {
+            LargeImageSheet(
+                image: largeImage,
+                assetName: asset.name,
+                isPresented: $showLargeImageSheet
+            )
+        }
+    }
+
+    // MARK: - Large Image status row with Generate button
+
+    @ViewBuilder
+    private var largeImageStatusRow: some View {
+        HStack(spacing: 8) {
+            Text("L").font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundStyle(asset.hasLargeImage ? .green : .gray)
+            Text("Large Image:").font(.callout)
+            Text(asset.hasLargeImage ? "yes" : "not yet").font(.callout)
+                .foregroundStyle(asset.hasLargeImage ? .green : .secondary)
+            Spacer()
+            // #40: Generate Large Image button
+            if asset.hasApprovedVariant && !asset.hasLargeImage {
+                if isLargeQueued {
+                    Text("Queued").font(.caption).foregroundStyle(.purple)
+                } else {
+                    Button { generateLargeImage() } label: {
+                        Label("Generate", systemImage: "arrow.up.left.and.arrow.down.right").font(.caption)
+                    }
+                    .buttonStyle(.bordered).controlSize(.mini)
+                }
+            }
+            if asset.hasLargeImage {
+                Button {
+                    showLargeImageSheet = true
+                } label: {
+                    Image(systemName: "eye").font(.caption)
+                }
+                .buttonStyle(.bordered).controlSize(.mini)
+                .help("View large image")
+            }
+        }
+        .padding(.vertical, 5).padding(.horizontal, 8)
+        .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
     }
 
     @ViewBuilder
@@ -173,7 +268,6 @@ private struct AssetEditorView: View {
         .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
     }
 
-    // #18: Variant tiles now show real generated images
     private func variantTile(index idx: Int) -> some View {
         let variant = asset.variant(at: idx)
         return VStack(spacing: 4) {
@@ -221,5 +315,76 @@ private struct AssetEditorView: View {
         var v = asset.variant(at: idx)
         v.isApproved = true
         asset.setVariant(at: idx, v)
+    }
+
+    // #40: Generate large image for this single asset
+    private func generateLargeImage() {
+        guard asset.hasApprovedVariant, let approvedIdx = asset.approvedVariantIndex else { return }
+        let approvedSeed = asset.variant(at: approvedIdx).seed
+        var parts: [String] = []
+        if !resolvedStyleDescription.isEmpty { parts.append(resolvedStyleDescription) }
+        parts.append(asset.description)
+        let prompt = parts.joined(separator: ", ")
+
+        let job = GenerationJob(
+            id: UUID().uuidString,
+            itemName: asset.name,
+            jobType: .generateAsset,
+            size: .large,
+            styleName: resolvedStyleDescription,
+            queuedAt: Date(),
+            estimatedDuration: 180,
+            itemIcon: asset.isCharacter ? "person.fill" : "map",
+            seed: approvedSeed,
+            width: config.largeImageWidth,
+            height: config.largeImageHeight,
+            combinedPrompt: prompt,
+            variantCount: 1,
+            assetType: asset.type,
+            assetSubType: asset.subType,
+            assetID: asset.assetID
+        )
+        generationQueue.append(job)
+    }
+}
+
+// MARK: - Large image sheet
+
+private struct LargeImageSheet: View {
+    let image: NSImage?
+    let assetName: String
+    @Binding var isPresented: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(assetName).font(.headline)
+                Spacer()
+                Button { isPresented = false } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding()
+
+            if let img = image {
+                Image(nsImage: img)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.horizontal)
+                    .padding(.bottom)
+            } else {
+                ContentUnavailableView(
+                    "Image not found",
+                    systemImage: "photo",
+                    description: Text("The large image file could not be loaded.")
+                )
+            }
+        }
+        .frame(minWidth: 800, minHeight: 500)
     }
 }

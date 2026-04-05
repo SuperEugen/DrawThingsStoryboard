@@ -73,17 +73,14 @@ struct ContentView: View {
         .onChange(of: selectedSection) { _, _ in
             clearSelections()
         }
-        // Auto-start queue when jobs are added
         .onChange(of: generationQueue.count) { _, _ in
             triggerQueueRunner()
         }
-        // Also restart after a job completes (runner sets isRunning = false)
         .onChange(of: queueRunner.isRunning) { _, running in
             if !running { triggerQueueRunner() }
         }
         .frame(minWidth: 1100, minHeight: 680)
         .navigationTitle(windowTitle)
-        // #15: Connection status in toolbar
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 ConnectionStatusView(
@@ -179,11 +176,14 @@ struct ContentView: View {
                 config: config
             )
         case .assets:
+            // #40: Pass styles + storyboards for prompt building
             AssetsDetailView(
                 assets: $assets,
                 selectedAssetID: selectedAssetID,
                 generationQueue: $generationQueue,
-                config: config
+                config: config,
+                styles: styles,
+                storyboards: storyboards
             )
         case .styles:
             StylesDetailView(
@@ -226,16 +226,13 @@ struct ContentView: View {
         doneQueue.insert(done, at: 0)
         generationQueue.removeAll { $0.id == job.id }
 
-        // Write production log entries for each generated image
         let isoFormatter = ISO8601DateFormatter()
         let startTimeStr = job.startedAt.map { isoFormatter.string(from: $0) } ?? ""
         let endTimeStr = isoFormatter.string(from: done.completedAt ?? Date())
         let resolvedModelID = selectedModelID ?? models.models.first?.modelID ?? ""
         let resolvedStyleID: String = {
             if !job.styleID.isEmpty { return job.styleID }
-            if let sb = currentStoryboard {
-                return sb.styleID
-            }
+            if let sb = currentStoryboard { return sb.styleID }
             return ""
         }()
 
@@ -255,7 +252,6 @@ struct ContentView: View {
         }
         StorageLoadService.shared.saveProductionLog(productionLog)
 
-        // Wire images back to data
         guard let firstImageID = job.savedImageIDs.first else { return }
 
         switch job.jobType {
