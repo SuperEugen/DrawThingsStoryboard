@@ -60,11 +60,9 @@ private struct QueueSection: View {
     private func estimatedPerImage(size: GenerationSize) -> TimeInterval {
         let sizeStr = size.rawValue
         let isoFormatter = ISO8601DateFormatter()
-        // Filter log entries with matching size and valid timestamps
         let matching = productionLog.generatedImages.filter { entry in
             entry.size == sizeStr && !entry.startTime.isEmpty && !entry.endTime.isEmpty
         }
-        // Take the last 3 entries (most recent)
         let recent = matching.suffix(3)
         guard !recent.isEmpty else {
             return size == .large ? 180 : 60
@@ -91,6 +89,11 @@ private struct QueueSection: View {
         return fmt.string(from: finish)
     }
 
+    /// Number of waiting (non-running) jobs in the queue.
+    private var waitingCount: Int {
+        queue.filter { $0.id != queueRunner.currentJobID }.count
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
@@ -98,6 +101,17 @@ private struct QueueSection: View {
                     Image(systemName: "film.stack").font(.title2).foregroundStyle(.secondary)
                     Text("Production Queue").font(.title2.bold())
                     Spacer()
+                    // Stop button: removes all waiting jobs
+                    if queueRunner.isRunning && waitingCount > 0 {
+                        Button {
+                            queueRunner.stopQueue(queue: &queue)
+                        } label: {
+                            Label("Stop", systemImage: "stop.fill").font(.caption)
+                        }
+                        .buttonStyle(.bordered).controlSize(.small)
+                        .tint(.red)
+                        .help("Remove all waiting jobs from the queue. The running job will finish.")
+                    }
                     if queueRunner.isRunning {
                         ProgressView().controlSize(.small)
                     }

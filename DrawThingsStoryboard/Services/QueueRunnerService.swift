@@ -17,7 +17,8 @@ final class QueueRunnerService: ObservableObject {
     @Published var errorMessage: String? = nil
 
     // MARK: - Internal
-    private let vm = ImageGenerationViewModel()
+    /// Synchronous flag to prevent re-entry — set immediately, not after await.
+    private var isBusy: Bool = false
     private var onJobCompleted: ((GenerationJob) -> Void)?
 
     /// Call once from ContentView to wire up the completion handler.
@@ -32,7 +33,10 @@ final class QueueRunnerService: ObservableObject {
         models: ModelsFile,
         selectedModelID: String?
     ) {
-        guard !isRunning, let nextJob = queue.first else { return }
+        // Synchronous guard — prevents any re-entry
+        guard !isBusy, let nextJob = queue.first else { return }
+        isBusy = true
+        isRunning = true
         Task {
             await processJob(
                 nextJob,
@@ -43,6 +47,12 @@ final class QueueRunnerService: ObservableObject {
         }
     }
 
+    /// Stop: clear all waiting jobs from the queue (called from UI).
+    /// Returns IDs of jobs that should be removed (everything except the running one).
+    func stopQueue(queue: inout [GenerationJob]) {
+        queue.removeAll { $0.id != currentJobID }
+    }
+
     // MARK: - Process a single job
 
     private func processJob(
@@ -51,12 +61,13 @@ final class QueueRunnerService: ObservableObject {
         models: ModelsFile,
         selectedModelID: String?
     ) async {
-        isRunning = true
         currentJobID = job.id
         generatedImages = []
         errorMessage = nil
+        generationStage = ""
 
-        // Configure VM
+        // Fresh VM per job to avoid any accumulated state
+        let vm = ImageGenerationViewModel()
         vm.prompt = job.combinedPrompt
         vm.seed = job.seed
         vm.width = job.width
@@ -70,14 +81,21 @@ final class QueueRunnerService: ObservableObject {
             vm.model = model.model
         }
 
-        totalVariants = job.jobType == .generateAsset ? max(1, job.variantCount) : 1
+        // Determine how many images to generate
+        let count: Int
+        if job.jobType == .generateAsset && job.size == .small {
+            count = max(1, job.variantCount)
+        } else {
+            count = 1
+        }
+        totalVariants = count
         currentVariant = 0
 
         var savedImageIDs: [String] = []
         let startedAt = Date()
 
-        // Generate all variants sequentially
-        for i in 0..<totalVariants {
+        // Generate images sequentially
+        for i in 0..<count {
             currentVariant = i
             vm.seed = job.seed == 0 ? SeedHelper.randomSeed() : job.seed + i
 
@@ -113,7 +131,10 @@ final class QueueRunnerService: ObservableObject {
         // Reset state
         currentJobID = nil
         currentVariant = 0
+        totalVariants = 1
         generationStage = ""
+        generatedImages = []
+        isBusy = false
         isRunning = false
     }
 }
