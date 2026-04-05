@@ -55,7 +55,7 @@ erDiagram
         int seed
     }
 
-    ASSET_VARIANT {
+    VARIANT {
         string smallImageID
         int seed
         string isApproved
@@ -72,14 +72,14 @@ erDiagram
     MODEL {
         string modelID
         string name
-        float guidanceScale
+        string guidanceScale
         string model
         int steps
         int defaultGenTimeSmall
         int defaultGenTimeLarge
     }
 
-    GENERATED_IMAGE {
+    GENERATEDIMAGE {
         string imageID
         string type
         string modelID
@@ -98,4 +98,4 @@ erDiagram
     STORYBOARD }o--|| STYLE : uses
     STORYBOARD }o--|| MODEL : uses
     PANEL }o--o| ASSET : references
-    ASSET ||--|{ ASSET_VARIANT : variants
+    ASSET ||--|{ VARIANT : has
