@@ -18,33 +18,48 @@ Completed: April 2026
 - [x] Style example generation writes UUID back to styles.json
 - [x] Generated style images shown in tiles and detail view
 
-## v0.3 — Complete Generation Wiring
+## v0.3 — Complete Generation Wiring ✅
 
-Images are saved but not yet fully wired back into assets and panels.
+Completed: April 2026
 
-- [ ] Asset variant generation: image UUIDs → AssetEntry.variant1–4.smallImageID
-- [ ] Asset large image generation: UUID → AssetEntry.largeImageID
-- [ ] Panel generation: UUID → PanelEntry.smallImageID / largeImageID
-- [ ] Show actual variant images in Asset Browser tiles
-- [ ] Show panel images in Storyboard Browser
-- [ ] Production log entries written after each generation
+- [x] Asset variant generation: image UUIDs → AssetEntry.variant1–4.smallImageID
+- [x] Asset large image generation: UUID → AssetEntry.largeImageID (uses seed from approved variant)
+- [x] Panel generation: UUID → PanelEntry.smallImageID / largeImageID
+- [x] Show actual variant images in Asset Browser tiles and detail view
+- [x] Show panel images in Storyboard Browser (mini thumbnails in panel rows)
+- [x] Production log entries written after each generation to production-log.json
+- [x] "Generate all Variants" batch button in Assets Browser
+- [x] "Generate all Large Images" batch button in Assets Browser
+- [x] UnifiedThumbnailView supports real images via imageID parameter
 
-## v0.4 — Production Workflow
+## v0.4 — Production Workflow & Fountain Import ✅
 
-The current "Generate (Test)" button is a proof of concept. The real workflow needs proper queue processing.
+Completed: April 2026
 
-- [ ] Auto-process queue (generate all queued jobs in sequence)
-- [ ] Retry failed jobs
-- [ ] Job priority / reordering
-- [ ] Proper error handling when Draw Things is not running
-- [ ] gRPC address and port configurable in Settings
+- [x] QueueRunnerService: auto-process queue (jobs start automatically, sequential processing)
+- [x] Manual Generate button removed — queue is fully automatic
+- [x] Stop button removes all waiting jobs (running job finishes)
+- [x] Production log persistence — time estimation from last 3 jobs per size (small/large)
+- [x] Fallback estimation: 60s small, 180s large when no log data
+- [x] "Generate Large Image" button per asset in detail view (with seed from approved variant)
+- [x] Large image preview with full-size sheet viewer (800×500)
+- [x] Import Fountain screenplay files (.fountain) → Act/Sequence/Scene structure
+- [x] FountainParser strips Beat metadata blocks
+- [x] Style selector picker in Storyboard Browser header
+- [x] Generate Small/Large Image buttons in Panel detail view (enabled when description exists)
+- [x] +/Delete buttons for Acts, Sequences, Scenes, and Panels in storyboard tree
+- [x] Sidebar reordered: Assets, Styles, Models, Storyboard, Production Queue, Settings
+- [x] Proper default descriptions for location assets in demo data
+- [x] Race condition fix: synchronous isBusy flag prevents duplicate job generation
+- [x] Fresh ImageGenerationViewModel per job (no accumulated state between jobs)
 
 ## v0.5 — More Draw Things Control
 
 To get consistent images over several panels it is crucial to use the moodboard feature.
 
-- [ ] Generate large image uses the same seed used for generation of variant or small image
-- [ ] Generate panel uses reference images attached to the job
+- [ ] Generate panel uses reference images (approved asset variants) attached to the job
+- [ ] Moodboard images sent via gRPC for consistent character appearance
+- [ ] Proper error handling when Draw Things is not running
 
 ## v0.6 — Prompt Refinement
 
@@ -62,12 +77,13 @@ The goal of the app. Something to hand out.
 - [ ] Export individual panels as PNG/JPEG
 - [ ] Export asset sheet (all approved variants per character/location)
 
-## v0.8 — Import Fountain Files
+## v0.8 — Fountain Import Phase 2
 
-Connect to other apps in the whole production workflow.
+Deeper integration with Fountain screenplay files.
 
-- [ ] Import fountain file format used by screenwriting software like Beat to import acts, sequences and scenes
-- [ ] Use fountain import to create character and location assets
+- [ ] Import dialogue lines from Fountain files into panel dialogue fields
+- [ ] Auto-create character assets from Fountain character names
+- [ ] Map Fountain scene headings to location assets
 
 ## v0.9 — Dialog and Actions
 
