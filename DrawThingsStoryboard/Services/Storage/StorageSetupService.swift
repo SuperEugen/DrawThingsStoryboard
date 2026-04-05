@@ -83,7 +83,7 @@ final class StorageSetupService {
         ])
         storage.write(storyboards, to: storage.storyboardsURL)
 
-        // assets.json
+        // assets.json — #39: proper descriptions for location assets
         let assets = AssetsFile(assets: [
             AssetEntry(assetID: "A1", name: "SuperEugen", type: "character", subType: "male",
                        description: "A 60yo man with a slight belly and a prominent chin wearing black glasses with a thick frame."),
@@ -94,13 +94,13 @@ final class StorageSetupService {
             AssetEntry(assetID: "A4", name: "Sylli", type: "character", subType: "female",
                        description: "A 55yo sportive slim woman with a ponytail."),
             AssetEntry(assetID: "A5", name: "SuperEugen's apartment", type: "location", subType: "interior",
-                       description: "Describe your location here."),
+                       description: "Attic apartment with slope walls a round window and a red brick church outside."),
             AssetEntry(assetID: "A6", name: "Park", type: "location", subType: "exterior",
-                       description: "Describe your location here."),
+                       description: "A small park with a basketball court and a red brick church in the background."),
             AssetEntry(assetID: "A7", name: "Restaurant", type: "location", subType: "interior",
-                       description: "Describe your location here."),
+                       description: "A restaurant with a bar in the middle of the room and floor to ceiling windows on street level."),
             AssetEntry(assetID: "A8", name: "Staircase", type: "location", subType: "interior",
-                       description: "Describe your location here.")
+                       description: "A staircase in an old Berlin building.")
         ])
         storage.write(assets, to: storage.assetsURL)
 
