@@ -1,6 +1,3 @@
----
-title: DrawThingsStoryboard Data Model
----
 erDiagram
     CONFIG {
         int smallImageWidth
@@ -61,21 +58,21 @@ erDiagram
     ASSET_VARIANT {
         string smallImageID
         int seed
-        bool isApproved
+        string isApproved
     }
 
     STYLE {
         string styleID
         string name
         string smallImageID
-        bool isGenerated
+        string isGenerated
         string style
     }
 
     MODEL {
         string modelID
         string name
-        double guidanceScale
+        float guidanceScale
         string model
         int steps
         int defaultGenTimeSmall
@@ -101,4 +98,4 @@ erDiagram
     STORYBOARD }o--|| STYLE : uses
     STORYBOARD }o--|| MODEL : uses
     PANEL }o--o| ASSET : references
-    ASSET ||--|{ ASSET_VARIANT : has-4-of
+    ASSET ||--|{ ASSET_VARIANT : variants
