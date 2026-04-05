@@ -61,15 +61,15 @@ erDiagram
         string isApproved
     }
 
-    STYLE {
+    STYLEENTRY {
         string styleID
         string name
         string smallImageID
         string isGenerated
-        string style
+        string stylePrompt
     }
 
-    MODEL {
+    MODELENTRY {
         string modelID
         string name
         string guidanceScale
@@ -95,7 +95,7 @@ erDiagram
     ACT ||--o{ SEQUENCE : contains
     SEQUENCE ||--o{ SCENE : contains
     SCENE ||--o{ PANEL : contains
-    STORYBOARD }o--|| STYLE : uses
-    STORYBOARD }o--|| MODEL : uses
+    STORYBOARD }o--|| STYLEENTRY : uses
+    STORYBOARD }o--|| MODELENTRY : uses
     PANEL }o--o| ASSET : references
     ASSET ||--|{ VARIANT : has
