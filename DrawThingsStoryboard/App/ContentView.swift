@@ -26,7 +26,7 @@ struct ContentView: View {
     @State private var generationQueue: [GenerationJob] = []
     @State private var doneQueue: [GenerationJob] = []
 
-    // MARK: - Queue Runner (auto-processes queue)
+    // MARK: - Queue Runner
     @StateObject private var queueRunner = QueueRunnerService()
 
     // MARK: - Helpers
@@ -41,6 +41,14 @@ struct ContentView: View {
             return .constant([])
         }
         return $storyboards.storyboards[selectedStoryboardIndex].acts
+    }
+
+    /// Binding to the current storyboard's styleID for the style picker.
+    private var currentStyleIDBinding: Binding<String> {
+        guard storyboards.storyboards.indices.contains(selectedStoryboardIndex) else {
+            return .constant("")
+        }
+        return $storyboards.storyboards[selectedStoryboardIndex].styleID
     }
 
     private var resolvedStyleName: String? {
@@ -121,6 +129,8 @@ struct ContentView: View {
                     get: { resolvedStyleName },
                     set: { _ in }
                 ),
+                styles: styles,
+                currentStyleID: currentStyleIDBinding,
                 onFountainImport: { importedActs, name in
                     handleFountainImport(acts: importedActs, name: name)
                 }
@@ -220,15 +230,13 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - Fountain import (#41)
+    // MARK: - Fountain import
 
     private func handleFountainImport(acts: [ActEntry], name: String) {
-        // Replace the current storyboard's acts with the imported structure
         if storyboards.storyboards.indices.contains(selectedStoryboardIndex) {
             storyboards.storyboards[selectedStoryboardIndex].acts = acts
             storyboards.storyboards[selectedStoryboardIndex].name = name
         } else {
-            // No storyboard exists — create one
             let modelID = models.models.first?.modelID ?? "M1"
             let styleID = styles.styles.first?.styleID ?? "S1"
             let sb = StoryboardEntry(name: name, acts: acts, modelID: modelID, styleID: styleID)

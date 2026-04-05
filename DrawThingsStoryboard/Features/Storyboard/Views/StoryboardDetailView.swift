@@ -137,26 +137,65 @@ private struct PanelDetailView: View {
     var styleDescription: String = ""
     var config: AppConfig = AppConfig()
 
+    @State private var showLargeImageSheet = false
+
     private var attachedAssets: [AssetEntry] {
         panel.refIDs.compactMap { refID in
             assets.assets.first { $0.assetID == refID }
         }
     }
 
-    // #33: Asset limit info
     private var refCount: Int { panel.refIDs.count }
     private var canAddMoreRefs: Bool { refCount < 4 }
+
+    /// Whether the description is filled in enough to generate.
+    private var hasDescription: Bool {
+        !panel.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Check if a small image job is already queued.
+    private var isSmallQueued: Bool {
+        generationQueue.contains {
+            $0.panelID == panel.panelID && $0.jobType == .generatePanel && $0.size == .small
+        }
+    }
+
+    /// Check if a large image job is already queued.
+    private var isLargeQueued: Bool {
+        generationQueue.contains {
+            $0.panelID == panel.panelID && $0.jobType == .generatePanel && $0.size == .large
+        }
+    }
+
+    /// Build the combined prompt for this panel.
+    private var combinedPrompt: String {
+        var parts: [String] = []
+        if !styleDescription.isEmpty { parts.append(styleDescription) }
+        parts.append(panel.description)
+        if !panel.cameraMovement.isEmpty { parts.append(panel.cameraMovement) }
+        return parts.joined(separator: ", ")
+    }
+
+    /// Load large image from disk.
+    private var largeImage: NSImage? {
+        guard panel.hasLargeImage else { return nil }
+        return StorageService.shared.loadImage(id: panel.largeImageID)
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                UnifiedThumbnailView(itemType: .panel, name: "", sizeMode: .header)
+                // Header: show generated image if available
+                let headerImageID = panel.hasLargeImage ? panel.largeImageID
+                    : panel.hasSmallImage ? panel.smallImageID : ""
+                UnifiedThumbnailView(itemType: .panel, name: "", sizeMode: .header, imageID: headerImageID)
                     .padding(.bottom, 16)
 
+                // Status with Generate buttons
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Status")
-                    statusRow(label: "Small Image", available: panel.hasSmallImage, letter: "S")
-                    statusRow(label: "Large Image", available: panel.hasLargeImage, letter: "L")
+                    smallImageStatusRow
+                    largeImageStatusRow
                 }
                 .padding(.bottom, 12)
 
@@ -173,6 +212,10 @@ private struct PanelDetailView: View {
                     TextEditor(text: $panel.description).font(.callout).frame(minHeight: 80)
                         .overlay(RoundedRectangle(cornerRadius: 6)
                             .stroke(Color.secondary.opacity(0.25), lineWidth: 0.5))
+                    if !hasDescription {
+                        Text("Add a description to enable image generation.")
+                            .font(.caption2).foregroundStyle(.orange)
+                    }
                 }
                 .padding(.bottom, 12)
 
@@ -203,7 +246,26 @@ private struct PanelDetailView: View {
 
                 Divider().padding(.vertical, 8)
 
-                // #33: Referenced Assets with limit explanation
+                // Large image preview
+                if panel.hasLargeImage {
+                    VStack(alignment: .leading, spacing: 6) {
+                        sectionLabel("Large Image")
+                        if let img = largeImage {
+                            Button { showLargeImageSheet = true } label: {
+                                Image(nsImage: img)
+                                    .resizable().scaledToFit()
+                                    .frame(maxWidth: .infinity).frame(maxHeight: 200)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            .buttonStyle(.plain)
+                            .help("Click to view full size")
+                        }
+                    }
+                    .padding(.bottom, 12)
+                    Divider().padding(.vertical, 8)
+                }
+
+                // Referenced Assets
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Referenced Assets (\(refCount)/4)")
                     if !canAddMoreRefs {
@@ -236,19 +298,124 @@ private struct PanelDetailView: View {
             .padding(14)
         }
         .background(Color(NSColor.windowBackgroundColor))
+        .sheet(isPresented: $showLargeImageSheet) {
+            PanelLargeImageSheet(image: largeImage, panelName: panel.name, isPresented: $showLargeImageSheet)
+        }
     }
 
+    // MARK: - Status rows with Generate buttons
+
     @ViewBuilder
-    private func statusRow(label: String, available: Bool, letter: String) -> some View {
+    private var smallImageStatusRow: some View {
         HStack(spacing: 8) {
-            Text(letter).font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundStyle(available ? .green : .gray)
-            Text("\(label):").font(.callout)
-            Text(available ? "available" : "not yet").font(.callout)
-                .foregroundStyle(available ? .green : .secondary)
+            Text("S").font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundStyle(panel.hasSmallImage ? .green : .gray)
+            Text("Small Image:").font(.callout)
+            Text(panel.hasSmallImage ? "available" : "not yet").font(.callout)
+                .foregroundStyle(panel.hasSmallImage ? .green : .secondary)
             Spacer()
+            if !panel.hasSmallImage {
+                if isSmallQueued {
+                    Text("Queued").font(.caption).foregroundStyle(.purple)
+                } else {
+                    Button { generateImage(size: .small) } label: {
+                        Label("Generate", systemImage: "photo").font(.caption)
+                    }
+                    .buttonStyle(.bordered).controlSize(.mini)
+                    .disabled(!hasDescription)
+                }
+            }
         }
         .padding(.vertical, 5).padding(.horizontal, 8)
         .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
+    }
+
+    @ViewBuilder
+    private var largeImageStatusRow: some View {
+        HStack(spacing: 8) {
+            Text("L").font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundStyle(panel.hasLargeImage ? .green : .gray)
+            Text("Large Image:").font(.callout)
+            Text(panel.hasLargeImage ? "available" : "not yet").font(.callout)
+                .foregroundStyle(panel.hasLargeImage ? .green : .secondary)
+            Spacer()
+            if !panel.hasLargeImage {
+                if isLargeQueued {
+                    Text("Queued").font(.caption).foregroundStyle(.purple)
+                } else {
+                    Button { generateImage(size: .large) } label: {
+                        Label("Generate", systemImage: "arrow.up.left.and.arrow.down.right").font(.caption)
+                    }
+                    .buttonStyle(.bordered).controlSize(.mini)
+                    .disabled(!hasDescription)
+                }
+            }
+            if panel.hasLargeImage {
+                Button { showLargeImageSheet = true } label: {
+                    Image(systemName: "eye").font(.caption)
+                }
+                .buttonStyle(.bordered).controlSize(.mini)
+                .help("View large image")
+            }
+        }
+        .padding(.vertical, 5).padding(.horizontal, 8)
+        .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
+    }
+
+    // MARK: - Generate
+
+    private func generateImage(size: GenerationSize) {
+        guard hasDescription else { return }
+        let seed = panel.seed == 0 ? SeedHelper.randomSeed() : panel.seed
+        let w = size == .large ? config.largeImageWidth : config.smallImageWidth
+        let h = size == .large ? config.largeImageHeight : config.smallImageHeight
+        let job = GenerationJob(
+            id: UUID().uuidString,
+            itemName: panel.name,
+            jobType: .generatePanel,
+            size: size,
+            styleName: resolvedStyleName ?? "",
+            queuedAt: Date(),
+            estimatedDuration: size == .large ? 180 : 60,
+            itemIcon: "video.fill",
+            seed: seed,
+            width: w,
+            height: h,
+            combinedPrompt: combinedPrompt,
+            panelID: panel.panelID
+        )
+        generationQueue.append(job)
+    }
+}
+
+// MARK: - Large image sheet for panels
+
+private struct PanelLargeImageSheet: View {
+    let image: NSImage?
+    let panelName: String
+    @Binding var isPresented: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(panelName).font(.headline)
+                Spacer()
+                Button { isPresented = false } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2).symbolRenderingMode(.hierarchical).foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding()
+            if let img = image {
+                Image(nsImage: img).resizable().scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.horizontal).padding(.bottom)
+            } else {
+                ContentUnavailableView("Image not found", systemImage: "photo",
+                    description: Text("The large image file could not be loaded."))
+            }
+        }
+        .frame(minWidth: 800, minHeight: 500)
     }
 }

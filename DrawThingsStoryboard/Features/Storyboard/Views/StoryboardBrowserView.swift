@@ -18,6 +18,9 @@ struct StoryboardBrowserView: View {
     @Binding var acts: [ActEntry]
     @Binding var selection: StoryboardSelection?
     @Binding var styleName: String?
+    /// Style picker: all available styles + binding to current storyboard's styleID
+    let styles: StylesFile
+    @Binding var currentStyleID: String
     /// #41: Callback to replace entire storyboard from Fountain import.
     var onFountainImport: (([ActEntry], String) -> Void)? = nil
 
@@ -27,12 +30,16 @@ struct StoryboardBrowserView: View {
                 Image(systemName: "pencil.and.list.clipboard").font(.title2).foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Storyboard").font(.title2.bold())
-                    if let name = styleName {
-                        Text(name).font(.caption).foregroundStyle(.secondary)
-                    }
                 }
                 Spacer()
-                // #41: Import Fountain file
+                // Style selector
+                Picker("Style", selection: $currentStyleID) {
+                    ForEach(styles.styles) { s in
+                        Text(s.name).tag(s.styleID)
+                    }
+                }
+                .pickerStyle(.menu).labelsHidden().frame(maxWidth: 160)
+                // Import Fountain file
                 Button {
                     importFountainFile()
                 } label: {
@@ -71,7 +78,6 @@ struct StoryboardBrowserView: View {
         panel.title = "Import Fountain Screenplay"
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        // Accept .fountain files (falls back to plain text if UTType not registered)
         let fountainType = UTType(filenameExtension: "fountain") ?? UTType.plainText
         panel.allowedContentTypes = [fountainType, .plainText]
 
