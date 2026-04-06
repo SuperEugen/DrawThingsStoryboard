@@ -81,6 +81,16 @@ final class QueueRunnerService: ObservableObject {
             vm.model = model.model
         }
 
+        // #43: Load init image (e.g. location asset) if specified
+        if !job.initImageID.isEmpty {
+            vm.initImage = StorageService.shared.loadImage(id: job.initImageID)
+            if vm.initImage != nil {
+                print("[QueueRunner] Loaded init image '\(job.initImageID)' for job '\(job.itemName)'")
+            } else {
+                print("[QueueRunner] Warning: init image '\(job.initImageID)' not found on disk")
+            }
+        }
+
         // Determine how many images to generate
         let count: Int
         if job.jobType == .generateAsset && job.size == .small {

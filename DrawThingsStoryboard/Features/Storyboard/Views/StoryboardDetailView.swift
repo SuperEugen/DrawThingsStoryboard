@@ -129,6 +129,7 @@ private struct NodeDetailView: View {
 
 // MARK: - Panel detail
 /// #42: Interactive asset slots with location-first constraint
+/// #43: Location image passed as canvas/init image to gRPC
 
 private struct PanelDetailView: View {
     @Binding var panel: PanelEntry
@@ -157,6 +158,32 @@ private struct PanelDetailView: View {
         assignedIDs.contains { id in
             asset(for: id)?.isLocation == true
         }
+    }
+
+    /// The assigned location asset, if any.
+    private var locationAsset: AssetEntry? {
+        for id in assignedIDs {
+            if let entry = asset(for: id), entry.isLocation {
+                return entry
+            }
+        }
+        return nil
+    }
+
+    /// #43: Resolve the best image ID from a location asset for use as init image.
+    /// Prefers largeImageID, then approved variant, then first variant with image.
+    private var locationImageID: String {
+        guard let loc = locationAsset else { return "" }
+        if loc.hasLargeImage { return loc.largeImageID }
+        if let idx = loc.approvedVariantIndex {
+            let v = loc.variant(at: idx)
+            if v.hasImage { return v.smallImageID }
+        }
+        for i in 0..<4 {
+            let v = loc.variant(at: i)
+            if v.hasImage { return v.smallImageID }
+        }
+        return ""
     }
 
     /// Number of currently assigned refs.
@@ -357,6 +384,17 @@ private struct PanelDetailView: View {
                 }
             }
 
+            // #43: Show init image indicator when location has an image
+            if hasLocation && !locationImageID.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .font(.caption).foregroundStyle(.teal)
+                    Text("Location image will be sent as canvas to Draw Things")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 3).padding(.horizontal, 8)
+            }
+
             // Add button when slots available
             if canAddMoreRefs {
                 assetPickerMenu
@@ -509,6 +547,7 @@ private struct PanelDetailView: View {
     }
 
     // MARK: - Generate
+    /// #43: Includes initImageID when a location asset with an image is assigned.
 
     private func generateImage(size: GenerationSize) {
         guard hasDescription else { return }
@@ -528,7 +567,8 @@ private struct PanelDetailView: View {
             width: w,
             height: h,
             combinedPrompt: combinedPrompt,
-            panelID: panel.panelID
+            panelID: panel.panelID,
+            initImageID: locationImageID
         )
         generationQueue.append(job)
     }
