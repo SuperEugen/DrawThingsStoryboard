@@ -128,6 +128,7 @@ private struct NodeDetailView: View {
 }
 
 // MARK: - Panel detail
+/// #42: Interactive asset slots with location-first constraint
 
 private struct PanelDetailView: View {
     @Binding var panel: PanelEntry
@@ -139,14 +140,39 @@ private struct PanelDetailView: View {
 
     @State private var showLargeImageSheet = false
 
-    private var attachedAssets: [AssetEntry] {
-        panel.refIDs.compactMap { refID in
-            assets.assets.first { $0.assetID == refID }
+    // MARK: - Asset slot helpers
+
+    /// Ordered list of currently assigned asset IDs (non-empty refs).
+    private var assignedIDs: [String] {
+        [panel.ref1ID, panel.ref2ID, panel.ref3ID, panel.ref4ID].filter { !$0.isEmpty }
+    }
+
+    /// Resolve an asset entry by ID.
+    private func asset(for id: String) -> AssetEntry? {
+        assets.assets.first { $0.assetID == id }
+    }
+
+    /// Whether a location is already assigned.
+    private var hasLocation: Bool {
+        assignedIDs.contains { id in
+            asset(for: id)?.isLocation == true
         }
     }
 
-    private var refCount: Int { panel.refIDs.count }
+    /// Number of currently assigned refs.
+    private var refCount: Int { assignedIDs.count }
     private var canAddMoreRefs: Bool { refCount < 4 }
+
+    /// Assets available for the picker (not already assigned).
+    private var availableCharacters: [AssetEntry] {
+        assets.assets.filter { $0.isCharacter && !assignedIDs.contains($0.assetID) }
+    }
+
+    /// Locations available — only if no location is assigned yet.
+    private var availableLocations: [AssetEntry] {
+        guard !hasLocation else { return [] }
+        return assets.assets.filter { $0.isLocation && !assignedIDs.contains($0.assetID) }
+    }
 
     /// Whether the description is filled in enough to generate.
     private var hasDescription: Bool {
@@ -185,114 +211,17 @@ private struct PanelDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                // Header: show generated image if available
-                let headerImageID = panel.hasLargeImage ? panel.largeImageID
-                    : panel.hasSmallImage ? panel.smallImageID : ""
-                UnifiedThumbnailView(itemType: .panel, name: "", sizeMode: .header, imageID: headerImageID)
-                    .padding(.bottom, 16)
-
-                // Status with Generate buttons
-                VStack(alignment: .leading, spacing: 6) {
-                    sectionLabel("Status")
-                    smallImageStatusRow
-                    largeImageStatusRow
-                }
-                .padding(.bottom, 12)
-
+                panelHeader
+                statusSection
                 Divider().padding(.vertical, 8)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    sectionLabel("Name")
-                    TextField("Name", text: $panel.name).textFieldStyle(.roundedBorder)
-                }
-                .padding(.bottom, 12)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    sectionLabel("Description")
-                    TextEditor(text: $panel.description).font(.callout).frame(minHeight: 80)
-                        .overlay(RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color.secondary.opacity(0.25), lineWidth: 0.5))
-                    if !hasDescription {
-                        Text("Add a description to enable image generation.")
-                            .font(.caption2).foregroundStyle(.orange)
-                    }
-                }
-                .padding(.bottom, 12)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    sectionLabel("Camera Movement")
-                    TextField("e.g. Pan left, Zoom in", text: $panel.cameraMovement)
-                        .textFieldStyle(.roundedBorder)
-                }
-                .padding(.bottom, 12)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    sectionLabel("Dialogue")
-                    TextEditor(text: $panel.dialogue).font(.callout).frame(minHeight: 60)
-                        .overlay(RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color.secondary.opacity(0.25), lineWidth: 0.5))
-                }
-                .padding(.bottom, 12)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    sectionLabel("Duration")
-                    HStack {
-                        TextField("Seconds", value: $panel.duration, format: .number)
-                            .textFieldStyle(.roundedBorder).frame(width: 80)
-                        Text("seconds").font(.callout).foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.bottom, 12)
-
+                nameSection
+                descriptionSection
+                cameraSection
+                dialogueSection
+                durationSection
                 Divider().padding(.vertical, 8)
-
-                // Large image preview
-                if panel.hasLargeImage {
-                    VStack(alignment: .leading, spacing: 6) {
-                        sectionLabel("Large Image")
-                        if let img = largeImage {
-                            Button { showLargeImageSheet = true } label: {
-                                Image(nsImage: img)
-                                    .resizable().scaledToFit()
-                                    .frame(maxWidth: .infinity).frame(maxHeight: 200)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
-                            .buttonStyle(.plain)
-                            .help("Click to view full size")
-                        }
-                    }
-                    .padding(.bottom, 12)
-                    Divider().padding(.vertical, 8)
-                }
-
-                // Referenced Assets
-                VStack(alignment: .leading, spacing: 6) {
-                    sectionLabel("Referenced Assets (\(refCount)/4)")
-                    if !canAddMoreRefs {
-                        Text("Maximum 4 asset references reached (Draw Things limit).")
-                            .font(.caption2).foregroundStyle(.orange)
-                    }
-                    if attachedAssets.isEmpty {
-                        Text("No assets referenced. Edit ref1ID\u{2013}ref4ID in the JSON to assign assets.")
-                            .font(.caption).foregroundStyle(.tertiary)
-                            .padding(.vertical, 8)
-                    } else {
-                        ForEach(attachedAssets) { asset in
-                            HStack(spacing: 8) {
-                                Image(systemName: asset.isCharacter ? "person.fill" : "map")
-                                    .foregroundStyle(asset.isCharacter ? .blue : .teal)
-                                Text(asset.name).font(.callout)
-                                Spacer()
-                                Text(asset.subType).font(.caption).foregroundStyle(.secondary)
-                            }
-                            .padding(.vertical, 4).padding(.horizontal, 8)
-                            .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.05)))
-                        }
-                    }
-                }
-                .padding(.bottom, 12)
-                .help("Maximum 4 asset references per panel (Draw Things limitation)")
-
+                largeImageSection
+                assetSlotsSection
                 Spacer(minLength: 20)
             }
             .padding(14)
@@ -301,6 +230,223 @@ private struct PanelDetailView: View {
         .sheet(isPresented: $showLargeImageSheet) {
             PanelLargeImageSheet(image: largeImage, panelName: panel.name, isPresented: $showLargeImageSheet)
         }
+    }
+
+    // MARK: - Header
+
+    @ViewBuilder
+    private var panelHeader: some View {
+        let headerImageID = panel.hasLargeImage ? panel.largeImageID
+            : panel.hasSmallImage ? panel.smallImageID : ""
+        UnifiedThumbnailView(itemType: .panel, name: "", sizeMode: .header, imageID: headerImageID)
+            .padding(.bottom, 16)
+    }
+
+    // MARK: - Status
+
+    @ViewBuilder
+    private var statusSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionLabel("Status")
+            smallImageStatusRow
+            largeImageStatusRow
+        }
+        .padding(.bottom, 12)
+    }
+
+    // MARK: - Fields
+
+    @ViewBuilder
+    private var nameSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionLabel("Name")
+            TextField("Name", text: $panel.name).textFieldStyle(.roundedBorder)
+        }
+        .padding(.bottom, 12)
+    }
+
+    @ViewBuilder
+    private var descriptionSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionLabel("Description")
+            TextEditor(text: $panel.description).font(.callout).frame(minHeight: 80)
+                .overlay(RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.secondary.opacity(0.25), lineWidth: 0.5))
+            if !hasDescription {
+                Text("Add a description to enable image generation.")
+                    .font(.caption2).foregroundStyle(.orange)
+            }
+        }
+        .padding(.bottom, 12)
+    }
+
+    @ViewBuilder
+    private var cameraSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionLabel("Camera Movement")
+            TextField("e.g. Pan left, Zoom in", text: $panel.cameraMovement)
+                .textFieldStyle(.roundedBorder)
+        }
+        .padding(.bottom, 12)
+    }
+
+    @ViewBuilder
+    private var dialogueSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionLabel("Dialogue")
+            TextEditor(text: $panel.dialogue).font(.callout).frame(minHeight: 60)
+                .overlay(RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.secondary.opacity(0.25), lineWidth: 0.5))
+        }
+        .padding(.bottom, 12)
+    }
+
+    @ViewBuilder
+    private var durationSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionLabel("Duration")
+            HStack {
+                TextField("Seconds", value: $panel.duration, format: .number)
+                    .textFieldStyle(.roundedBorder).frame(width: 80)
+                Text("seconds").font(.callout).foregroundStyle(.secondary)
+            }
+        }
+        .padding(.bottom, 12)
+    }
+
+    // MARK: - Large image preview
+
+    @ViewBuilder
+    private var largeImageSection: some View {
+        if panel.hasLargeImage {
+            VStack(alignment: .leading, spacing: 6) {
+                sectionLabel("Large Image")
+                if let img = largeImage {
+                    Button { showLargeImageSheet = true } label: {
+                        Image(nsImage: img)
+                            .resizable().scaledToFit()
+                            .frame(maxWidth: .infinity).frame(maxHeight: 200)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Click to view full size")
+                }
+            }
+            .padding(.bottom, 12)
+            Divider().padding(.vertical, 8)
+        }
+    }
+
+    // MARK: - #42 Asset Slots
+
+    @ViewBuilder
+    private var assetSlotsSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            sectionLabel("Referenced Assets (\(refCount)/4)")
+            if !canAddMoreRefs {
+                Text("Maximum 4 asset references reached (Draw Things limit).")
+                    .font(.caption2).foregroundStyle(.orange)
+            }
+
+            // Show assigned slots
+            ForEach(Array(assignedIDs.enumerated()), id: \.element) { index, assetID in
+                if let entry = asset(for: assetID) {
+                    AssetSlotRow(asset: entry, slotIndex: index, onRemove: {
+                        removeAsset(id: assetID)
+                    })
+                }
+            }
+
+            // Add button when slots available
+            if canAddMoreRefs {
+                assetPickerMenu
+            }
+
+            if assignedIDs.isEmpty && !canAddMoreRefs {
+                Text("No assets referenced.")
+                    .font(.caption).foregroundStyle(.tertiary)
+                    .padding(.vertical, 8)
+            }
+        }
+        .padding(.bottom, 12)
+        .help("Maximum 4 asset references per panel (Draw Things limitation). Location always in slot 1.")
+    }
+
+    @ViewBuilder
+    private var assetPickerMenu: some View {
+        Menu {
+            if !availableLocations.isEmpty {
+                Section("Locations") {
+                    ForEach(availableLocations) { loc in
+                        Button {
+                            assignAsset(id: loc.assetID)
+                        } label: {
+                            Label(loc.name, systemImage: loc.subType == "exterior" ? "map" : "house.fill")
+                        }
+                    }
+                }
+            }
+            if !availableCharacters.isEmpty {
+                Section("Characters") {
+                    ForEach(availableCharacters) { char in
+                        Button {
+                            assignAsset(id: char.assetID)
+                        } label: {
+                            Label(char.name, systemImage: "person.fill")
+                        }
+                    }
+                }
+            }
+            if availableLocations.isEmpty && availableCharacters.isEmpty {
+                Text("No assets available")
+            }
+        } label: {
+            Label("Add Asset", systemImage: "plus.circle")
+                .font(.callout)
+        }
+        .menuStyle(.borderlessButton)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 4)
+    }
+
+    // MARK: - Assign / Remove with location-first compaction
+
+    private func assignAsset(id: String) {
+        var current = assignedIDs
+        guard current.count < 4 else { return }
+        current.append(id)
+        writeRefIDs(compacted(current))
+    }
+
+    private func removeAsset(id: String) {
+        var current = assignedIDs
+        current.removeAll { $0 == id }
+        writeRefIDs(compacted(current))
+    }
+
+    /// Compact: location always first, then characters in order.
+    private func compacted(_ ids: [String]) -> [String] {
+        var locationID: String? = nil
+        var characterIDs: [String] = []
+        for id in ids {
+            if let entry = asset(for: id), entry.isLocation {
+                locationID = id
+            } else {
+                characterIDs.append(id)
+            }
+        }
+        var result: [String] = []
+        if let loc = locationID { result.append(loc) }
+        result.append(contentsOf: characterIDs)
+        return result
+    }
+
+    /// Write up to 4 ref IDs back to the panel, padding with empty strings.
+    private func writeRefIDs(_ ids: [String]) {
+        panel.ref1ID = ids.count > 0 ? ids[0] : ""
+        panel.ref2ID = ids.count > 1 ? ids[1] : ""
+        panel.ref3ID = ids.count > 2 ? ids[2] : ""
+        panel.ref4ID = ids.count > 3 ? ids[3] : ""
     }
 
     // MARK: - Status rows with Generate buttons
@@ -385,6 +531,52 @@ private struct PanelDetailView: View {
             panelID: panel.panelID
         )
         generationQueue.append(job)
+    }
+}
+
+// MARK: - #42 Asset slot row
+
+private struct AssetSlotRow: View {
+    let asset: AssetEntry
+    let slotIndex: Int
+    let onRemove: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            // Slot number badge
+            Text("\(slotIndex + 1)")
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .frame(width: 16)
+
+            Image(systemName: asset.isCharacter ? "person.fill" : "map")
+                .foregroundStyle(asset.isCharacter ? .blue : .teal)
+                .frame(width: 16)
+
+            Text(asset.name).font(.callout).lineLimit(1)
+
+            Spacer()
+
+            Text(asset.subType).font(.caption).foregroundStyle(.secondary)
+
+            if asset.isLocation {
+                Image(systemName: "pin.fill")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.teal.opacity(0.6))
+                    .help("Location always in slot 1")
+            }
+
+            Button(action: onRemove) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 13))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Remove asset reference")
+        }
+        .padding(.vertical, 5).padding(.horizontal, 8)
+        .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.05)))
     }
 }
 
