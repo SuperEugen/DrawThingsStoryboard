@@ -54,12 +54,12 @@ struct StyleEntry: Codable, Identifiable {
 
 // MARK: - storyboards.json
 
-struct StoryboardsFile: Codable {
+struct StoryboardsFile: Codable, Equatable {
     var storyboards: [StoryboardEntry]
     var version: Int = 1
 }
 
-struct StoryboardEntry: Codable, Identifiable {
+struct StoryboardEntry: Codable, Identifiable, Equatable {
     var name: String
     var acts: [ActEntry]
     var modelID: String
@@ -68,28 +68,28 @@ struct StoryboardEntry: Codable, Identifiable {
     var id: String { name }
 }
 
-struct ActEntry: Codable, Identifiable {
+struct ActEntry: Codable, Identifiable, Equatable {
     var name: String
     var sequences: [SequenceEntry]
 
     var id: String { name }
 }
 
-struct SequenceEntry: Codable, Identifiable {
+struct SequenceEntry: Codable, Identifiable, Equatable {
     var name: String
     var scenes: [SceneEntry]
 
     var id: String { name }
 }
 
-struct SceneEntry: Codable, Identifiable {
+struct SceneEntry: Codable, Identifiable, Equatable {
     var name: String
     var panels: [PanelEntry]
 
     var id: String { name }
 }
 
-struct PanelEntry: Codable, Identifiable {
+struct PanelEntry: Codable, Identifiable, Equatable {
     var panelID: String
     var name: String
     var description: String = ""
