@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Root layout: three-pane NavigationSplitView.
 /// #45: Storyboard picker wiring
+/// #48: Asset style picker wiring
 struct ContentView: View {
 
     // MARK: - Navigation
@@ -22,6 +23,8 @@ struct ContentView: View {
     @State private var selectedAssetID: String? = nil
     @State private var selectedJobID: String? = nil
     @State private var storyboardSelection: StoryboardSelection? = nil
+    /// #48: Style used for asset generation (independent of storyboard style).
+    @State private var assetStyleID: String = ""
 
     // MARK: - Production Queue
     @State private var generationQueue: [GenerationJob] = []
@@ -44,7 +47,6 @@ struct ContentView: View {
         return $storyboards.storyboards[selectedStoryboardIndex].acts
     }
 
-    /// Binding to the current storyboard's styleID for the style picker.
     private var currentStyleIDBinding: Binding<String> {
         guard storyboards.storyboards.indices.contains(selectedStoryboardIndex) else {
             return .constant("")
@@ -60,6 +62,11 @@ struct ContentView: View {
     private var resolvedStyleDescription: String {
         guard let sb = currentStoryboard else { return "" }
         return styles.styles.first { $0.styleID == sb.styleID }?.style ?? ""
+    }
+
+    /// #48: Resolved style description for asset generation.
+    private var resolvedAssetStyleDescription: String {
+        styles.styles.first { $0.styleID == assetStyleID }?.style ?? ""
     }
 
     private var windowTitle: String {
@@ -121,7 +128,6 @@ struct ContentView: View {
     }
 
     // MARK: - Content pane
-    /// #45: StoryboardBrowserView now takes storyboards + selectedStoryboardIndex
 
     @ViewBuilder
     private var contentPane: some View {
@@ -144,7 +150,7 @@ struct ContentView: View {
                 generationQueue: $generationQueue,
                 config: config,
                 styles: styles,
-                storyboards: storyboards
+                assetStyleID: $assetStyleID
             )
         case .styles:
             StylesBrowserView(
@@ -196,8 +202,7 @@ struct ContentView: View {
                 selectedAssetID: selectedAssetID,
                 generationQueue: $generationQueue,
                 config: config,
-                styles: styles,
-                storyboards: storyboards
+                assetStyleDescription: resolvedAssetStyleDescription
             )
         case .styles:
             StylesDetailView(
@@ -366,6 +371,15 @@ struct ContentView: View {
         if selectedStyleID == nil { selectedStyleID = styles.styles.first?.styleID }
         if selectedModelID == nil { selectedModelID = models.models.first?.modelID }
         if selectedAssetID == nil { selectedAssetID = assets.assets.first?.assetID }
+        // #48: Default asset style to first style or current storyboard's style
+        if assetStyleID.isEmpty {
+            if let sb = storyboards.storyboards.first,
+               styles.styles.contains(where: { $0.styleID == sb.styleID }) {
+                assetStyleID = sb.styleID
+            } else {
+                assetStyleID = styles.styles.first?.styleID ?? ""
+            }
+        }
     }
 }
 

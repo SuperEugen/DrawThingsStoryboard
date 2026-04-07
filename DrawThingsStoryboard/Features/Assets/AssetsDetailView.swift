@@ -2,14 +2,15 @@ import SwiftUI
 
 // MARK: - Assets detail
 /// #40: Generate Large Image button + Large Image preview
+/// #48: Uses passed-in style description instead of resolving from storyboard
 
 struct AssetsDetailView: View {
     @Binding var assets: AssetsFile
     let selectedAssetID: String?
     @Binding var generationQueue: [GenerationJob]
     let config: AppConfig
-    let styles: StylesFile
-    let storyboards: StoryboardsFile
+    /// #48: Style description resolved by parent (ContentView) from assetStyleID.
+    let assetStyleDescription: String
 
     private var selectedIndex: Int? {
         guard let id = selectedAssetID else { return nil }
@@ -22,8 +23,7 @@ struct AssetsDetailView: View {
                 asset: $assets.assets[idx],
                 generationQueue: $generationQueue,
                 config: config,
-                styles: styles,
-                storyboards: storyboards,
+                assetStyleDescription: assetStyleDescription,
                 onDelete: {
                     assets.assets.remove(at: idx)
                 }
@@ -44,27 +44,18 @@ private struct AssetEditorView: View {
     @Binding var asset: AssetEntry
     @Binding var generationQueue: [GenerationJob]
     let config: AppConfig
-    let styles: StylesFile
-    let storyboards: StoryboardsFile
+    /// #48: Style description passed from parent.
+    let assetStyleDescription: String
     let onDelete: () -> Void
     @State private var showDeleteConfirmation = false
     @State private var showLargeImageSheet = false
 
-    /// Resolved style description from first storyboard's style.
-    private var resolvedStyleDescription: String {
-        guard let sb = storyboards.storyboards.first,
-              let style = styles.styles.first(where: { $0.styleID == sb.styleID }) else { return "" }
-        return style.style
-    }
-
-    /// Check if a large image job is already queued for this asset.
     private var isLargeQueued: Bool {
         generationQueue.contains {
             $0.assetID == asset.assetID && $0.jobType == .generateAsset && $0.size == .large
         }
     }
 
-    /// Load the large image from disk if available.
     private var largeImage: NSImage? {
         guard asset.hasLargeImage else { return nil }
         return StorageService.shared.loadImage(id: asset.largeImageID)
@@ -73,7 +64,6 @@ private struct AssetEditorView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                // Header: show large image if available, else approved variant, else placeholder
                 let headerImageID: String = {
                     if asset.hasLargeImage { return asset.largeImageID }
                     if let idx = asset.approvedVariantIndex {
@@ -92,7 +82,6 @@ private struct AssetEditorView: View {
                 )
                 .padding(.bottom, 16)
 
-                // Status section
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Status")
                     statusRow("V", "Variants", asset.hasApprovedVariant)
@@ -154,7 +143,6 @@ private struct AssetEditorView: View {
 
                 Divider().padding(.vertical, 8)
 
-                // Large Image section
                 if asset.hasLargeImage {
                     VStack(alignment: .leading, spacing: 6) {
                         sectionLabel("Large Image")
@@ -208,7 +196,6 @@ private struct AssetEditorView: View {
             .padding(14)
         }
         .background(Color(NSColor.windowBackgroundColor))
-        // #40: Large image sheet
         .sheet(isPresented: $showLargeImageSheet) {
             LargeImageSheet(
                 image: largeImage,
@@ -229,7 +216,6 @@ private struct AssetEditorView: View {
             Text(asset.hasLargeImage ? "yes" : "not yet").font(.callout)
                 .foregroundStyle(asset.hasLargeImage ? .green : .secondary)
             Spacer()
-            // #40: Generate Large Image button
             if asset.hasApprovedVariant && !asset.hasLargeImage {
                 if isLargeQueued {
                     Text("Queued").font(.caption).foregroundStyle(.purple)
@@ -317,12 +303,12 @@ private struct AssetEditorView: View {
         asset.setVariant(at: idx, v)
     }
 
-    // #40: Generate large image for this single asset
+    /// #48: Uses assetStyleDescription from parent.
     private func generateLargeImage() {
         guard asset.hasApprovedVariant, let approvedIdx = asset.approvedVariantIndex else { return }
         let approvedSeed = asset.variant(at: approvedIdx).seed
         var parts: [String] = []
-        if !resolvedStyleDescription.isEmpty { parts.append(resolvedStyleDescription) }
+        if !assetStyleDescription.isEmpty { parts.append(assetStyleDescription) }
         parts.append(asset.description)
         let prompt = parts.joined(separator: ", ")
 
@@ -331,7 +317,7 @@ private struct AssetEditorView: View {
             itemName: asset.name,
             jobType: .generateAsset,
             size: .large,
-            styleName: resolvedStyleDescription,
+            styleName: assetStyleDescription,
             queuedAt: Date(),
             estimatedDuration: 180,
             itemIcon: asset.isCharacter ? "person.fill" : "map",

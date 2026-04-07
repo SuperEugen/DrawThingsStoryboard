@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - Assets browser
 /// #4: "Generate all Variants" button
 /// #5: "Generate all Large Images" button
+/// #48: Style picker for asset generation
 
 struct AssetsBrowserView: View {
     @Binding var assets: AssetsFile
@@ -10,7 +11,7 @@ struct AssetsBrowserView: View {
     @Binding var generationQueue: [GenerationJob]
     let config: AppConfig
     let styles: StylesFile
-    let storyboards: StoryboardsFile
+    @Binding var assetStyleID: String
 
     private var characters: [AssetEntry] {
         assets.assets.filter { $0.isCharacter }
@@ -21,24 +22,19 @@ struct AssetsBrowserView: View {
 
     private let columns = [GridItem(.adaptive(minimum: 288, maximum: 320), spacing: 12)]
 
-    /// Resolved style description for the first storyboard's style.
+    /// #48: Resolved style description from the selected asset style.
     private var resolvedStyleDescription: String {
-        guard let sb = storyboards.storyboards.first,
-              let style = styles.styles.first(where: { $0.styleID == sb.styleID }) else { return "" }
-        return style.style
+        styles.styles.first(where: { $0.styleID == assetStyleID })?.style ?? ""
     }
 
-    /// How many empty variant slots does an asset have?
     private func emptyVariantCount(for asset: AssetEntry) -> Int {
         (0..<4).filter { !asset.variant(at: $0).hasImage }.count
     }
 
-    /// Assets that need variant generation (have at least one empty slot and no approved variant).
     private var assetsNeedingVariants: [AssetEntry] {
         assets.assets.filter { !$0.hasApprovedVariant && emptyVariantCount(for: $0) > 0 }
     }
 
-    /// Assets that have an approved variant but no large image.
     private var assetsNeedingLargeImage: [AssetEntry] {
         assets.assets.filter { $0.hasApprovedVariant && !$0.hasLargeImage }
     }
@@ -49,6 +45,14 @@ struct AssetsBrowserView: View {
                 Image(systemName: "photo.stack").font(.title2).foregroundStyle(.secondary)
                 Text("Assets").font(.title2.bold())
                 Spacer()
+
+                // #48: Style picker
+                Picker("Style", selection: $assetStyleID) {
+                    ForEach(styles.styles) { s in
+                        Text(s.name).tag(s.styleID)
+                    }
+                }
+                .pickerStyle(.menu).labelsHidden().frame(maxWidth: 160)
 
                 // #4: Generate all Variants
                 Button {
@@ -113,7 +117,6 @@ struct AssetsBrowserView: View {
                     }
 
                     if assets.assets.isEmpty {
-                        // #35: Actionable empty state
                         ContentUnavailableView("No assets yet", systemImage: "photo.stack",
                             description: Text("Add a character or location using the + button above."))
                             .padding(.top, 40)
@@ -126,13 +129,11 @@ struct AssetsBrowserView: View {
         .onAppear { ensureSelection() }
     }
 
-    // #18: Show approved variant image in tile if available
     private func assetTile(_ asset: AssetEntry) -> some View {
         let isSelected = selectedAssetID == asset.assetID
         let thumbType: ThumbnailItemType = asset.isCharacter
             ? .character(subType: asset.subType)
             : .location(subType: asset.subType)
-        // Find the approved variant's image, or fall back to first variant with an image
         let displayImageID: String = {
             if let approvedIdx = asset.approvedVariantIndex {
                 return asset.variant(at: approvedIdx).smallImageID
@@ -173,7 +174,6 @@ struct AssetsBrowserView: View {
         selectedAssetID = id
     }
 
-    // #4: Generate all Variants
     private func generateAllVariants() {
         for asset in assetsNeedingVariants {
             let count = emptyVariantCount(for: asset)
@@ -200,7 +200,6 @@ struct AssetsBrowserView: View {
         }
     }
 
-    // #5: Generate all Large Images (#6: uses seed from approved variant)
     private func generateAllLargeImages() {
         for asset in assetsNeedingLargeImage {
             let approvedSeed: Int = {
