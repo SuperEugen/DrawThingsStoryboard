@@ -127,6 +127,7 @@ struct StoryboardDetailView: View {
 
 // MARK: - Node detail with panel list
 /// #45: Shows name editor + list of all descendant panels
+/// #47: PDF export button
 
 private struct NodeDetailWithPanels: View {
     let level: String
@@ -163,9 +164,29 @@ private struct NodeDetailWithPanels: View {
 
                 Divider().padding(.vertical, 8)
 
-                // Panel list
+                // Panel list with export button
                 VStack(alignment: .leading, spacing: 6) {
-                    sectionLabel("Panels (\(panels.count))")
+                    HStack {
+                        sectionLabel("Panels (\(panels.count))")
+                        Spacer()
+                        // #47: PDF export button
+                        Button {
+                            let headerTitle = "\(level) \u{2014} \(name)"
+                            let filename = "\(name.replacingOccurrences(of: " ", with: "_")).pdf"
+                            PDFExportService.exportWithSavePanel(
+                                panels: panels,
+                                headerTitle: headerTitle,
+                                defaultFilename: filename
+                            )
+                        } label: {
+                            Label("Export PDF", systemImage: "square.and.arrow.up")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.bordered).controlSize(.mini)
+                        .disabled(panels.isEmpty)
+                        .help("Export panels as PDF (2\u00d73 grid, A4)")
+                    }
+
                     if panels.isEmpty {
                         Text("No panels in this \(level.lowercased()).")
                             .font(.caption).foregroundStyle(.tertiary)
@@ -197,7 +218,6 @@ private struct CompactPanelRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            // Thumbnail or placeholder
             if panel.hasSmallImage, let img = StorageService.shared.loadImage(id: panel.smallImageID) {
                 Image(nsImage: img)
                     .resizable().scaledToFill()
@@ -222,7 +242,6 @@ private struct CompactPanelRow: View {
 
             Spacer()
 
-            // Status badges
             HStack(spacing: 4) {
                 if panel.hasSmallImage {
                     Text("S").font(.system(size: 9, weight: .bold, design: .monospaced))
@@ -259,8 +278,6 @@ private struct PanelDetailView: View {
     var config: AppConfig = AppConfig()
 
     @State private var showLargeImageSheet = false
-
-    // MARK: - Asset slot helpers
 
     private var assignedIDs: [String] {
         [panel.ref1ID, panel.ref2ID, panel.ref3ID, panel.ref4ID].filter { !$0.isEmpty }
