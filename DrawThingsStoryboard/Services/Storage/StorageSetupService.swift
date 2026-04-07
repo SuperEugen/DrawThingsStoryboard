@@ -32,7 +32,7 @@ final class StorageSetupService {
                 name: "FLUX 2 klein KV",
                 guidanceScale: 1,
                 model: "flux_2_klein_9b_kv_q8p.ckpt",
-                steps: 4,
+                steps: 6,
                 defaultGenTimeSmall: 60,
                 defaultGenTimeLarge: 180
             )
