@@ -17,23 +17,19 @@ final class QueueRunnerService: ObservableObject {
     @Published var errorMessage: String? = nil
 
     // MARK: - Internal
-    /// Synchronous flag to prevent re-entry — set immediately, not after await.
     private var isBusy: Bool = false
     private var onJobCompleted: ((GenerationJob) -> Void)?
 
-    /// Call once from ContentView to wire up the completion handler.
     func configure(onJobCompleted: @escaping (GenerationJob) -> Void) {
         self.onJobCompleted = onJobCompleted
     }
 
-    /// Called whenever the queue changes. Starts processing if idle.
     func queueDidChange(
         queue: [GenerationJob],
         config: AppConfig,
         models: ModelsFile,
         selectedModelID: String?
     ) {
-        // Synchronous guard — prevents any re-entry
         guard !isBusy, let nextJob = queue.first else { return }
         isBusy = true
         isRunning = true
@@ -47,13 +43,12 @@ final class QueueRunnerService: ObservableObject {
         }
     }
 
-    /// Stop: clear all waiting jobs from the queue (called from UI).
-    /// Returns IDs of jobs that should be removed (everything except the running one).
     func stopQueue(queue: inout [GenerationJob]) {
         queue.removeAll { $0.id != currentJobID }
     }
 
     // MARK: - Process a single job
+    /// #50: Fresh random seeds per variant, canvas/moodboard only for panels
 
     private func processJob(
         _ job: GenerationJob,
@@ -66,49 +61,6 @@ final class QueueRunnerService: ObservableObject {
         errorMessage = nil
         generationStage = ""
 
-        // Fresh VM per job to avoid any accumulated state
-        let vm = ImageGenerationViewModel()
-        vm.prompt = job.combinedPrompt
-        vm.seed = job.seed
-        vm.width = job.width
-        vm.height = job.height
-        vm.grpcAddress = config.grpcAddress
-        vm.grpcPort = config.grpcPort
-        let model = models.models.first { $0.modelID == selectedModelID } ?? models.models.first
-        if let model {
-            vm.steps = model.steps
-            vm.guidanceScale = model.guidanceScale
-            vm.model = model.model
-        }
-
-        // #43: Load init image (e.g. location asset) if specified
-        print("[QueueRunner] Job '\(job.itemName)' — initImageID: '\(job.initImageID)', moodboardIDs: \(job.moodboardImageIDs)")
-        if !job.initImageID.isEmpty {
-            let loaded = StorageService.shared.loadImage(id: job.initImageID)
-            vm.initImage = loaded
-            if let img = loaded {
-                print("[QueueRunner] ✅ Loaded init image '\(job.initImageID)' (\(Int(img.size.width))×\(Int(img.size.height)))")
-            } else {
-                print("[QueueRunner] ⚠️ Init image '\(job.initImageID)' not found on disk!")
-            }
-        }
-
-        // #44: Load moodboard images (e.g. character assets) for shuffle hints
-        if !job.moodboardImageIDs.isEmpty {
-            var loaded: [NSImage] = []
-            for imgID in job.moodboardImageIDs {
-                if let img = StorageService.shared.loadImage(id: imgID) {
-                    loaded.append(img)
-                    print("[QueueRunner] ✅ Loaded moodboard image '\(imgID)' (\(Int(img.size.width))×\(Int(img.size.height)))")
-                } else {
-                    print("[QueueRunner] ⚠️ Moodboard image '\(imgID)' not found on disk!")
-                }
-            }
-            vm.moodboardImages = loaded
-            print("[QueueRunner] Moodboard: \(loaded.count)/\(job.moodboardImageIDs.count) images loaded")
-        }
-
-        // Determine how many images to generate
         let count: Int
         if job.jobType == .generateAsset && job.size == .small {
             count = max(1, job.variantCount)
@@ -121,17 +73,79 @@ final class QueueRunnerService: ObservableObject {
         var savedImageIDs: [String] = []
         let startedAt = Date()
 
+        // #50: Only load canvas/moodboard for panel generation
+        let isPanelJob = job.jobType == .generatePanel
+        var initImage: NSImage? = nil
+        var moodboardImages: [NSImage] = []
+
+        if isPanelJob {
+            // #43: Load init image (e.g. location asset)
+            if !job.initImageID.isEmpty {
+                initImage = StorageService.shared.loadImage(id: job.initImageID)
+                if let img = initImage {
+                    print("[QueueRunner] \u{2705} Loaded init image '\(job.initImageID)' (\(Int(img.size.width))x\(Int(img.size.height)))")
+                } else {
+                    print("[QueueRunner] \u{26a0}\u{fe0f} Init image '\(job.initImageID)' not found on disk!")
+                }
+            }
+            // #44: Load moodboard images (e.g. character assets)
+            if !job.moodboardImageIDs.isEmpty {
+                for imgID in job.moodboardImageIDs {
+                    if let img = StorageService.shared.loadImage(id: imgID) {
+                        moodboardImages.append(img)
+                        print("[QueueRunner] \u{2705} Loaded moodboard image '\(imgID)'")
+                    } else {
+                        print("[QueueRunner] \u{26a0}\u{fe0f} Moodboard image '\(imgID)' not found!")
+                    }
+                }
+                print("[QueueRunner] Moodboard: \(moodboardImages.count)/\(job.moodboardImageIDs.count) images loaded")
+            }
+        }
+
+        print("[QueueRunner] Job '\(job.itemName)' \u{2014} type: \(job.jobType.rawValue), variants: \(count), initImage: \(initImage != nil), moodboard: \(moodboardImages.count)")
+
         // Generate images sequentially
         for i in 0..<count {
             currentVariant = i
-            vm.seed = job.seed == 0 ? SeedHelper.randomSeed() : job.seed + i
 
-            // Observe stage changes
+            // #50: Fresh VM per variant to avoid any accumulated state
+            let vm = ImageGenerationViewModel()
+            vm.prompt = job.combinedPrompt
+            vm.width = job.width
+            vm.height = job.height
+            vm.grpcAddress = config.grpcAddress
+            vm.grpcPort = config.grpcPort
+
+            let model = models.models.first { $0.modelID == selectedModelID } ?? models.models.first
+            if let model {
+                vm.steps = model.steps
+                vm.guidanceScale = model.guidanceScale
+                vm.model = model.model
+            }
+
+            // #50: Always use fresh random seeds for multi-variant jobs
+            // For single-image jobs (panels, large assets): use job seed or random
+            if count > 1 {
+                // Multi-variant: always completely random per variant
+                vm.seed = SeedHelper.randomSeed()
+            } else {
+                // Single image: use job seed (0 = random in ViewModel)
+                vm.seed = job.seed
+            }
+
+            // #50: Only set canvas/moodboard for panel jobs (clean slate for assets)
+            if isPanelJob {
+                vm.initImage = initImage
+                vm.moodboardImages = moodboardImages
+            }
+            // For asset/style jobs: vm.initImage and vm.moodboardImages stay nil/empty
+
+            print("[QueueRunner] Generation #\(i) \u{2014} seed: \(vm.seed), initImage: \(vm.initImage != nil), moodboard: \(vm.moodboardImages.count)")
+
             let cancellable = vm.$generationStage.sink { [weak self] stage in
                 self?.generationStage = stage
             }
 
-            print("[QueueRunner] Starting generation #\(i) — vm.initImage is \(vm.initImage != nil ? "SET" : "nil"), vm.moodboardImages: \(vm.moodboardImages.count)")
             await vm.generate()
             cancellable.cancel()
 
