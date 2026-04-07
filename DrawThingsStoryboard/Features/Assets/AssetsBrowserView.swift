@@ -4,6 +4,7 @@ import SwiftUI
 /// #4: "Generate all Variants" button
 /// #5: "Generate all Large Images" button
 /// #48: Style picker for asset generation
+/// #49: Character turn-around prompt for characters
 
 struct AssetsBrowserView: View {
     @Binding var assets: AssetsFile
@@ -22,7 +23,6 @@ struct AssetsBrowserView: View {
 
     private let columns = [GridItem(.adaptive(minimum: 288, maximum: 320), spacing: 12)]
 
-    /// #48: Resolved style description from the selected asset style.
     private var resolvedStyleDescription: String {
         styles.styles.first(where: { $0.styleID == assetStyleID })?.style ?? ""
     }
@@ -46,7 +46,6 @@ struct AssetsBrowserView: View {
                 Text("Assets").font(.title2.bold())
                 Spacer()
 
-                // #48: Style picker
                 Picker("Style", selection: $assetStyleID) {
                     ForEach(styles.styles) { s in
                         Text(s.name).tag(s.styleID)
@@ -54,7 +53,6 @@ struct AssetsBrowserView: View {
                 }
                 .pickerStyle(.menu).labelsHidden().frame(maxWidth: 160)
 
-                // #4: Generate all Variants
                 Button {
                     generateAllVariants()
                 } label: {
@@ -65,7 +63,6 @@ struct AssetsBrowserView: View {
                 .help("Generate all missing variants for all assets")
                 .disabled(assetsNeedingVariants.isEmpty)
 
-                // #5: Generate all Large Images
                 Button {
                     generateAllLargeImages()
                 } label: {
@@ -149,9 +146,7 @@ struct AssetsBrowserView: View {
             itemType: thumbType,
             name: asset.name,
             sizeMode: .standard,
-            badges: ThumbnailBadges(
-                showSelectionStroke: isSelected
-            ),
+            badges: ThumbnailBadges(showSelectionStroke: isSelected),
             imageID: displayImageID
         )
         .padding(3)
@@ -166,9 +161,7 @@ struct AssetsBrowserView: View {
         let new = AssetEntry(
             assetID: id,
             name: type == "character" ? "New Character" : "New Location",
-            type: type,
-            subType: subType,
-            description: ""
+            type: type, subType: subType, description: ""
         )
         assets.assets.append(new)
         selectedAssetID = id
@@ -179,22 +172,13 @@ struct AssetsBrowserView: View {
             let count = emptyVariantCount(for: asset)
             let prompt = buildAssetPrompt(asset)
             let job = GenerationJob(
-                id: UUID().uuidString,
-                itemName: asset.name,
-                jobType: .generateAsset,
-                size: .small,
-                styleName: resolvedStyleDescription,
-                queuedAt: Date(),
+                id: UUID().uuidString, itemName: asset.name, jobType: .generateAsset,
+                size: .small, styleName: resolvedStyleDescription, queuedAt: Date(),
                 estimatedDuration: TimeInterval(count * 60),
                 itemIcon: asset.isCharacter ? "person.fill" : "map",
-                seed: 0,
-                width: config.smallImageWidth,
-                height: config.smallImageHeight,
-                combinedPrompt: prompt,
-                variantCount: count,
-                assetType: asset.type,
-                assetSubType: asset.subType,
-                assetID: asset.assetID
+                seed: 0, width: config.smallImageWidth, height: config.smallImageHeight,
+                combinedPrompt: prompt, variantCount: count,
+                assetType: asset.type, assetSubType: asset.subType, assetID: asset.assetID
             )
             generationQueue.append(job)
         }
@@ -203,37 +187,31 @@ struct AssetsBrowserView: View {
     private func generateAllLargeImages() {
         for asset in assetsNeedingLargeImage {
             let approvedSeed: Int = {
-                if let idx = asset.approvedVariantIndex {
-                    return asset.variant(at: idx).seed
-                }
+                if let idx = asset.approvedVariantIndex { return asset.variant(at: idx).seed }
                 return 0
             }()
             let prompt = buildAssetPrompt(asset)
             let job = GenerationJob(
-                id: UUID().uuidString,
-                itemName: asset.name,
-                jobType: .generateAsset,
-                size: .large,
-                styleName: resolvedStyleDescription,
-                queuedAt: Date(),
+                id: UUID().uuidString, itemName: asset.name, jobType: .generateAsset,
+                size: .large, styleName: resolvedStyleDescription, queuedAt: Date(),
                 estimatedDuration: 180,
                 itemIcon: asset.isCharacter ? "person.fill" : "map",
-                seed: approvedSeed,
-                width: config.largeImageWidth,
-                height: config.largeImageHeight,
-                combinedPrompt: prompt,
-                variantCount: 1,
-                assetType: asset.type,
-                assetSubType: asset.subType,
-                assetID: asset.assetID
+                seed: approvedSeed, width: config.largeImageWidth, height: config.largeImageHeight,
+                combinedPrompt: prompt, variantCount: 1,
+                assetType: asset.type, assetSubType: asset.subType, assetID: asset.assetID
             )
             generationQueue.append(job)
         }
     }
 
+    /// #49: Build prompt with character turn-around for characters.
     private func buildAssetPrompt(_ asset: AssetEntry) -> String {
         var parts: [String] = []
         if !resolvedStyleDescription.isEmpty { parts.append(resolvedStyleDescription) }
+        // #49: Prepend character turn-around for character assets only
+        if asset.isCharacter && !config.characterTurnAround.isEmpty {
+            parts.append(config.characterTurnAround)
+        }
         parts.append(asset.description)
         return parts.joined(separator: ", ")
     }

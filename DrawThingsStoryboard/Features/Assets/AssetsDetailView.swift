@@ -3,13 +3,13 @@ import SwiftUI
 // MARK: - Assets detail
 /// #40: Generate Large Image button + Large Image preview
 /// #48: Uses passed-in style description instead of resolving from storyboard
+/// #49: Character turn-around prompt for characters
 
 struct AssetsDetailView: View {
     @Binding var assets: AssetsFile
     let selectedAssetID: String?
     @Binding var generationQueue: [GenerationJob]
     let config: AppConfig
-    /// #48: Style description resolved by parent (ContentView) from assetStyleID.
     let assetStyleDescription: String
 
     private var selectedIndex: Int? {
@@ -44,7 +44,6 @@ private struct AssetEditorView: View {
     @Binding var asset: AssetEntry
     @Binding var generationQueue: [GenerationJob]
     let config: AppConfig
-    /// #48: Style description passed from parent.
     let assetStyleDescription: String
     let onDelete: () -> Void
     @State private var showDeleteConfirmation = false
@@ -75,10 +74,7 @@ private struct AssetEditorView: View {
                     ? .character(subType: asset.subType)
                     : .location(subType: asset.subType)
                 UnifiedThumbnailView(
-                    itemType: thumbType,
-                    name: "",
-                    sizeMode: .header,
-                    imageID: headerImageID
+                    itemType: thumbType, name: "", sizeMode: .header, imageID: headerImageID
                 )
                 .padding(.bottom, 16)
 
@@ -147,22 +143,16 @@ private struct AssetEditorView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         sectionLabel("Large Image")
                         if let img = largeImage {
-                            Button {
-                                showLargeImageSheet = true
-                            } label: {
+                            Button { showLargeImageSheet = true } label: {
                                 Image(nsImage: img)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(maxWidth: .infinity)
-                                    .frame(maxHeight: 200)
+                                    .resizable().scaledToFit()
+                                    .frame(maxWidth: .infinity).frame(maxHeight: 200)
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
-                            .buttonStyle(.plain)
-                            .help("Click to view full size")
+                            .buttonStyle(.plain).help("Click to view full size")
                         }
                     }
                     .padding(.bottom, 12)
-
                     Divider().padding(.vertical, 8)
                 }
 
@@ -197,15 +187,9 @@ private struct AssetEditorView: View {
         }
         .background(Color(NSColor.windowBackgroundColor))
         .sheet(isPresented: $showLargeImageSheet) {
-            LargeImageSheet(
-                image: largeImage,
-                assetName: asset.name,
-                isPresented: $showLargeImageSheet
-            )
+            LargeImageSheet(image: largeImage, assetName: asset.name, isPresented: $showLargeImageSheet)
         }
     }
-
-    // MARK: - Large Image status row with Generate button
 
     @ViewBuilder
     private var largeImageStatusRow: some View {
@@ -227,13 +211,10 @@ private struct AssetEditorView: View {
                 }
             }
             if asset.hasLargeImage {
-                Button {
-                    showLargeImageSheet = true
-                } label: {
+                Button { showLargeImageSheet = true } label: {
                     Image(systemName: "eye").font(.caption)
                 }
-                .buttonStyle(.bordered).controlSize(.mini)
-                .help("View large image")
+                .buttonStyle(.bordered).controlSize(.mini).help("View large image")
             }
         }
         .padding(.vertical, 5).padding(.horizontal, 8)
@@ -273,9 +254,7 @@ private struct AssetEditorView: View {
 
             if variant.hasImage {
                 HStack(spacing: 8) {
-                    Button {
-                        approveVariant(at: idx)
-                    } label: {
+                    Button { approveVariant(at: idx) } label: {
                         Image(systemName: variant.isApproved ? "hand.thumbsup.fill" : "hand.thumbsup")
                             .font(.caption2)
                             .foregroundStyle(variant.isApproved ? .green : .secondary)
@@ -303,32 +282,26 @@ private struct AssetEditorView: View {
         asset.setVariant(at: idx, v)
     }
 
-    /// #48: Uses assetStyleDescription from parent.
+    /// #49: Build prompt with character turn-around for characters.
     private func generateLargeImage() {
         guard asset.hasApprovedVariant, let approvedIdx = asset.approvedVariantIndex else { return }
         let approvedSeed = asset.variant(at: approvedIdx).seed
         var parts: [String] = []
         if !assetStyleDescription.isEmpty { parts.append(assetStyleDescription) }
+        if asset.isCharacter && !config.characterTurnAround.isEmpty {
+            parts.append(config.characterTurnAround)
+        }
         parts.append(asset.description)
         let prompt = parts.joined(separator: ", ")
 
         let job = GenerationJob(
-            id: UUID().uuidString,
-            itemName: asset.name,
-            jobType: .generateAsset,
-            size: .large,
-            styleName: assetStyleDescription,
-            queuedAt: Date(),
+            id: UUID().uuidString, itemName: asset.name, jobType: .generateAsset,
+            size: .large, styleName: assetStyleDescription, queuedAt: Date(),
             estimatedDuration: 180,
             itemIcon: asset.isCharacter ? "person.fill" : "map",
-            seed: approvedSeed,
-            width: config.largeImageWidth,
-            height: config.largeImageHeight,
-            combinedPrompt: prompt,
-            variantCount: 1,
-            assetType: asset.type,
-            assetSubType: asset.subType,
-            assetID: asset.assetID
+            seed: approvedSeed, width: config.largeImageWidth, height: config.largeImageHeight,
+            combinedPrompt: prompt, variantCount: 1,
+            assetType: asset.type, assetSubType: asset.subType, assetID: asset.assetID
         )
         generationQueue.append(job)
     }
@@ -348,27 +321,18 @@ private struct LargeImageSheet: View {
                 Spacer()
                 Button { isPresented = false } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.title2)
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(.secondary)
+                        .font(.title2).symbolRenderingMode(.hierarchical).foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
             }
             .padding()
-
             if let img = image {
-                Image(nsImage: img)
-                    .resizable()
-                    .scaledToFit()
+                Image(nsImage: img).resizable().scaledToFit()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.horizontal)
-                    .padding(.bottom)
+                    .padding(.horizontal).padding(.bottom)
             } else {
-                ContentUnavailableView(
-                    "Image not found",
-                    systemImage: "photo",
-                    description: Text("The large image file could not be loaded.")
-                )
+                ContentUnavailableView("Image not found", systemImage: "photo",
+                    description: Text("The large image file could not be loaded."))
             }
         }
         .frame(minWidth: 800, minHeight: 500)

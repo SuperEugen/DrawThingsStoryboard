@@ -1,6 +1,7 @@
 import SwiftUI
 
 // MARK: - Settings content (shown as center pane when Settings selected)
+/// #49: Assets section with Character Turn-Around setting
 
 struct SettingsContentView: View {
     @Binding var config: AppConfig
@@ -84,6 +85,18 @@ struct SettingsContentView: View {
                             }
                         }
                     }
+                }
+                // #49: Assets settings
+                Section("Assets") {
+                    LabeledContent("Character Turn-Around") {
+                        TextEditor(text: $config.characterTurnAround)
+                            .font(.callout)
+                            .frame(minHeight: 60, maxHeight: 100)
+                            .overlay(RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.secondary.opacity(0.25), lineWidth: 0.5))
+                    }
+                    Text("Prepended to character asset descriptions when generating images.")
+                        .font(.caption2).foregroundStyle(.secondary)
                 }
                 Section("Style Preview") {
                     LabeledContent("Example Prompt") {

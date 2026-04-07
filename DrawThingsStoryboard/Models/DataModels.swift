@@ -13,6 +13,8 @@ struct AppConfig: Codable, Equatable {
     // #19: gRPC server settings
     var grpcAddress: String = "localhost"
     var grpcPort: Int = 7859
+    // #49: Character turn-around prompt fragment
+    var characterTurnAround: String = "Character turn-around sheet with exactly two views: frontal and side looking to the right. Full body-view, neutral grey background."
     var version: Int = 1
 }
 
@@ -222,24 +224,20 @@ enum SeedHelper {
 // MARK: - Validation Helpers
 
 enum ValidationHelper {
-    /// Check if image dimension is valid (positive, multiple of 64).
     static func isValidDimension(_ value: Int) -> Bool {
         value > 0 && value % 64 == 0
     }
 
-    /// Check if guidance scale is in valid range.
     static func isValidGuidanceScale(_ value: Double) -> Bool {
         value >= 0 && value <= 30
     }
 
-    /// Check if model filename looks valid.
     static func isValidModelFilename(_ name: String) -> Bool {
         guard !name.isEmpty else { return false }
         let lower = name.lowercased()
         return lower.hasSuffix(".ckpt") || lower.hasSuffix(".safetensors")
     }
 
-    /// Check if port number is valid.
     static func isValidPort(_ port: Int) -> Bool {
         port >= 1 && port <= 65535
     }
