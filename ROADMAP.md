@@ -57,45 +57,41 @@ Completed: April 2026
 
 To get consistent images over several panels it is crucial to use the moodboard feature.
 
-- [ ] Generate panel uses reference images (approved asset variants) attached to the job
-- [ ] Moodboard images sent via gRPC for consistent character appearance
-- [ ] Proper error handling when Draw Things is not running
+- [x] Generate panel uses reference images (approved asset variants) attached to the job
+- [x] Moodboard images sent via gRPC for consistent character appearance
+- [x] Export storyboard as PDF (panels in sequence with scene descriptions)
 
-## v0.6 — Prompt Refinement
+## v0.6 - Improved Character Assets Handling
 
-Better control of the prompts used to generate each image. A modular system.
+Character turn-around sheets improve panel creation and asset export.
 
-- [ ] Prompt preview before queuing
-- [ ] Prompt history per item
-- [ ] Modular prompt assembly with reusable fragments
+- [ ] UI Updates
+- [ ] Add prompt fragments to character assets to create a proper turn-around sheet.
+- [ ] Export one or all character turn-around sheets.
+- [ ] Add prompt fragment to character assets to separate body parts for 2d animation use.
+- [ ] Export one or all character parts sheets.
 
-## v0.7 — Storyboard Export
-
-The goal of the app. Something to hand out.
-
-- [ ] Export storyboard as PDF (panels in sequence with scene descriptions)
-- [ ] Export individual panels as PNG/JPEG
-- [ ] Export asset sheet (all approved variants per character/location)
-
-## v0.8 — Fountain Import Phase 2
+## v0.7 — Fountain Import Phase 2
 
 Deeper integration with Fountain screenplay files.
 
 - [ ] Import dialogue lines from Fountain files into panel dialogue fields
 - [ ] Auto-create character assets from Fountain character names
 - [ ] Map Fountain scene headings to location assets
-
-## v0.9 — Dialog and Actions
-
-Essential for a complete storyboard.
-
 - [ ] Panel fields for dialogue, action instruction, camera movement already exist in data model
-- [ ] UI polish for these fields in the Storyboard detail view
+- [ ] UI polish for these fields in the Storyboard detail view and export.
 
-## v1.0 — Clean Up
+## v0.8 — Customization for Storyboard PDFs
+
+Custom option for the exported storyboard.
+
+- [ ] Columns, rows, title etc.
+
+## v0.9 — Clean Up
 
 The user interface and the code must be checked for a proper v1.
 
+- [ ] Proper error handling when Draw Things is not running
 - [ ] Complete UI consistency check
 - [ ] Create missing visuals
 - [ ] Update documentation
