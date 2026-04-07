@@ -1,11 +1,12 @@
 import AppKit
 import CoreGraphics
+import UniformTypeIdentifiers
 
 /// #47: PDF export service for storyboard panels.
-/// Default template: 2×3 grid, A4 portrait.
+/// Default template: 2x3 grid, A4 portrait.
 enum PDFExportService {
 
-    // MARK: - Template constants (default 2×3 A4)
+    // MARK: - Template constants (default 2x3 A4)
 
     private static let pageWidth: CGFloat = 595    // A4 portrait
     private static let pageHeight: CGFloat = 842
@@ -169,11 +170,11 @@ enum PDFExportService {
             let boxAspect = imageWidth / imageHeight
             var drawRect: CGRect
             if imgAspect > boxAspect {
-                // Image wider than box — fit by width
+                // Image wider than box -- fit by width
                 let h = imageWidth / imgAspect
                 drawRect = CGRect(x: x, y: y + (imageHeight - h) / 2, width: imageWidth, height: h)
             } else {
-                // Image taller than box — fit by height
+                // Image taller than box -- fit by height
                 let w = imageHeight * imgAspect
                 drawRect = CGRect(x: x + (imageWidth - w) / 2, y: y, width: w, height: imageHeight)
             }
