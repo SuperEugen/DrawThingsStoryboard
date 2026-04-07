@@ -82,13 +82,17 @@ final class QueueRunnerService: ObservableObject {
         }
 
         // #43: Load init image (e.g. location asset) if specified
+        print("[QueueRunner] Job '\(job.itemName)' — initImageID: '\(job.initImageID)'")
         if !job.initImageID.isEmpty {
-            vm.initImage = StorageService.shared.loadImage(id: job.initImageID)
-            if vm.initImage != nil {
-                print("[QueueRunner] Loaded init image '\(job.initImageID)' for job '\(job.itemName)'")
+            let loaded = StorageService.shared.loadImage(id: job.initImageID)
+            vm.initImage = loaded
+            if let img = loaded {
+                print("[QueueRunner] ✅ Loaded init image '\(job.initImageID)' (\(Int(img.size.width))×\(Int(img.size.height)))")
             } else {
-                print("[QueueRunner] Warning: init image '\(job.initImageID)' not found on disk")
+                print("[QueueRunner] ⚠️ Init image '\(job.initImageID)' not found on disk!")
             }
+        } else {
+            print("[QueueRunner] No init image for this job")
         }
 
         // Determine how many images to generate
@@ -114,6 +118,7 @@ final class QueueRunnerService: ObservableObject {
                 self?.generationStage = stage
             }
 
+            print("[QueueRunner] Starting generation #\(i) — vm.initImage is \(vm.initImage != nil ? "SET" : "nil")")
             await vm.generate()
             cancellable.cancel()
 
