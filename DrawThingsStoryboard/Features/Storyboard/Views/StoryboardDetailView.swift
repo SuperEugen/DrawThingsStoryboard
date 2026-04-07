@@ -1,6 +1,7 @@
 import SwiftUI
 
 /// Right pane for the Storyboard section.
+/// #45: Panel list for parent nodes (Act, Sequence, Scene)
 struct StoryboardDetailView: View {
 
     @Binding var acts: [ActEntry]
@@ -16,17 +17,41 @@ struct StoryboardDetailView: View {
             switch selection {
             case .act(let name):
                 if let idx = acts.firstIndex(where: { $0.name == name }) {
-                    NodeDetailView(level: "Act", name: $acts[idx].name, color: .purple, icon: "theatermask.and.paintbrush")
+                    NodeDetailWithPanels(
+                        level: "Act", name: $acts[idx].name, color: .purple,
+                        icon: "theatermask.and.paintbrush",
+                        panels: panelsForAct(acts[idx]),
+                        selection: Binding(
+                            get: { self.selection },
+                            set: { _ in }
+                        )
+                    )
                 } else { emptyState }
 
             case .sequence(let name):
                 if let (ai, si) = findSequence(name) {
-                    NodeDetailView(level: "Sequence", name: $acts[ai].sequences[si].name, color: .orange, icon: "arrow.triangle.branch")
+                    NodeDetailWithPanels(
+                        level: "Sequence", name: $acts[ai].sequences[si].name, color: .orange,
+                        icon: "arrow.triangle.branch",
+                        panels: panelsForSequence(acts[ai].sequences[si]),
+                        selection: Binding(
+                            get: { self.selection },
+                            set: { _ in }
+                        )
+                    )
                 } else { emptyState }
 
             case .scene(let name):
                 if let (ai, si, sci) = findScene(name) {
-                    NodeDetailView(level: "Scene", name: $acts[ai].sequences[si].scenes[sci].name, color: .teal, icon: "rectangle.on.rectangle")
+                    NodeDetailWithPanels(
+                        level: "Scene", name: $acts[ai].sequences[si].scenes[sci].name, color: .teal,
+                        icon: "rectangle.on.rectangle",
+                        panels: acts[ai].sequences[si].scenes[sci].panels,
+                        selection: Binding(
+                            get: { self.selection },
+                            set: { _ in }
+                        )
+                    )
                 } else { emptyState }
 
             case .panel(let id):
@@ -51,6 +76,20 @@ struct StoryboardDetailView: View {
             "Nothing selected", systemImage: "square.dashed",
             description: Text("Select an act, sequence, scene, or panel."))
     }
+
+    // MARK: - Panel collection helpers
+
+    private func panelsForAct(_ act: ActEntry) -> [PanelEntry] {
+        act.sequences.flatMap { seq in
+            seq.scenes.flatMap { $0.panels }
+        }
+    }
+
+    private func panelsForSequence(_ seq: SequenceEntry) -> [PanelEntry] {
+        seq.scenes.flatMap { $0.panels }
+    }
+
+    // MARK: - Find helpers
 
     private func findSequence(_ name: String) -> (Int, Int)? {
         for ai in acts.indices {
@@ -86,13 +125,16 @@ struct StoryboardDetailView: View {
     }
 }
 
-// MARK: - Node detail (Act / Sequence / Scene)
+// MARK: - Node detail with panel list
+/// #45: Shows name editor + list of all descendant panels
 
-private struct NodeDetailView: View {
+private struct NodeDetailWithPanels: View {
     let level: String
     @Binding var name: String
     let color: Color
     let icon: String
+    let panels: [PanelEntry]
+    @Binding var selection: StoryboardSelection?
 
     var body: some View {
         ScrollView {
@@ -119,11 +161,87 @@ private struct NodeDetailView: View {
                 }
                 .padding(.bottom, 16)
 
+                Divider().padding(.vertical, 8)
+
+                // Panel list
+                VStack(alignment: .leading, spacing: 6) {
+                    sectionLabel("Panels (\(panels.count))")
+                    if panels.isEmpty {
+                        Text("No panels in this \(level.lowercased()).")
+                            .font(.caption).foregroundStyle(.tertiary)
+                            .padding(.vertical, 8)
+                    } else {
+                        ForEach(panels) { panel in
+                            CompactPanelRow(panel: panel, isSelected: selection == .panel(panel.panelID))
+                                .onTapGesture {
+                                    selection = .panel(panel.panelID)
+                                }
+                        }
+                    }
+                }
+                .padding(.bottom, 16)
+
                 Spacer(minLength: 20)
             }
             .padding(14)
         }
         .background(Color(NSColor.windowBackgroundColor))
+    }
+}
+
+// MARK: - Compact panel row for parent detail views
+
+private struct CompactPanelRow: View {
+    let panel: PanelEntry
+    let isSelected: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            // Thumbnail or placeholder
+            if panel.hasSmallImage, let img = StorageService.shared.loadImage(id: panel.smallImageID) {
+                Image(nsImage: img)
+                    .resizable().scaledToFill()
+                    .frame(width: 48, height: 27)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            } else {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.yellow.opacity(0.15))
+                    .frame(width: 48, height: 27)
+                    .overlay {
+                        Image(systemName: "photo").font(.system(size: 12))
+                            .foregroundStyle(Color.yellow.opacity(0.5))
+                    }
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(panel.name).font(.callout).lineLimit(1)
+                if !panel.description.isEmpty {
+                    Text(panel.description).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+
+            Spacer()
+
+            // Status badges
+            HStack(spacing: 4) {
+                if panel.hasSmallImage {
+                    Text("S").font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.orange)
+                }
+                if panel.hasLargeImage {
+                    Text("L").font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.green)
+                }
+                if !panel.refIDs.isEmpty {
+                    Text("\(panel.refIDs.count)R").font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.blue)
+                }
+            }
+        }
+        .padding(.vertical, 4).padding(.horizontal, 8)
+        .background(RoundedRectangle(cornerRadius: 7)
+            .fill(isSelected ? Color.accentColor.opacity(0.1) : Color.accentColor.opacity(0.03)))
+        .contentShape(Rectangle())
     }
 }
 
@@ -144,18 +262,14 @@ private struct PanelDetailView: View {
 
     // MARK: - Asset slot helpers
 
-    /// Ordered list of currently assigned asset IDs (non-empty refs).
     private var assignedIDs: [String] {
         [panel.ref1ID, panel.ref2ID, panel.ref3ID, panel.ref4ID].filter { !$0.isEmpty }
     }
 
-    /// Resolve an asset entry by ID.
     private func asset(for id: String) -> AssetEntry? {
         assets.assets.first { $0.assetID == id }
     }
 
-    /// Resolve the best image ID from an asset.
-    /// Prefers largeImageID, then approved variant, then first variant with image.
     private func bestImageID(for entry: AssetEntry) -> String {
         if entry.hasLargeImage { return entry.largeImageID }
         if let idx = entry.approvedVariantIndex {
@@ -169,30 +283,22 @@ private struct PanelDetailView: View {
         return ""
     }
 
-    /// Whether a location is already assigned.
     private var hasLocation: Bool {
-        assignedIDs.contains { id in
-            asset(for: id)?.isLocation == true
-        }
+        assignedIDs.contains { id in asset(for: id)?.isLocation == true }
     }
 
-    /// The assigned location asset, if any.
     private var locationAsset: AssetEntry? {
         for id in assignedIDs {
-            if let entry = asset(for: id), entry.isLocation {
-                return entry
-            }
+            if let entry = asset(for: id), entry.isLocation { return entry }
         }
         return nil
     }
 
-    /// #43: Location image ID for canvas/init image.
     private var locationImageID: String {
         guard let loc = locationAsset else { return "" }
         return bestImageID(for: loc)
     }
 
-    /// #44: Character asset image IDs for moodboard/shuffle hints.
     private var characterImageIDs: [String] {
         assignedIDs.compactMap { id -> String? in
             guard let entry = asset(for: id), entry.isCharacter else { return nil }
@@ -201,41 +307,34 @@ private struct PanelDetailView: View {
         }
     }
 
-    /// Number of currently assigned refs.
     private var refCount: Int { assignedIDs.count }
     private var canAddMoreRefs: Bool { refCount < 4 }
 
-    /// Assets available for the picker (not already assigned).
     private var availableCharacters: [AssetEntry] {
         assets.assets.filter { $0.isCharacter && !assignedIDs.contains($0.assetID) }
     }
 
-    /// Locations available — only if no location is assigned yet.
     private var availableLocations: [AssetEntry] {
         guard !hasLocation else { return [] }
         return assets.assets.filter { $0.isLocation && !assignedIDs.contains($0.assetID) }
     }
 
-    /// Whether the description is filled in enough to generate.
     private var hasDescription: Bool {
         !panel.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /// Check if a small image job is already queued.
     private var isSmallQueued: Bool {
         generationQueue.contains {
             $0.panelID == panel.panelID && $0.jobType == .generatePanel && $0.size == .small
         }
     }
 
-    /// Check if a large image job is already queued.
     private var isLargeQueued: Bool {
         generationQueue.contains {
             $0.panelID == panel.panelID && $0.jobType == .generatePanel && $0.size == .large
         }
     }
 
-    /// Build the combined prompt for this panel.
     private var combinedPrompt: String {
         var parts: [String] = []
         if !styleDescription.isEmpty { parts.append(styleDescription) }
@@ -244,7 +343,6 @@ private struct PanelDetailView: View {
         return parts.joined(separator: ", ")
     }
 
-    /// Load large image from disk.
     private var largeImage: NSImage? {
         guard panel.hasLargeImage else { return nil }
         return StorageService.shared.loadImage(id: panel.largeImageID)
@@ -274,20 +372,14 @@ private struct PanelDetailView: View {
         }
     }
 
-    // MARK: - Header
-
-    @ViewBuilder
-    private var panelHeader: some View {
+    @ViewBuilder private var panelHeader: some View {
         let headerImageID = panel.hasLargeImage ? panel.largeImageID
             : panel.hasSmallImage ? panel.smallImageID : ""
         UnifiedThumbnailView(itemType: .panel, name: "", sizeMode: .header, imageID: headerImageID)
             .padding(.bottom, 16)
     }
 
-    // MARK: - Status
-
-    @ViewBuilder
-    private var statusSection: some View {
+    @ViewBuilder private var statusSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             sectionLabel("Status")
             smallImageStatusRow
@@ -296,10 +388,7 @@ private struct PanelDetailView: View {
         .padding(.bottom, 12)
     }
 
-    // MARK: - Fields
-
-    @ViewBuilder
-    private var nameSection: some View {
+    @ViewBuilder private var nameSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             sectionLabel("Name")
             TextField("Name", text: $panel.name).textFieldStyle(.roundedBorder)
@@ -307,8 +396,7 @@ private struct PanelDetailView: View {
         .padding(.bottom, 12)
     }
 
-    @ViewBuilder
-    private var descriptionSection: some View {
+    @ViewBuilder private var descriptionSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             sectionLabel("Description")
             TextEditor(text: $panel.description).font(.callout).frame(minHeight: 80)
@@ -322,8 +410,7 @@ private struct PanelDetailView: View {
         .padding(.bottom, 12)
     }
 
-    @ViewBuilder
-    private var cameraSection: some View {
+    @ViewBuilder private var cameraSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             sectionLabel("Camera Movement")
             TextField("e.g. Pan left, Zoom in", text: $panel.cameraMovement)
@@ -332,8 +419,7 @@ private struct PanelDetailView: View {
         .padding(.bottom, 12)
     }
 
-    @ViewBuilder
-    private var dialogueSection: some View {
+    @ViewBuilder private var dialogueSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             sectionLabel("Dialogue")
             TextEditor(text: $panel.dialogue).font(.callout).frame(minHeight: 60)
@@ -343,8 +429,7 @@ private struct PanelDetailView: View {
         .padding(.bottom, 12)
     }
 
-    @ViewBuilder
-    private var durationSection: some View {
+    @ViewBuilder private var durationSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             sectionLabel("Duration")
             HStack {
@@ -356,10 +441,7 @@ private struct PanelDetailView: View {
         .padding(.bottom, 12)
     }
 
-    // MARK: - Large image preview
-
-    @ViewBuilder
-    private var largeImageSection: some View {
+    @ViewBuilder private var largeImageSection: some View {
         if panel.hasLargeImage {
             VStack(alignment: .leading, spacing: 6) {
                 sectionLabel("Large Image")
@@ -370,8 +452,7 @@ private struct PanelDetailView: View {
                             .frame(maxWidth: .infinity).frame(maxHeight: 200)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
-                    .buttonStyle(.plain)
-                    .help("Click to view full size")
+                    .buttonStyle(.plain).help("Click to view full size")
                 }
             }
             .padding(.bottom, 12)
@@ -379,18 +460,13 @@ private struct PanelDetailView: View {
         }
     }
 
-    // MARK: - #42 Asset Slots
-
-    @ViewBuilder
-    private var assetSlotsSection: some View {
+    @ViewBuilder private var assetSlotsSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             sectionLabel("Referenced Assets (\(refCount)/4)")
             if !canAddMoreRefs {
                 Text("Maximum 4 asset references reached (Draw Things limit).")
                     .font(.caption2).foregroundStyle(.orange)
             }
-
-            // Show assigned slots
             ForEach(Array(assignedIDs.enumerated()), id: \.element) { index, assetID in
                 if let entry = asset(for: assetID) {
                     AssetSlotRow(asset: entry, slotIndex: index, onRemove: {
@@ -398,41 +474,28 @@ private struct PanelDetailView: View {
                     })
                 }
             }
-
-            // #43/#44: Show gRPC transfer indicators
             assetTransferIndicators
-
-            // Add button when slots available
-            if canAddMoreRefs {
-                assetPickerMenu
-            }
-
+            if canAddMoreRefs { assetPickerMenu }
             if assignedIDs.isEmpty && !canAddMoreRefs {
                 Text("No assets referenced.")
-                    .font(.caption).foregroundStyle(.tertiary)
-                    .padding(.vertical, 8)
+                    .font(.caption).foregroundStyle(.tertiary).padding(.vertical, 8)
             }
         }
         .padding(.bottom, 12)
         .help("Maximum 4 asset references per panel (Draw Things limitation). Location always in slot 1.")
     }
 
-    /// Show indicators for what gets sent to Draw Things.
-    @ViewBuilder
-    private var assetTransferIndicators: some View {
+    @ViewBuilder private var assetTransferIndicators: some View {
         if hasLocation && !locationImageID.isEmpty {
             HStack(spacing: 6) {
-                Image(systemName: "photo.on.rectangle.angled")
-                    .font(.caption).foregroundStyle(.teal)
-                Text("Location \u{2192} canvas")
-                    .font(.caption2).foregroundStyle(.secondary)
+                Image(systemName: "photo.on.rectangle.angled").font(.caption).foregroundStyle(.teal)
+                Text("Location \u{2192} canvas").font(.caption2).foregroundStyle(.secondary)
             }
             .padding(.vertical, 2).padding(.horizontal, 8)
         }
         if !characterImageIDs.isEmpty {
             HStack(spacing: 6) {
-                Image(systemName: "person.2.fill")
-                    .font(.caption).foregroundStyle(.blue)
+                Image(systemName: "person.2.fill").font(.caption).foregroundStyle(.blue)
                 Text("\(characterImageIDs.count) character(s) \u{2192} moodboard hints")
                     .font(.caption2).foregroundStyle(.secondary)
             }
@@ -440,15 +503,12 @@ private struct PanelDetailView: View {
         }
     }
 
-    @ViewBuilder
-    private var assetPickerMenu: some View {
+    @ViewBuilder private var assetPickerMenu: some View {
         Menu {
             if !availableLocations.isEmpty {
                 Section("Locations") {
                     ForEach(availableLocations) { loc in
-                        Button {
-                            assignAsset(id: loc.assetID)
-                        } label: {
+                        Button { assignAsset(id: loc.assetID) } label: {
                             Label(loc.name, systemImage: loc.subType == "exterior" ? "map" : "house.fill")
                         }
                     }
@@ -457,9 +517,7 @@ private struct PanelDetailView: View {
             if !availableCharacters.isEmpty {
                 Section("Characters") {
                     ForEach(availableCharacters) { char in
-                        Button {
-                            assignAsset(id: char.assetID)
-                        } label: {
+                        Button { assignAsset(id: char.assetID) } label: {
                             Label(char.name, systemImage: "person.fill")
                         }
                     }
@@ -469,15 +527,12 @@ private struct PanelDetailView: View {
                 Text("No assets available")
             }
         } label: {
-            Label("Add Asset", systemImage: "plus.circle")
-                .font(.callout)
+            Label("Add Asset", systemImage: "plus.circle").font(.callout)
         }
         .menuStyle(.borderlessButton)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 4)
     }
-
-    // MARK: - Assign / Remove with location-first compaction
 
     private func assignAsset(id: String) {
         var current = assignedIDs
@@ -492,16 +547,12 @@ private struct PanelDetailView: View {
         writeRefIDs(compacted(current))
     }
 
-    /// Compact: location always first, then characters in order.
     private func compacted(_ ids: [String]) -> [String] {
         var locationID: String? = nil
         var characterIDs: [String] = []
         for id in ids {
-            if let entry = asset(for: id), entry.isLocation {
-                locationID = id
-            } else {
-                characterIDs.append(id)
-            }
+            if let entry = asset(for: id), entry.isLocation { locationID = id }
+            else { characterIDs.append(id) }
         }
         var result: [String] = []
         if let loc = locationID { result.append(loc) }
@@ -509,7 +560,6 @@ private struct PanelDetailView: View {
         return result
     }
 
-    /// Write up to 4 ref IDs back to the panel, padding with empty strings.
     private func writeRefIDs(_ ids: [String]) {
         panel.ref1ID = ids.count > 0 ? ids[0] : ""
         panel.ref2ID = ids.count > 1 ? ids[1] : ""
@@ -517,10 +567,7 @@ private struct PanelDetailView: View {
         panel.ref4ID = ids.count > 3 ? ids[3] : ""
     }
 
-    // MARK: - Status rows with Generate buttons
-
-    @ViewBuilder
-    private var smallImageStatusRow: some View {
+    @ViewBuilder private var smallImageStatusRow: some View {
         HStack(spacing: 8) {
             Text("S").font(.system(size: 10, weight: .bold, design: .monospaced))
                 .foregroundStyle(panel.hasSmallImage ? .green : .gray)
@@ -535,8 +582,7 @@ private struct PanelDetailView: View {
                     Button { generateImage(size: .small) } label: {
                         Label("Generate", systemImage: "photo").font(.caption)
                     }
-                    .buttonStyle(.bordered).controlSize(.mini)
-                    .disabled(!hasDescription)
+                    .buttonStyle(.bordered).controlSize(.mini).disabled(!hasDescription)
                 }
             }
         }
@@ -544,8 +590,7 @@ private struct PanelDetailView: View {
         .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
     }
 
-    @ViewBuilder
-    private var largeImageStatusRow: some View {
+    @ViewBuilder private var largeImageStatusRow: some View {
         HStack(spacing: 8) {
             Text("L").font(.system(size: 10, weight: .bold, design: .monospaced))
                 .foregroundStyle(panel.hasLargeImage ? .green : .gray)
@@ -560,25 +605,19 @@ private struct PanelDetailView: View {
                     Button { generateImage(size: .large) } label: {
                         Label("Generate", systemImage: "arrow.up.left.and.arrow.down.right").font(.caption)
                     }
-                    .buttonStyle(.bordered).controlSize(.mini)
-                    .disabled(!hasDescription)
+                    .buttonStyle(.bordered).controlSize(.mini).disabled(!hasDescription)
                 }
             }
             if panel.hasLargeImage {
                 Button { showLargeImageSheet = true } label: {
                     Image(systemName: "eye").font(.caption)
                 }
-                .buttonStyle(.bordered).controlSize(.mini)
-                .help("View large image")
+                .buttonStyle(.bordered).controlSize(.mini).help("View large image")
             }
         }
         .padding(.vertical, 5).padding(.horizontal, 8)
         .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
     }
-
-    // MARK: - Generate
-    /// #43: Includes initImageID when a location asset with an image is assigned.
-    /// #44: Includes moodboardImageIDs for character assets with images.
 
     private func generateImage(size: GenerationSize) {
         guard hasDescription else { return }
@@ -586,27 +625,18 @@ private struct PanelDetailView: View {
         let w = size == .large ? config.largeImageWidth : config.smallImageWidth
         let h = size == .large ? config.largeImageHeight : config.smallImageHeight
         let job = GenerationJob(
-            id: UUID().uuidString,
-            itemName: panel.name,
-            jobType: .generatePanel,
-            size: size,
-            styleName: resolvedStyleName ?? "",
-            queuedAt: Date(),
-            estimatedDuration: size == .large ? 180 : 60,
-            itemIcon: "video.fill",
-            seed: seed,
-            width: w,
-            height: h,
-            combinedPrompt: combinedPrompt,
-            panelID: panel.panelID,
-            initImageID: locationImageID,
+            id: UUID().uuidString, itemName: panel.name, jobType: .generatePanel,
+            size: size, styleName: resolvedStyleName ?? "", queuedAt: Date(),
+            estimatedDuration: size == .large ? 180 : 60, itemIcon: "video.fill",
+            seed: seed, width: w, height: h, combinedPrompt: combinedPrompt,
+            panelID: panel.panelID, initImageID: locationImageID,
             moodboardImageIDs: characterImageIDs
         )
         generationQueue.append(job)
     }
 }
 
-// MARK: - #42 Asset slot row
+// MARK: - Asset slot row
 
 private struct AssetSlotRow: View {
     let asset: AssetEntry
@@ -615,44 +645,30 @@ private struct AssetSlotRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            // Slot number badge
             Text("\(slotIndex + 1)")
                 .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .frame(width: 16)
-
+                .foregroundStyle(.secondary).frame(width: 16)
             Image(systemName: asset.isCharacter ? "person.fill" : "map")
-                .foregroundStyle(asset.isCharacter ? .blue : .teal)
-                .frame(width: 16)
-
+                .foregroundStyle(asset.isCharacter ? .blue : .teal).frame(width: 16)
             Text(asset.name).font(.callout).lineLimit(1)
-
             Spacer()
-
             Text(asset.subType).font(.caption).foregroundStyle(.secondary)
-
             if asset.isLocation {
-                Image(systemName: "pin.fill")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.teal.opacity(0.6))
-                    .help("Location always in slot 1")
+                Image(systemName: "pin.fill").font(.system(size: 9))
+                    .foregroundStyle(.teal.opacity(0.6)).help("Location always in slot 1")
             }
-
             Button(action: onRemove) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 13))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.secondary)
+                Image(systemName: "xmark.circle.fill").font(.system(size: 13))
+                    .symbolRenderingMode(.hierarchical).foregroundStyle(.secondary)
             }
-            .buttonStyle(.plain)
-            .help("Remove asset reference")
+            .buttonStyle(.plain).help("Remove asset reference")
         }
         .padding(.vertical, 5).padding(.horizontal, 8)
         .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.05)))
     }
 }
 
-// MARK: - Large image sheet for panels
+// MARK: - Large image sheet
 
 private struct PanelLargeImageSheet: View {
     let image: NSImage?
