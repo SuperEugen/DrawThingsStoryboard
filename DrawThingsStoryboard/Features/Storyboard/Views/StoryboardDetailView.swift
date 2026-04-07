@@ -130,6 +130,7 @@ private struct NodeDetailView: View {
 // MARK: - Panel detail
 /// #42: Interactive asset slots with location-first constraint
 /// #43: Location image passed as canvas/init image to gRPC
+/// #44: Character images passed as moodboard/shuffle hints to gRPC
 
 private struct PanelDetailView: View {
     @Binding var panel: PanelEntry
@@ -153,6 +154,21 @@ private struct PanelDetailView: View {
         assets.assets.first { $0.assetID == id }
     }
 
+    /// Resolve the best image ID from an asset.
+    /// Prefers largeImageID, then approved variant, then first variant with image.
+    private func bestImageID(for entry: AssetEntry) -> String {
+        if entry.hasLargeImage { return entry.largeImageID }
+        if let idx = entry.approvedVariantIndex {
+            let v = entry.variant(at: idx)
+            if v.hasImage { return v.smallImageID }
+        }
+        for i in 0..<4 {
+            let v = entry.variant(at: i)
+            if v.hasImage { return v.smallImageID }
+        }
+        return ""
+    }
+
     /// Whether a location is already assigned.
     private var hasLocation: Bool {
         assignedIDs.contains { id in
@@ -170,20 +186,19 @@ private struct PanelDetailView: View {
         return nil
     }
 
-    /// #43: Resolve the best image ID from a location asset for use as init image.
-    /// Prefers largeImageID, then approved variant, then first variant with image.
+    /// #43: Location image ID for canvas/init image.
     private var locationImageID: String {
         guard let loc = locationAsset else { return "" }
-        if loc.hasLargeImage { return loc.largeImageID }
-        if let idx = loc.approvedVariantIndex {
-            let v = loc.variant(at: idx)
-            if v.hasImage { return v.smallImageID }
+        return bestImageID(for: loc)
+    }
+
+    /// #44: Character asset image IDs for moodboard/shuffle hints.
+    private var characterImageIDs: [String] {
+        assignedIDs.compactMap { id -> String? in
+            guard let entry = asset(for: id), entry.isCharacter else { return nil }
+            let imgID = bestImageID(for: entry)
+            return imgID.isEmpty ? nil : imgID
         }
-        for i in 0..<4 {
-            let v = loc.variant(at: i)
-            if v.hasImage { return v.smallImageID }
-        }
-        return ""
     }
 
     /// Number of currently assigned refs.
@@ -384,16 +399,8 @@ private struct PanelDetailView: View {
                 }
             }
 
-            // #43: Show init image indicator when location has an image
-            if hasLocation && !locationImageID.isEmpty {
-                HStack(spacing: 6) {
-                    Image(systemName: "photo.on.rectangle.angled")
-                        .font(.caption).foregroundStyle(.teal)
-                    Text("Location image will be sent as canvas to Draw Things")
-                        .font(.caption2).foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 3).padding(.horizontal, 8)
-            }
+            // #43/#44: Show gRPC transfer indicators
+            assetTransferIndicators
 
             // Add button when slots available
             if canAddMoreRefs {
@@ -408,6 +415,29 @@ private struct PanelDetailView: View {
         }
         .padding(.bottom, 12)
         .help("Maximum 4 asset references per panel (Draw Things limitation). Location always in slot 1.")
+    }
+
+    /// Show indicators for what gets sent to Draw Things.
+    @ViewBuilder
+    private var assetTransferIndicators: some View {
+        if hasLocation && !locationImageID.isEmpty {
+            HStack(spacing: 6) {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.caption).foregroundStyle(.teal)
+                Text("Location \u{2192} canvas")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 2).padding(.horizontal, 8)
+        }
+        if !characterImageIDs.isEmpty {
+            HStack(spacing: 6) {
+                Image(systemName: "person.2.fill")
+                    .font(.caption).foregroundStyle(.blue)
+                Text("\(characterImageIDs.count) character(s) \u{2192} moodboard hints")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 2).padding(.horizontal, 8)
+        }
     }
 
     @ViewBuilder
@@ -548,6 +578,7 @@ private struct PanelDetailView: View {
 
     // MARK: - Generate
     /// #43: Includes initImageID when a location asset with an image is assigned.
+    /// #44: Includes moodboardImageIDs for character assets with images.
 
     private func generateImage(size: GenerationSize) {
         guard hasDescription else { return }
@@ -568,7 +599,8 @@ private struct PanelDetailView: View {
             height: h,
             combinedPrompt: combinedPrompt,
             panelID: panel.panelID,
-            initImageID: locationImageID
+            initImageID: locationImageID,
+            moodboardImageIDs: characterImageIDs
         )
         generationQueue.append(job)
     }

@@ -68,6 +68,8 @@ struct GenerationJob: Identifiable, Equatable {
     var panelID: String = ""
     /// #43: Image ID to load as canvas/init image (e.g. location asset image).
     var initImageID: String = ""
+    /// #44: Image IDs for moodboard/shuffle hints (e.g. character asset images).
+    var moodboardImageIDs: [String] = []
     /// Filled after generation: the saved image UUID(s).
     var savedImageIDs: [String] = []
     var startedAt: Date? = nil

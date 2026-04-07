@@ -82,7 +82,7 @@ final class QueueRunnerService: ObservableObject {
         }
 
         // #43: Load init image (e.g. location asset) if specified
-        print("[QueueRunner] Job '\(job.itemName)' — initImageID: '\(job.initImageID)'")
+        print("[QueueRunner] Job '\(job.itemName)' — initImageID: '\(job.initImageID)', moodboardIDs: \(job.moodboardImageIDs)")
         if !job.initImageID.isEmpty {
             let loaded = StorageService.shared.loadImage(id: job.initImageID)
             vm.initImage = loaded
@@ -91,8 +91,21 @@ final class QueueRunnerService: ObservableObject {
             } else {
                 print("[QueueRunner] ⚠️ Init image '\(job.initImageID)' not found on disk!")
             }
-        } else {
-            print("[QueueRunner] No init image for this job")
+        }
+
+        // #44: Load moodboard images (e.g. character assets) for shuffle hints
+        if !job.moodboardImageIDs.isEmpty {
+            var loaded: [NSImage] = []
+            for imgID in job.moodboardImageIDs {
+                if let img = StorageService.shared.loadImage(id: imgID) {
+                    loaded.append(img)
+                    print("[QueueRunner] ✅ Loaded moodboard image '\(imgID)' (\(Int(img.size.width))×\(Int(img.size.height)))")
+                } else {
+                    print("[QueueRunner] ⚠️ Moodboard image '\(imgID)' not found on disk!")
+                }
+            }
+            vm.moodboardImages = loaded
+            print("[QueueRunner] Moodboard: \(loaded.count)/\(job.moodboardImageIDs.count) images loaded")
         }
 
         // Determine how many images to generate
@@ -118,7 +131,7 @@ final class QueueRunnerService: ObservableObject {
                 self?.generationStage = stage
             }
 
-            print("[QueueRunner] Starting generation #\(i) — vm.initImage is \(vm.initImage != nil ? "SET" : "nil")")
+            print("[QueueRunner] Starting generation #\(i) — vm.initImage is \(vm.initImage != nil ? "SET" : "nil"), vm.moodboardImages: \(vm.moodboardImages.count)")
             await vm.generate()
             cancellable.cancel()
 
