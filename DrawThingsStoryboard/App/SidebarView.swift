@@ -6,7 +6,7 @@ struct SidebarView: View {
 
     var body: some View {
         List(selection: $selectedSection) {
-            ForEach([AppSection.storyboard, .styles, .assets, .models, .productionQueue]) { section in
+            ForEach([AppSection.styles, .assets, .models, .storyboard, .productionQueue]) { section in
                 Label(section.title, systemImage: section.icon)
                     .tag(section)
             }
