@@ -100,9 +100,6 @@ The user interface and the code must be checked for a proper v1.
 ## Future Ideas
 
 - **Draw Things on iPhone** — connect to Draw Things iOS over local network
-- **Prompt templates** — reusable prompt building blocks beyond style suffixes
-- **Export character turn-around sheets** — special prompts create turn-around sheets
-- **Export characters as parted image** — separate elements for 2D character animation
 - **Export vectorized assets** — usable in 2D animation software like Moho
 - **Export Pitch Book** — export a pitch book to present the story
 - **Export Video** — create a video from the storyboard
