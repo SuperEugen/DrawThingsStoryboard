@@ -12,47 +12,36 @@ enum StoryboardSelection: Hashable {
 }
 
 // MARK: - StoryboardBrowserView
+/// #45: Storyboard picker, move up/down for all tree levels
 
 struct StoryboardBrowserView: View {
 
-    @Binding var acts: [ActEntry]
+    @Binding var storyboards: StoryboardsFile
+    @Binding var selectedStoryboardIndex: Int
     @Binding var selection: StoryboardSelection?
-    @Binding var styleName: String?
     let styles: StylesFile
     @Binding var currentStyleID: String
     var onFountainImport: (([ActEntry], String) -> Void)? = nil
 
+    /// The acts of the currently selected storyboard.
+    private var acts: Binding<[ActEntry]> {
+        guard storyboards.storyboards.indices.contains(selectedStoryboardIndex) else {
+            return .constant([])
+        }
+        return $storyboards.storyboards[selectedStoryboardIndex].acts
+    }
+
+    private var currentStoryboard: StoryboardEntry? {
+        guard storyboards.storyboards.indices.contains(selectedStoryboardIndex) else { return nil }
+        return storyboards.storyboards[selectedStoryboardIndex]
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "pencil.and.list.clipboard").font(.title2).foregroundStyle(.secondary)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Storyboard").font(.title2.bold())
-                }
-                Spacer()
-                Picker("Style", selection: $currentStyleID) {
-                    ForEach(styles.styles) { s in
-                        Text(s.name).tag(s.styleID)
-                    }
-                }
-                .pickerStyle(.menu).labelsHidden().frame(maxWidth: 160)
-                // Add Act
-                Button { addAct() } label: {
-                    Image(systemName: "plus").frame(width: 22, height: 22)
-                }
-                .buttonStyle(.borderless)
-                .help("Add a new act")
-                // Import Fountain
-                Button { importFountainFile() } label: {
-                    Image(systemName: "doc.badge.arrow.up").frame(width: 22, height: 22)
-                }
-                .buttonStyle(.borderless)
-                .help("Import Fountain screenplay (.fountain)")
-            }
-            .padding(.horizontal, 16).padding(.vertical, 12)
+            headerBar
             Divider()
 
-            if acts.isEmpty {
+            if acts.wrappedValue.isEmpty {
                 Spacer()
                 ContentUnavailableView("No acts yet", systemImage: "pencil.and.list.clipboard",
                     description: Text("Use + to add an act, or import a Fountain file."))
@@ -60,12 +49,19 @@ struct StoryboardBrowserView: View {
             } else {
                 ScrollView {
                     VStack(spacing: 0) {
-                        ForEach(acts.indices, id: \.self) { ai in
+                        // Storyboard name row
+                        storyboardRow
+
+                        ForEach(acts.wrappedValue.indices, id: \.self) { ai in
                             ActRow(
-                                act: $acts[ai],
+                                act: acts[ai],
+                                actIndex: ai,
+                                actCount: acts.wrappedValue.count,
                                 selection: $selection,
                                 onAddSequence: { addSequence(toAct: ai) },
-                                onDelete: { acts.remove(at: ai) }
+                                onDelete: { acts.wrappedValue.remove(at: ai) },
+                                onMoveUp: ai > 0 ? { acts.wrappedValue.swapAt(ai, ai - 1) } : nil,
+                                onMoveDown: ai < acts.wrappedValue.count - 1 ? { acts.wrappedValue.swapAt(ai, ai + 1) } : nil
                             )
                         }
                     }
@@ -76,18 +72,91 @@ struct StoryboardBrowserView: View {
         .background(Color(NSColor.windowBackgroundColor))
     }
 
+    // MARK: - Header
+
+    @ViewBuilder
+    private var headerBar: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: "pencil.and.list.clipboard").font(.title2).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Storyboards").font(.title2.bold())
+            }
+            Spacer()
+            // Storyboard picker (when multiple exist)
+            if storyboards.storyboards.count > 1 {
+                Picker("Storyboard", selection: $selectedStoryboardIndex) {
+                    ForEach(storyboards.storyboards.indices, id: \.self) { i in
+                        Text(storyboards.storyboards[i].name).tag(i)
+                    }
+                }
+                .pickerStyle(.menu).labelsHidden().frame(maxWidth: 180)
+            }
+            Picker("Style", selection: $currentStyleID) {
+                ForEach(styles.styles) { s in
+                    Text(s.name).tag(s.styleID)
+                }
+            }
+            .pickerStyle(.menu).labelsHidden().frame(maxWidth: 160)
+            // Add Act
+            Button { addAct() } label: {
+                Image(systemName: "plus").frame(width: 22, height: 22)
+            }
+            .buttonStyle(.borderless)
+            .help("Add a new act")
+            // Add Storyboard
+            Button { addStoryboard() } label: {
+                Image(systemName: "doc.badge.plus").frame(width: 22, height: 22)
+            }
+            .buttonStyle(.borderless)
+            .help("Add a new storyboard")
+            // Import Fountain
+            Button { importFountainFile() } label: {
+                Image(systemName: "doc.badge.arrow.up").frame(width: 22, height: 22)
+            }
+            .buttonStyle(.borderless)
+            .help("Import Fountain screenplay (.fountain)")
+        }
+        .padding(.horizontal, 16).padding(.vertical, 12)
+    }
+
+    // MARK: - Storyboard name row
+
+    @ViewBuilder
+    private var storyboardRow: some View {
+        if let sb = currentStoryboard {
+            HStack(spacing: 6) {
+                Image(systemName: "book.fill")
+                    .foregroundStyle(.indigo).frame(width: 16)
+                Text(sb.name).font(.subheadline.weight(.bold))
+                Spacer()
+                Text("\(acts.wrappedValue.count) act(s)").font(.caption).foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .background(Color.indigo.opacity(0.06))
+        }
+    }
+
     // MARK: - Add helpers
 
     private func addAct() {
-        let name = "Act \(acts.count + 1)"
-        acts.append(ActEntry(name: name, sequences: []))
+        let name = "Act \(acts.wrappedValue.count + 1)"
+        acts.wrappedValue.append(ActEntry(name: name, sequences: []))
         selection = .act(name)
     }
 
     private func addSequence(toAct ai: Int) {
-        let name = "Sequence \(acts[ai].sequences.count + 1)"
-        acts[ai].sequences.append(SequenceEntry(name: name, scenes: []))
+        let name = "Sequence \(acts.wrappedValue[ai].sequences.count + 1)"
+        acts.wrappedValue[ai].sequences.append(SequenceEntry(name: name, scenes: []))
         selection = .sequence(name)
+    }
+
+    private func addStoryboard() {
+        let name = "Storyboard \(storyboards.storyboards.count + 1)"
+        let modelID = "M1"
+        let styleID = styles.styles.first?.styleID ?? "S1"
+        storyboards.storyboards.append(StoryboardEntry(name: name, acts: [], modelID: modelID, styleID: styleID))
+        selectedStoryboardIndex = storyboards.storyboards.count - 1
+        selection = nil
     }
 
     // MARK: - Fountain import
@@ -115,9 +184,13 @@ struct StoryboardBrowserView: View {
 
 private struct ActRow: View {
     @Binding var act: ActEntry
+    let actIndex: Int
+    let actCount: Int
     @Binding var selection: StoryboardSelection?
     let onAddSequence: () -> Void
     let onDelete: () -> Void
+    let onMoveUp: (() -> Void)?
+    let onMoveDown: (() -> Void)?
     @State private var isExpanded = true
 
     var body: some View {
@@ -145,6 +218,13 @@ private struct ActRow: View {
             .contextMenu {
                 Button { onAddSequence() } label: { Label("Add Sequence", systemImage: "plus") }
                 Divider()
+                if let onMoveUp {
+                    Button { onMoveUp() } label: { Label("Move Up", systemImage: "arrow.up") }
+                }
+                if let onMoveDown {
+                    Button { onMoveDown() } label: { Label("Move Down", systemImage: "arrow.down") }
+                }
+                Divider()
                 Button(role: .destructive, action: onDelete) { Label("Delete Act", systemImage: "trash") }
             }
 
@@ -152,9 +232,13 @@ private struct ActRow: View {
                 ForEach(act.sequences.indices, id: \.self) { si in
                     SequenceRow(
                         sequence: $act.sequences[si],
+                        seqIndex: si,
+                        seqCount: act.sequences.count,
                         selection: $selection,
                         onAddScene: { addScene(toSequence: si) },
-                        onDelete: { act.sequences.remove(at: si) }
+                        onDelete: { act.sequences.remove(at: si) },
+                        onMoveUp: si > 0 ? { act.sequences.swapAt(si, si - 1) } : nil,
+                        onMoveDown: si < act.sequences.count - 1 ? { act.sequences.swapAt(si, si + 1) } : nil
                     )
                     .padding(.leading, 16)
                     .background(Color.secondary.opacity(0.02))
@@ -175,9 +259,13 @@ private struct ActRow: View {
 
 private struct SequenceRow: View {
     @Binding var sequence: SequenceEntry
+    let seqIndex: Int
+    let seqCount: Int
     @Binding var selection: StoryboardSelection?
     let onAddScene: () -> Void
     let onDelete: () -> Void
+    let onMoveUp: (() -> Void)?
+    let onMoveDown: (() -> Void)?
     @State private var isExpanded = true
 
     var body: some View {
@@ -205,6 +293,13 @@ private struct SequenceRow: View {
             .contextMenu {
                 Button { onAddScene() } label: { Label("Add Scene", systemImage: "plus") }
                 Divider()
+                if let onMoveUp {
+                    Button { onMoveUp() } label: { Label("Move Up", systemImage: "arrow.up") }
+                }
+                if let onMoveDown {
+                    Button { onMoveDown() } label: { Label("Move Down", systemImage: "arrow.down") }
+                }
+                Divider()
                 Button(role: .destructive, action: onDelete) { Label("Delete Sequence", systemImage: "trash") }
             }
 
@@ -212,9 +307,13 @@ private struct SequenceRow: View {
                 ForEach(sequence.scenes.indices, id: \.self) { sci in
                     SceneRow(
                         scene: $sequence.scenes[sci],
+                        sceneIndex: sci,
+                        sceneCount: sequence.scenes.count,
                         selection: $selection,
                         onAddPanel: { addPanel(toScene: sci) },
-                        onDelete: { sequence.scenes.remove(at: sci) }
+                        onDelete: { sequence.scenes.remove(at: sci) },
+                        onMoveUp: sci > 0 ? { sequence.scenes.swapAt(sci, sci - 1) } : nil,
+                        onMoveDown: sci < sequence.scenes.count - 1 ? { sequence.scenes.swapAt(sci, sci + 1) } : nil
                     )
                     .padding(.leading, 16)
                     .background(Color.secondary.opacity(0.04))
@@ -235,9 +334,13 @@ private struct SequenceRow: View {
 
 private struct SceneRow: View {
     @Binding var scene: SceneEntry
+    let sceneIndex: Int
+    let sceneCount: Int
     @Binding var selection: StoryboardSelection?
     let onAddPanel: () -> Void
     let onDelete: () -> Void
+    let onMoveUp: (() -> Void)?
+    let onMoveDown: (() -> Void)?
     @State private var isExpanded = true
 
     var body: some View {
@@ -265,6 +368,13 @@ private struct SceneRow: View {
             .contextMenu {
                 Button { onAddPanel() } label: { Label("Add Panel", systemImage: "plus") }
                 Divider()
+                if let onMoveUp {
+                    Button { onMoveUp() } label: { Label("Move Up", systemImage: "arrow.up") }
+                }
+                if let onMoveDown {
+                    Button { onMoveDown() } label: { Label("Move Down", systemImage: "arrow.down") }
+                }
+                Divider()
                 Button(role: .destructive, action: onDelete) { Label("Delete Scene", systemImage: "trash") }
             }
 
@@ -272,8 +382,12 @@ private struct SceneRow: View {
                 ForEach(scene.panels.indices, id: \.self) { pi in
                     PanelRow(
                         panel: $scene.panels[pi],
+                        panelIndex: pi,
+                        panelCount: scene.panels.count,
                         selection: $selection,
-                        onDelete: { scene.panels.remove(at: pi) }
+                        onDelete: { scene.panels.remove(at: pi) },
+                        onMoveUp: pi > 0 ? { scene.panels.swapAt(pi, pi - 1) } : nil,
+                        onMoveDown: pi < scene.panels.count - 1 ? { scene.panels.swapAt(pi, pi + 1) } : nil
                     )
                     .padding(.leading, 16)
                     .background(Color.secondary.opacity(0.06))
@@ -287,8 +401,12 @@ private struct SceneRow: View {
 
 private struct PanelRow: View {
     @Binding var panel: PanelEntry
+    let panelIndex: Int
+    let panelCount: Int
     @Binding var selection: StoryboardSelection?
     let onDelete: () -> Void
+    let onMoveUp: (() -> Void)?
+    let onMoveDown: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 6) {
@@ -322,6 +440,13 @@ private struct PanelRow: View {
         .contentShape(Rectangle())
         .onTapGesture { selection = .panel(panel.panelID) }
         .contextMenu {
+            if let onMoveUp {
+                Button { onMoveUp() } label: { Label("Move Up", systemImage: "arrow.up") }
+            }
+            if let onMoveDown {
+                Button { onMoveDown() } label: { Label("Move Down", systemImage: "arrow.down") }
+            }
+            Divider()
             Button(role: .destructive, action: onDelete) { Label("Delete Panel", systemImage: "trash") }
         }
     }
