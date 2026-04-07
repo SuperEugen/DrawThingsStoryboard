@@ -66,6 +66,7 @@ To get consistent images over several panels it is crucial to use the moodboard 
 Character turn-around sheets improve panel creation and asset export.
 
 - [ ] UI Updates
+- [ ] Create assets for all styles.
 - [ ] Add prompt fragments to character assets to create a proper turn-around sheet.
 - [ ] Export one or all character turn-around sheets.
 - [ ] Add prompt fragment to character assets to separate body parts for 2d animation use.
