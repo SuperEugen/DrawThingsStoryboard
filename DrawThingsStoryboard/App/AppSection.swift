@@ -14,7 +14,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .storyboard:      return "Storyboard"
+        case .storyboard:      return "Storyboards"
         case .assets:          return "Assets"
         case .styles:          return "Styles"
         case .models:          return "Models"
