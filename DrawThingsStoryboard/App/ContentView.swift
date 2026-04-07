@@ -1,6 +1,7 @@
 import SwiftUI
 
 /// Root layout: three-pane NavigationSplitView.
+/// #45: Storyboard picker wiring
 struct ContentView: View {
 
     // MARK: - Navigation
@@ -87,6 +88,9 @@ struct ContentView: View {
         .onChange(of: queueRunner.isRunning) { _, running in
             if !running { triggerQueueRunner() }
         }
+        .onChange(of: storyboards) { _, _ in
+            StorageLoadService.shared.saveStoryboards(storyboards)
+        }
         .frame(minWidth: 1100, minHeight: 680)
         .navigationTitle(windowTitle)
         .toolbar {
@@ -117,18 +121,16 @@ struct ContentView: View {
     }
 
     // MARK: - Content pane
+    /// #45: StoryboardBrowserView now takes storyboards + selectedStoryboardIndex
 
     @ViewBuilder
     private var contentPane: some View {
         switch selectedSection {
         case .storyboard:
             StoryboardBrowserView(
-                acts: currentActsBinding,
+                storyboards: $storyboards,
+                selectedStoryboardIndex: $selectedStoryboardIndex,
                 selection: $storyboardSelection,
-                styleName: Binding(
-                    get: { resolvedStyleName },
-                    set: { _ in }
-                ),
                 styles: styles,
                 currentStyleID: currentStyleIDBinding,
                 onFountainImport: { importedActs, name in
