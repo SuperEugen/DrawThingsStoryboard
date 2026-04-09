@@ -5,7 +5,7 @@ import SwiftUI
 /// #48: Uses passed-in style description instead of resolving from storyboard
 /// #49: Character turn-around prompt for characters
 /// #53: Jobs now carry modelID
-/// #56: Generate Variants button for single asset
+/// #56: SF Symbols 7 icons: asset type icons, generate button icons
 /// #57: styleName uses passed-in name (not description)
 
 struct AssetsDetailView: View {
@@ -38,7 +38,7 @@ struct AssetsDetailView: View {
         } else {
             ContentUnavailableView(
                 "No asset selected",
-                systemImage: "photo.stack",
+                systemImage: "person.crop.square.on.square.angled",
                 description: Text("Select an asset to edit.")
             )
         }
@@ -46,6 +46,7 @@ struct AssetsDetailView: View {
 }
 
 // MARK: - Asset editor
+/// #56: Asset type icons updated to SF Symbols 7
 
 private struct AssetEditorView: View {
     @Binding var asset: AssetEntry
@@ -79,6 +80,24 @@ private struct AssetEditorView: View {
         return StorageService.shared.loadImage(id: asset.largeImageID)
     }
 
+    /// #56: Returns the appropriate SF Symbol for the asset's type/subType
+    private var assetTypeIcon: String {
+        if asset.isCharacter {
+            switch asset.subType {
+            case "female": return "figure.stand.dress"
+            case "male":   return "figure.stand"
+            default:        return "dog"
+            }
+        } else {
+            return asset.subType == "exterior" ? "tree" : "sofa"
+        }
+    }
+
+    /// #56: itemIcon for generation jobs
+    private var jobItemIcon: String {
+        asset.isCharacter ? "figure.stand" : "tree"
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
@@ -110,7 +129,7 @@ private struct AssetEditorView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Type")
                     HStack(spacing: 6) {
-                        Image(systemName: asset.isCharacter ? "person.fill" : "map")
+                        Image(systemName: assetTypeIcon)
                             .foregroundStyle(asset.isCharacter ? .blue : .teal)
                         Text(asset.isCharacter ? "Character" : "Location").font(.callout)
                         Text("\u{2014} \(asset.subType)").font(.callout).foregroundStyle(.secondary)
@@ -249,7 +268,7 @@ private struct AssetEditorView: View {
                     Text("Queued").font(.caption).foregroundStyle(.purple)
                 } else {
                     Button { generateLargeImage() } label: {
-                        Label("Generate", systemImage: "arrow.up.left.and.arrow.down.right").font(.caption)
+                        Label("Generate", systemImage: "arrow.up.left.and.arrow.down.right.rectangle").font(.caption)
                     }
                     .buttonStyle(.bordered).controlSize(.mini)
                 }
@@ -326,6 +345,7 @@ private struct AssetEditorView: View {
         asset.setVariant(at: idx, v)
     }
 
+    /// #56: itemIcon uses new SF Symbols
     /// #57: styleName uses name not description
     private func generateVariants() {
         let count = emptyVariantCount
@@ -335,7 +355,7 @@ private struct AssetEditorView: View {
             id: UUID().uuidString, itemName: asset.name, jobType: .generateAsset,
             size: .small, styleName: assetStyleName, queuedAt: Date(),
             estimatedDuration: TimeInterval(count * 60),
-            itemIcon: asset.isCharacter ? "person.fill" : "map",
+            itemIcon: jobItemIcon,
             seed: 0, width: config.smallImageWidth, height: config.smallImageHeight,
             combinedPrompt: prompt, variantCount: count,
             assetType: asset.type, assetSubType: asset.subType, assetID: asset.assetID,
@@ -344,6 +364,7 @@ private struct AssetEditorView: View {
         generationQueue.append(job)
     }
 
+    /// #56: itemIcon uses new SF Symbols
     /// #57: styleName uses name not description
     private func generateLargeImage() {
         guard asset.hasApprovedVariant, let approvedIdx = asset.approvedVariantIndex else { return }
@@ -353,7 +374,7 @@ private struct AssetEditorView: View {
             id: UUID().uuidString, itemName: asset.name, jobType: .generateAsset,
             size: .large, styleName: assetStyleName, queuedAt: Date(),
             estimatedDuration: 180,
-            itemIcon: asset.isCharacter ? "person.fill" : "map",
+            itemIcon: jobItemIcon,
             seed: approvedSeed, width: config.largeImageWidth, height: config.largeImageHeight,
             combinedPrompt: prompt, variantCount: 1,
             assetType: asset.type, assetSubType: asset.subType, assetID: asset.assetID,

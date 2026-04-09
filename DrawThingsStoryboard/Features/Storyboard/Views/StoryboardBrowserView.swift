@@ -14,6 +14,7 @@ enum StoryboardSelection: Hashable {
 // MARK: - StoryboardBrowserView
 /// #45: Storyboard picker, move up/down for all tree levels
 /// #52: Model picker in storyboard header
+/// #56: SF Symbols 7 icons for storyboard sections
 
 struct StoryboardBrowserView: View {
 
@@ -46,7 +47,7 @@ struct StoryboardBrowserView: View {
 
             if acts.wrappedValue.isEmpty {
                 Spacer()
-                ContentUnavailableView("No acts yet", systemImage: "pencil.and.list.clipboard",
+                ContentUnavailableView("No acts yet", systemImage: "film.stack",
                     description: Text("Use + to add an act, or import a Fountain file."))
                 Spacer()
             } else {
@@ -80,7 +81,7 @@ struct StoryboardBrowserView: View {
     @ViewBuilder
     private var headerBar: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: "pencil.and.list.clipboard").font(.title2).foregroundStyle(.secondary)
+            Image(systemName: "film.stack").font(.title2).foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 1) {
                 Text("Storyboards").font(.title2.bold())
             }
@@ -135,7 +136,7 @@ struct StoryboardBrowserView: View {
     private var storyboardRow: some View {
         if let sb = currentStoryboard {
             HStack(spacing: 6) {
-                Image(systemName: "book.fill")
+                Image(systemName: "film")
                     .foregroundStyle(.indigo).frame(width: 16)
                 Text(sb.name).font(.subheadline.weight(.bold))
                 Spacer()
@@ -191,6 +192,7 @@ struct StoryboardBrowserView: View {
 }
 
 // MARK: - Act row
+/// #56: Act icon → theatermasks
 
 private struct ActRow: View {
     @Binding var act: ActEntry
@@ -211,7 +213,7 @@ private struct ActRow: View {
                         .font(.caption.weight(.medium)).frame(width: 16)
                 }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
-                Image(systemName: "theatermask.and.paintbrush")
+                Image(systemName: "theatermasks")
                     .foregroundStyle(.purple).frame(width: 16)
                 Text(act.name).font(.subheadline.weight(.semibold))
                 Spacer()
@@ -266,6 +268,7 @@ private struct ActRow: View {
 }
 
 // MARK: - Sequence row
+/// #56: Sequence icon → ellipsis.rectangle
 
 private struct SequenceRow: View {
     @Binding var sequence: SequenceEntry
@@ -286,7 +289,7 @@ private struct SequenceRow: View {
                         .font(.caption.weight(.medium)).frame(width: 16)
                 }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
-                Image(systemName: "arrow.triangle.branch")
+                Image(systemName: "ellipsis.rectangle")
                     .foregroundStyle(.orange).frame(width: 16)
                 Text(sequence.name).font(.subheadline)
                 Spacer()
@@ -341,6 +344,7 @@ private struct SequenceRow: View {
 }
 
 // MARK: - Scene row
+/// #56: Scene icon → photo
 
 private struct SceneRow: View {
     @Binding var scene: SceneEntry
@@ -361,7 +365,7 @@ private struct SceneRow: View {
                         .font(.caption.weight(.medium)).frame(width: 16)
                 }
                 .buttonStyle(.plain).foregroundStyle(.secondary)
-                Image(systemName: "rectangle.on.rectangle")
+                Image(systemName: "photo")
                     .foregroundStyle(.teal).frame(width: 16)
                 Text(scene.name).font(.subheadline)
                 Spacer()
@@ -408,6 +412,7 @@ private struct SceneRow: View {
 }
 
 // MARK: - Panel row
+/// #56: Panel icon → list.and.film
 
 private struct PanelRow: View {
     @Binding var panel: PanelEntry
@@ -462,7 +467,7 @@ private struct PanelRow: View {
     }
 
     private var panelIcon: some View {
-        Image(systemName: "photo")
+        Image(systemName: "list.and.film")
             .foregroundStyle(.blue).frame(width: 16)
     }
 }

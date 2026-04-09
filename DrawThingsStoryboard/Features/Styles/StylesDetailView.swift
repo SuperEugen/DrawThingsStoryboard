@@ -1,7 +1,7 @@
 import SwiftUI
 
 // MARK: - Styles detail
-/// #56: Style detail example generation carries modelID
+/// #56: Style detail example generation carries modelID, icon → paintbrush.pointed
 
 struct StylesDetailView: View {
     @Binding var styles: StylesFile
@@ -78,7 +78,7 @@ private struct StyleEditorView: View {
                             Text("Queued").font(.caption).foregroundStyle(.purple)
                         } else {
                             Button { generateExample() } label: {
-                                Label(style.isGenerated ? "Regenerate Example" : "Generate Example", systemImage: "eye").font(.caption)
+                                Label(style.isGenerated ? "Regenerate Example" : "Generate Example", systemImage: "paintbrush.pointed").font(.caption)
                             }
                             .buttonStyle(.bordered).controlSize(.mini)
                             .keyboardShortcut(.return, modifiers: .command)
@@ -135,7 +135,7 @@ private struct StyleEditorView: View {
             styleName: style.name,
             queuedAt: Date(),
             estimatedDuration: 60,
-            itemIcon: "eye",
+            itemIcon: "paintbrush.pointed",
             seed: SeedHelper.randomSeed(),
             width: config.smallImageWidth,
             height: config.smallImageHeight,

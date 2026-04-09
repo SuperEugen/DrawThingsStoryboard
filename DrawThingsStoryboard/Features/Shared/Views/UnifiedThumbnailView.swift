@@ -1,6 +1,7 @@
 import SwiftUI
 
 // MARK: - Thumbnail item type
+/// #56: SF Symbols 7 icons for asset types
 
 enum ThumbnailItemType {
     case character(subType: String)
@@ -23,11 +24,17 @@ enum ThumbnailItemType {
 
     var icon: String {
         switch self {
-        case .character(let subType): return subType == "female" ? "person.fill" : "person.fill"
-        case .location(let subType):  return subType == "exterior" ? "map" : "house.fill"
-        case .style:                  return "paintpalette"
-        case .panel:                  return "video.fill"
-        case .model:                  return "gearshape"
+        case .character(let subType):
+            switch subType {
+            case "female": return "figure.stand.dress"
+            case "male":   return "figure.stand"
+            default:        return "dog"
+            }
+        case .location(let subType):
+            return subType == "exterior" ? "tree" : "sofa"
+        case .style:  return "paintpalette"
+        case .panel:  return "list.and.film"
+        case .model:  return "camera"
         }
     }
 

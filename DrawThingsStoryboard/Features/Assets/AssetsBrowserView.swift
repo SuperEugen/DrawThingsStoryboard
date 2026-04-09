@@ -7,6 +7,7 @@ import SwiftUI
 /// #49: Character turn-around prompt for characters
 /// #52: Model picker for asset generation
 /// #53: Jobs now carry modelID
+/// #56: SF Symbols 7 icons, Generate Large → arrow.up.left.and.arrow.down.right.rectangle
 /// #57: styleName uses resolved name (not description)
 
 struct AssetsBrowserView: View {
@@ -52,7 +53,7 @@ struct AssetsBrowserView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "photo.stack").font(.title2).foregroundStyle(.secondary)
+                Image(systemName: "person.crop.square.on.square.angled").font(.title2).foregroundStyle(.secondary)
                 Text("Assets").font(.title2.bold())
                 Spacer()
 
@@ -83,7 +84,7 @@ struct AssetsBrowserView: View {
                 Button {
                     generateAllLargeImages()
                 } label: {
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    Image(systemName: "arrow.up.left.and.arrow.down.right.rectangle")
                         .frame(width: 22, height: 22)
                 }
                 .buttonStyle(.borderless)
@@ -92,10 +93,10 @@ struct AssetsBrowserView: View {
 
                 Menu {
                     Button { addAsset(type: "character", subType: "male") } label: {
-                        Label("New Character", systemImage: "person.fill.badge.plus")
+                        Label("New Character", systemImage: "figure.stand")
                     }
                     Button { addAsset(type: "location", subType: "interior") } label: {
-                        Label("New Location", systemImage: "mappin.circle")
+                        Label("New Location", systemImage: "sofa")
                     }
                 } label: {
                     Image(systemName: "plus").frame(width: 22, height: 22)
@@ -131,7 +132,7 @@ struct AssetsBrowserView: View {
                     }
 
                     if assets.assets.isEmpty {
-                        ContentUnavailableView("No assets yet", systemImage: "photo.stack",
+                        ContentUnavailableView("No assets yet", systemImage: "person.crop.square.on.square.angled",
                             description: Text("Add a character or location using the + button above."))
                             .padding(.top, 40)
                     }
@@ -184,16 +185,18 @@ struct AssetsBrowserView: View {
         selectedAssetID = id
     }
 
+    /// #56: itemIcon uses new SF Symbol for asset type
     /// #57: styleName uses resolved name (not description)
     private func generateAllVariants() {
         for asset in assetsNeedingVariants {
             let count = emptyVariantCount(for: asset)
             let prompt = buildAssetPrompt(asset)
+            let icon = asset.isCharacter ? "figure.stand" : "tree"
             let job = GenerationJob(
                 id: UUID().uuidString, itemName: asset.name, jobType: .generateAsset,
                 size: .small, styleName: resolvedStyleName, queuedAt: Date(),
                 estimatedDuration: TimeInterval(count * 60),
-                itemIcon: asset.isCharacter ? "person.fill" : "map",
+                itemIcon: icon,
                 seed: 0, width: config.smallImageWidth, height: config.smallImageHeight,
                 combinedPrompt: prompt, variantCount: count,
                 assetType: asset.type, assetSubType: asset.subType, assetID: asset.assetID,
@@ -203,6 +206,7 @@ struct AssetsBrowserView: View {
         }
     }
 
+    /// #56: itemIcon uses new SF Symbol for asset type
     /// #57: styleName uses resolved name (not description)
     private func generateAllLargeImages() {
         for asset in assetsNeedingLargeImage {
@@ -211,11 +215,12 @@ struct AssetsBrowserView: View {
                 return 0
             }()
             let prompt = buildAssetPrompt(asset)
+            let icon = asset.isCharacter ? "figure.stand" : "tree"
             let job = GenerationJob(
                 id: UUID().uuidString, itemName: asset.name, jobType: .generateAsset,
                 size: .large, styleName: resolvedStyleName, queuedAt: Date(),
                 estimatedDuration: 180,
-                itemIcon: asset.isCharacter ? "person.fill" : "map",
+                itemIcon: icon,
                 seed: approvedSeed, width: config.largeImageWidth, height: config.largeImageHeight,
                 combinedPrompt: prompt, variantCount: 1,
                 assetType: asset.type, assetSubType: asset.subType, assetID: asset.assetID,

@@ -3,6 +3,7 @@ import SwiftUI
 /// Right pane for the Storyboard section.
 /// #45: Panel list for parent nodes (Act, Sequence, Scene)
 /// #53: Panel jobs now carry modelID
+/// #56: SF Symbols 7 icons for storyboard sections
 struct StoryboardDetailView: View {
 
     @Binding var acts: [ActEntry]
@@ -21,7 +22,7 @@ struct StoryboardDetailView: View {
                 if let idx = acts.firstIndex(where: { $0.name == name }) {
                     NodeDetailWithPanels(
                         level: "Act", name: $acts[idx].name, color: .purple,
-                        icon: "theatermask.and.paintbrush",
+                        icon: "theatermasks",
                         panels: panelsForAct(acts[idx]),
                         selection: Binding(
                             get: { self.selection },
@@ -34,7 +35,7 @@ struct StoryboardDetailView: View {
                 if let (ai, si) = findSequence(name) {
                     NodeDetailWithPanels(
                         level: "Sequence", name: $acts[ai].sequences[si].name, color: .orange,
-                        icon: "arrow.triangle.branch",
+                        icon: "ellipsis.rectangle",
                         panels: panelsForSequence(acts[ai].sequences[si]),
                         selection: Binding(
                             get: { self.selection },
@@ -47,7 +48,7 @@ struct StoryboardDetailView: View {
                 if let (ai, si, sci) = findScene(name) {
                     NodeDetailWithPanels(
                         level: "Scene", name: $acts[ai].sequences[si].scenes[sci].name, color: .teal,
-                        icon: "rectangle.on.rectangle",
+                        icon: "photo",
                         panels: acts[ai].sequences[si].scenes[sci].panels,
                         selection: Binding(
                             get: { self.selection },
@@ -214,6 +215,7 @@ private struct NodeDetailWithPanels: View {
 }
 
 // MARK: - Compact panel row for parent detail views
+/// #56: Panel placeholder icon → list.and.film
 
 private struct CompactPanelRow: View {
     let panel: PanelEntry
@@ -231,7 +233,7 @@ private struct CompactPanelRow: View {
                     .fill(Color.yellow.opacity(0.15))
                     .frame(width: 48, height: 27)
                     .overlay {
-                        Image(systemName: "photo").font(.system(size: 12))
+                        Image(systemName: "list.and.film").font(.system(size: 12))
                             .foregroundStyle(Color.yellow.opacity(0.5))
                     }
             }
@@ -270,6 +272,7 @@ private struct CompactPanelRow: View {
 // MARK: - Panel detail
 /// #42: Interactive asset slots with location-first constraint
 /// #53: Panel jobs carry modelID
+/// #56: SF Symbols 7 icons for panel generation + asset type icons
 
 private struct PanelDetailView: View {
     @Binding var panel: PanelEntry
@@ -523,13 +526,14 @@ private struct PanelDetailView: View {
         }
     }
 
+    /// #56: Asset picker menu uses new SF Symbols for asset types
     @ViewBuilder private var assetPickerMenu: some View {
         Menu {
             if !availableLocations.isEmpty {
                 Section("Locations") {
                     ForEach(availableLocations) { loc in
                         Button { assignAsset(id: loc.assetID) } label: {
-                            Label(loc.name, systemImage: loc.subType == "exterior" ? "map" : "house.fill")
+                            Label(loc.name, systemImage: loc.subType == "exterior" ? "tree" : "sofa")
                         }
                     }
                 }
@@ -538,7 +542,7 @@ private struct PanelDetailView: View {
                 Section("Characters") {
                     ForEach(availableCharacters) { char in
                         Button { assignAsset(id: char.assetID) } label: {
-                            Label(char.name, systemImage: "person.fill")
+                            Label(char.name, systemImage: char.subType == "female" ? "figure.stand.dress" : "figure.stand")
                         }
                     }
                 }
@@ -587,6 +591,7 @@ private struct PanelDetailView: View {
         panel.ref4ID = ids.count > 3 ? ids[3] : ""
     }
 
+    /// #56: Generate Small icon → paintbrush.pointed (consistent with style generation)
     @ViewBuilder private var smallImageStatusRow: some View {
         HStack(spacing: 8) {
             Text("S").font(.system(size: 10, weight: .bold, design: .monospaced))
@@ -600,7 +605,7 @@ private struct PanelDetailView: View {
                     Text("Queued").font(.caption).foregroundStyle(.purple)
                 } else {
                     Button { generateImage(size: .small) } label: {
-                        Label("Generate", systemImage: "photo").font(.caption)
+                        Label("Generate", systemImage: "paintbrush.pointed").font(.caption)
                     }
                     .buttonStyle(.bordered).controlSize(.mini).disabled(!hasDescription)
                 }
@@ -610,6 +615,7 @@ private struct PanelDetailView: View {
         .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
     }
 
+    /// #56: Generate Large icon → arrow.up.left.and.arrow.down.right.rectangle
     @ViewBuilder private var largeImageStatusRow: some View {
         HStack(spacing: 8) {
             Text("L").font(.system(size: 10, weight: .bold, design: .monospaced))
@@ -623,7 +629,7 @@ private struct PanelDetailView: View {
                     Text("Queued").font(.caption).foregroundStyle(.purple)
                 } else {
                     Button { generateImage(size: .large) } label: {
-                        Label("Generate", systemImage: "arrow.up.left.and.arrow.down.right").font(.caption)
+                        Label("Generate", systemImage: "arrow.up.left.and.arrow.down.right.rectangle").font(.caption)
                     }
                     .buttonStyle(.bordered).controlSize(.mini).disabled(!hasDescription)
                 }
@@ -640,6 +646,7 @@ private struct PanelDetailView: View {
     }
 
     /// #53: Panel jobs now carry modelID
+    /// #56: itemIcon → list.and.film
     private func generateImage(size: GenerationSize) {
         guard hasDescription else { return }
         let seed = panel.seed == 0 ? SeedHelper.randomSeed() : panel.seed
@@ -648,7 +655,7 @@ private struct PanelDetailView: View {
         let job = GenerationJob(
             id: UUID().uuidString, itemName: panel.name, jobType: .generatePanel,
             size: size, styleName: resolvedStyleName ?? "", queuedAt: Date(),
-            estimatedDuration: size == .large ? 180 : 60, itemIcon: "video.fill",
+            estimatedDuration: size == .large ? 180 : 60, itemIcon: "list.and.film",
             seed: seed, width: w, height: h, combinedPrompt: combinedPrompt,
             panelID: panel.panelID, modelID: modelID,
             initImageID: locationImageID,
@@ -659,18 +666,27 @@ private struct PanelDetailView: View {
 }
 
 // MARK: - Asset slot row
+/// #56: Asset slot icons use new SF Symbols
 
 private struct AssetSlotRow: View {
     let asset: AssetEntry
     let slotIndex: Int
     let onRemove: () -> Void
 
+    private var assetIcon: String {
+        if asset.isCharacter {
+            return asset.subType == "female" ? "figure.stand.dress" : "figure.stand"
+        } else {
+            return asset.subType == "exterior" ? "tree" : "sofa"
+        }
+    }
+
     var body: some View {
         HStack(spacing: 8) {
             Text("\(slotIndex + 1)")
                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                 .foregroundStyle(.secondary).frame(width: 16)
-            Image(systemName: asset.isCharacter ? "person.fill" : "map")
+            Image(systemName: assetIcon)
                 .foregroundStyle(asset.isCharacter ? .blue : .teal).frame(width: 16)
             Text(asset.name).font(.callout).lineLimit(1)
             Spacer()

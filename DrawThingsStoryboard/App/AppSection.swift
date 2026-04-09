@@ -1,7 +1,7 @@
 import Foundation
 
 /// Top-level navigation sections shown in the sidebar.
-/// #56: Reordered: Models, Styles, Assets, Storyboards, Production Queue, Settings
+/// #56: SF Symbols 7 icons
 enum AppSection: String, CaseIterable, Identifiable, Hashable {
 
     case models
@@ -26,11 +26,11 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
 
     var icon: String {
         switch self {
-        case .models:          return "gearshape"
+        case .models:          return "camera"
         case .styles:          return "paintpalette"
-        case .assets:          return "photo.stack"
-        case .storyboard:      return "pencil.and.list.clipboard"
-        case .productionQueue: return "film.stack"
+        case .assets:          return "person.crop.square.on.square.angled"
+        case .storyboard:      return "film.stack"
+        case .productionQueue: return "square.and.arrow.down.on.square"
         case .settings:        return "slider.horizontal.3"
         }
     }

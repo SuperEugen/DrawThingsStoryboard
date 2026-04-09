@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Styles browser
 /// #53: Style jobs carry modelID
-/// #56: Model picker in styles header
+/// #56: Model picker in styles header, Generate Example icon → paintbrush.pointed
 
 struct StylesBrowserView: View {
     @Binding var styles: StylesFile
@@ -34,10 +34,10 @@ struct StylesBrowserView: View {
                     }
                 }
                 .pickerStyle(.menu).labelsHidden().frame(maxWidth: 160)
-                // #7: Generate all missing examples
+                // #7/#56: Generate all missing examples
                 if ungeneratedCount > 0 {
                     Button { generateAllExamples() } label: {
-                        Label("Generate \(ungeneratedCount) Example\(ungeneratedCount == 1 ? "" : "s")", systemImage: "eye")
+                        Label("Generate \(ungeneratedCount) Example\(ungeneratedCount == 1 ? "" : "s")", systemImage: "paintbrush.pointed")
                             .font(.caption)
                     }
                     .buttonStyle(.bordered).controlSize(.mini)
@@ -103,7 +103,7 @@ struct StylesBrowserView: View {
                 styleName: style.name,
                 queuedAt: Date(),
                 estimatedDuration: 60,
-                itemIcon: "eye",
+                itemIcon: "paintbrush.pointed",
                 seed: SeedHelper.randomSeed(),
                 width: config.smallImageWidth,
                 height: config.smallImageHeight,
