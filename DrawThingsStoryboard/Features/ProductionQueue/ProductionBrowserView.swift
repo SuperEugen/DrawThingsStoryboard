@@ -2,6 +2,8 @@ import SwiftUI
 import Combine
 
 // MARK: - Production browser
+/// #53: Jobs now carry modelID; shown in row
+/// #54: Model-aware estimated running times
 
 struct ProductionBrowserView: View {
     @Binding var queue: [GenerationJob]
@@ -25,7 +27,7 @@ struct ProductionBrowserView: View {
             )
             .frame(minHeight: 120)
 
-            DoneSection(doneQueue: $doneQueue)
+            DoneSection(doneQueue: $doneQueue, models: models)
                 .frame(minHeight: 100)
         }
         .background(Color(NSColor.windowBackgroundColor))
@@ -55,24 +57,31 @@ private struct QueueSection: View {
     @State private var timerTick: Int = 0
     let timer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
-    /// Estimate seconds per image from production log (last 3 entries of matching size).
-    /// Falls back to 60s for small, 180s for large if no log data.
-    private func estimatedPerImage(size: GenerationSize) -> TimeInterval {
+    /// #54: Estimate seconds per image from production log (last 3 entries matching model + size).
+    /// Fallback chain: log average -> model defaults -> hardcoded 60/180s.
+    private func estimatedPerImage(size: GenerationSize, modelID: String) -> TimeInterval {
         let sizeStr = size.rawValue
         let isoFormatter = ISO8601DateFormatter()
+        // Filter by both modelID and size for accurate per-model estimates
         let matching = productionLog.generatedImages.filter { entry in
-            entry.size == sizeStr && !entry.startTime.isEmpty && !entry.endTime.isEmpty
+            entry.size == sizeStr && entry.modelID == modelID
+                && !entry.startTime.isEmpty && !entry.endTime.isEmpty
         }
         let recent = matching.suffix(3)
-        guard !recent.isEmpty else {
-            return size == .large ? 180 : 60
+        if !recent.isEmpty {
+            let totalDuration = recent.reduce(0.0) { acc, entry in
+                guard let start = isoFormatter.date(from: entry.startTime),
+                      let end = isoFormatter.date(from: entry.endTime) else { return acc }
+                return acc + end.timeIntervalSince(start)
+            }
+            return totalDuration / Double(recent.count)
         }
-        let totalDuration = recent.reduce(0.0) { acc, entry in
-            guard let start = isoFormatter.date(from: entry.startTime),
-                  let end = isoFormatter.date(from: entry.endTime) else { return acc }
-            return acc + end.timeIntervalSince(start)
+        // Fallback: model defaults
+        if let model = models.models.first(where: { $0.modelID == modelID }) {
+            return TimeInterval(size == .large ? model.defaultGenTimeLarge : model.defaultGenTimeSmall)
         }
-        return totalDuration / Double(recent.count)
+        // Last resort
+        return size == .large ? 180 : 60
     }
 
     private var estimatedFinishString: String {
@@ -80,7 +89,7 @@ private struct QueueSection: View {
         _ = timerTick
         var total: TimeInterval = 0
         for job in queue {
-            let perImage = estimatedPerImage(size: job.size)
+            let perImage = estimatedPerImage(size: job.size, modelID: job.modelID)
             let images = max(1, job.variantCount > 0 ? job.variantCount : 1)
             total += perImage * Double(images)
         }
@@ -92,6 +101,10 @@ private struct QueueSection: View {
     /// Number of waiting (non-running) jobs in the queue.
     private var waitingCount: Int {
         queue.filter { $0.id != queueRunner.currentJobID }.count
+    }
+
+    private func modelName(for id: String) -> String {
+        models.models.first(where: { $0.modelID == id })?.name ?? "?"
     }
 
     var body: some View {
@@ -141,7 +154,8 @@ private struct QueueSection: View {
                     JobRow(
                         job: job,
                         isRunning: queueRunner.currentJobID == job.id,
-                        estimatedDuration: estimatedPerImage(size: job.size) * Double(max(1, job.variantCount)),
+                        estimatedDuration: estimatedPerImage(size: job.size, modelID: job.modelID) * Double(max(1, job.variantCount)),
+                        modelName: modelName(for: job.modelID),
                         onDelete: {
                             guard queueRunner.currentJobID != job.id else { return }
                             queue.removeAll { $0.id == job.id }
@@ -161,6 +175,11 @@ private struct QueueSection: View {
 
 private struct DoneSection: View {
     @Binding var doneQueue: [GenerationJob]
+    let models: ModelsFile
+
+    private func modelName(for id: String) -> String {
+        models.models.first(where: { $0.modelID == id })?.name ?? "?"
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -181,7 +200,7 @@ private struct DoneSection: View {
                 Spacer()
             } else {
                 List(doneQueue) { job in
-                    DoneJobRow(job: job)
+                    DoneJobRow(job: job, modelName: modelName(for: job.modelID))
                 }.listStyle(.plain)
             }
         }
@@ -189,11 +208,13 @@ private struct DoneSection: View {
 }
 
 // MARK: - Job row
+/// #53: Shows model name in job row
 
 private struct JobRow: View {
     let job: GenerationJob
     let isRunning: Bool
     let estimatedDuration: TimeInterval
+    let modelName: String
     let onDelete: () -> Void
 
     var body: some View {
@@ -209,7 +230,11 @@ private struct JobRow: View {
                 .foregroundStyle(job.size == .large ? .green : .orange).frame(width: 14)
             VStack(alignment: .leading, spacing: 1) {
                 Text(job.itemName).font(.callout.weight(.medium)).lineLimit(1)
-                Text(job.styleName).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(modelName).font(.caption2).foregroundStyle(.blue.opacity(0.8)).lineLimit(1)
+                    Text("\u{00b7}").font(.caption2).foregroundStyle(.quaternary)
+                    Text(job.styleName).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                }
             }
             Spacer()
             if isRunning {
@@ -232,9 +257,11 @@ private struct JobRow: View {
 }
 
 // MARK: - Done job row
+/// #53: Shows model name in done row
 
 private struct DoneJobRow: View {
     let job: GenerationJob
+    let modelName: String
 
     private var durationString: String {
         guard let completed = job.completedAt, let started = job.startedAt else { return "" }
@@ -250,7 +277,11 @@ private struct DoneJobRow: View {
                 .foregroundStyle(job.jobType.color).frame(width: 14)
             VStack(alignment: .leading, spacing: 1) {
                 Text(job.itemName).font(.callout.weight(.medium)).lineLimit(1)
-                Text(job.styleName).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(modelName).font(.caption2).foregroundStyle(.blue.opacity(0.8)).lineLimit(1)
+                    Text("\u{00b7}").font(.caption2).foregroundStyle(.quaternary)
+                    Text(job.styleName).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                }
             }
             Spacer()
             Text(durationString).font(.caption2).foregroundStyle(.tertiary)

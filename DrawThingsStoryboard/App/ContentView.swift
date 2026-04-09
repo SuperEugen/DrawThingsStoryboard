@@ -4,6 +4,8 @@ import SwiftUI
 /// #45: Storyboard picker wiring
 /// #48: Asset style picker wiring
 /// #52: Model picker wiring for assets + storyboard
+/// #53: Pass modelID context to job creation views
+/// #55: Queue status toolbar indicator
 struct ContentView: View {
 
     // MARK: - Navigation
@@ -80,6 +82,11 @@ struct ContentView: View {
         styles.styles.first { $0.styleID == assetStyleID }?.style ?? ""
     }
 
+    /// #53: Resolved modelID for storyboard panel jobs.
+    private var resolvedStoryboardModelID: String {
+        currentStoryboard?.modelID ?? models.models.first?.modelID ?? ""
+    }
+
     private var windowTitle: String {
         if let sb = currentStoryboard {
             return "Draw Things Storyboard \u{2014} \(sb.name)"
@@ -112,6 +119,15 @@ struct ContentView: View {
         .frame(minWidth: 1100, minHeight: 680)
         .navigationTitle(windowTitle)
         .toolbar {
+            // #55: Queue status indicator
+            ToolbarItem(placement: .automatic) {
+                QueueStatusToolbarView(
+                    queue: generationQueue,
+                    queueRunner: queueRunner,
+                    productionLog: productionLog,
+                    models: models
+                )
+            }
             ToolbarItem(placement: .automatic) {
                 ConnectionStatusView(
                     address: config.grpcAddress,
@@ -172,7 +188,9 @@ struct ContentView: View {
                 styles: $styles,
                 selectedStyleID: $selectedStyleID,
                 generationQueue: $generationQueue,
-                config: config
+                config: config,
+                models: models,
+                selectedModelID: selectedModelID
             )
         case .models:
             ModelsBrowserView(
@@ -209,7 +227,8 @@ struct ContentView: View {
                 assets: assets,
                 resolvedStyleName: resolvedStyleName,
                 styleDescription: resolvedStyleDescription,
-                config: config
+                config: config,
+                modelID: resolvedStoryboardModelID
             )
         case .assets:
             AssetsDetailView(
@@ -217,7 +236,8 @@ struct ContentView: View {
                 selectedAssetID: selectedAssetID,
                 generationQueue: $generationQueue,
                 config: config,
-                assetStyleDescription: resolvedAssetStyleDescription
+                assetStyleDescription: resolvedAssetStyleDescription,
+                assetModelID: assetModelID
             )
         case .styles:
             StylesDetailView(
@@ -280,7 +300,10 @@ struct ContentView: View {
         let isoFormatter = ISO8601DateFormatter()
         let startTimeStr = job.startedAt.map { isoFormatter.string(from: $0) } ?? ""
         let endTimeStr = isoFormatter.string(from: done.completedAt ?? Date())
-        let resolvedModelID = selectedModelID ?? models.models.first?.modelID ?? ""
+        // #53: Use job's modelID for production log (more accurate than selectedModelID)
+        let resolvedModelID = job.modelID.isEmpty
+            ? (selectedModelID ?? models.models.first?.modelID ?? "")
+            : job.modelID
         let resolvedStyleID: String = {
             if !job.styleID.isEmpty { return job.styleID }
             if let sb = currentStoryboard { return sb.styleID }

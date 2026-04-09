@@ -1,7 +1,7 @@
 import SwiftUI
 
 // MARK: - Production job detail
-/// Now shows live progress from QueueRunnerService instead of a manual Generate button.
+/// #53: Shows modelID in job info
 
 struct ProductionJobDetailView: View {
     let queue: [GenerationJob]
@@ -22,6 +22,10 @@ struct ProductionJobDetailView: View {
         return queueRunner.currentJobID == job.id
     }
 
+    private func modelName(for id: String) -> String {
+        models.models.first(where: { $0.modelID == id })?.name ?? "?"
+    }
+
     var body: some View {
         if let job = selectedJob {
             ScrollView {
@@ -30,6 +34,7 @@ struct ProductionJobDetailView: View {
                         sectionLabel("Job")
                         infoRow("Type", job.jobType.rawValue)
                         infoRow("Size", job.size.rawValue)
+                        infoRow("Model", modelName(for: job.modelID))
                         infoRow("Style", job.styleName)
                         infoRow("Item", job.itemName)
                         infoRow("Seed", job.seed == 0 ? "random" : "\(job.seed)")
@@ -105,7 +110,6 @@ private struct GenerationProgressPanel: View {
             sectionLabel("Progress")
 
             if isCurrentJob {
-                // This job is currently being generated
                 HStack(spacing: 8) {
                     ProgressView()
                         .controlSize(.small)
@@ -122,7 +126,6 @@ private struct GenerationProgressPanel: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
 
-                // Show generated images so far
                 if !queueRunner.generatedImages.isEmpty {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                         ForEach(Array(queueRunner.generatedImages.enumerated()), id: \.offset) { _, img in
@@ -137,7 +140,6 @@ private struct GenerationProgressPanel: View {
                         .font(.caption).foregroundStyle(.red)
                 }
             } else {
-                // Waiting in queue
                 HStack(spacing: 8) {
                     Image(systemName: "clock")
                         .foregroundStyle(.secondary)

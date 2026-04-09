@@ -66,6 +66,8 @@ struct GenerationJob: Identifiable, Equatable {
     var assetID: String = ""
     /// The panelID this job belongs to (for panel generation).
     var panelID: String = ""
+    /// #53: The modelID this job was created with.
+    var modelID: String = ""
     /// #43: Image ID to load as canvas/init image (e.g. location asset image).
     var initImageID: String = ""
     /// #44: Image IDs for moodboard/shuffle hints (e.g. character asset images).

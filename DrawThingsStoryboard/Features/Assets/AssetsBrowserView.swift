@@ -6,6 +6,7 @@ import SwiftUI
 /// #48: Style picker for asset generation
 /// #49: Character turn-around prompt for characters
 /// #52: Model picker for asset generation
+/// #53: Jobs now carry modelID
 
 struct AssetsBrowserView: View {
     @Binding var assets: AssetsFile
@@ -178,6 +179,7 @@ struct AssetsBrowserView: View {
         selectedAssetID = id
     }
 
+    /// #53: Asset batch jobs carry modelID
     private func generateAllVariants() {
         for asset in assetsNeedingVariants {
             let count = emptyVariantCount(for: asset)
@@ -189,12 +191,14 @@ struct AssetsBrowserView: View {
                 itemIcon: asset.isCharacter ? "person.fill" : "map",
                 seed: 0, width: config.smallImageWidth, height: config.smallImageHeight,
                 combinedPrompt: prompt, variantCount: count,
-                assetType: asset.type, assetSubType: asset.subType, assetID: asset.assetID
+                assetType: asset.type, assetSubType: asset.subType, assetID: asset.assetID,
+                modelID: assetModelID
             )
             generationQueue.append(job)
         }
     }
 
+    /// #53: Asset batch jobs carry modelID
     private func generateAllLargeImages() {
         for asset in assetsNeedingLargeImage {
             let approvedSeed: Int = {
@@ -209,7 +213,8 @@ struct AssetsBrowserView: View {
                 itemIcon: asset.isCharacter ? "person.fill" : "map",
                 seed: approvedSeed, width: config.largeImageWidth, height: config.largeImageHeight,
                 combinedPrompt: prompt, variantCount: 1,
-                assetType: asset.type, assetSubType: asset.subType, assetID: asset.assetID
+                assetType: asset.type, assetSubType: asset.subType, assetID: asset.assetID,
+                modelID: assetModelID
             )
             generationQueue.append(job)
         }
@@ -219,7 +224,6 @@ struct AssetsBrowserView: View {
     private func buildAssetPrompt(_ asset: AssetEntry) -> String {
         var parts: [String] = []
         if !resolvedStyleDescription.isEmpty { parts.append(resolvedStyleDescription) }
-        // #49: Prepend character turn-around for character assets only
         if asset.isCharacter && !config.characterTurnAround.isEmpty {
             parts.append(config.characterTurnAround)
         }

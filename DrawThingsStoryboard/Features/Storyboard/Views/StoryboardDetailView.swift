@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Right pane for the Storyboard section.
 /// #45: Panel list for parent nodes (Act, Sequence, Scene)
+/// #53: Panel jobs now carry modelID
 struct StoryboardDetailView: View {
 
     @Binding var acts: [ActEntry]
@@ -11,6 +12,7 @@ struct StoryboardDetailView: View {
     var resolvedStyleName: String? = nil
     var styleDescription: String = ""
     var config: AppConfig = AppConfig()
+    var modelID: String = ""
 
     var body: some View {
         if let selection {
@@ -62,7 +64,8 @@ struct StoryboardDetailView: View {
                         assets: assets,
                         resolvedStyleName: resolvedStyleName,
                         styleDescription: styleDescription,
-                        config: config
+                        config: config,
+                        modelID: modelID
                     )
                 } else { emptyState }
             }
@@ -266,8 +269,7 @@ private struct CompactPanelRow: View {
 
 // MARK: - Panel detail
 /// #42: Interactive asset slots with location-first constraint
-/// #43: Location image passed as canvas/init image to gRPC
-/// #44: Character images passed as moodboard/shuffle hints to gRPC
+/// #53: Panel jobs carry modelID
 
 private struct PanelDetailView: View {
     @Binding var panel: PanelEntry
@@ -276,6 +278,7 @@ private struct PanelDetailView: View {
     var resolvedStyleName: String? = nil
     var styleDescription: String = ""
     var config: AppConfig = AppConfig()
+    var modelID: String = ""
 
     @State private var showLargeImageSheet = false
 
@@ -636,6 +639,7 @@ private struct PanelDetailView: View {
         .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
     }
 
+    /// #53: Panel jobs now carry modelID
     private func generateImage(size: GenerationSize) {
         guard hasDescription else { return }
         let seed = panel.seed == 0 ? SeedHelper.randomSeed() : panel.seed
@@ -646,7 +650,8 @@ private struct PanelDetailView: View {
             size: size, styleName: resolvedStyleName ?? "", queuedAt: Date(),
             estimatedDuration: size == .large ? 180 : 60, itemIcon: "video.fill",
             seed: seed, width: w, height: h, combinedPrompt: combinedPrompt,
-            panelID: panel.panelID, initImageID: locationImageID,
+            panelID: panel.panelID, modelID: modelID,
+            initImageID: locationImageID,
             moodboardImageIDs: characterImageIDs
         )
         generationQueue.append(job)

@@ -4,6 +4,7 @@ import SwiftUI
 /// #40: Generate Large Image button + Large Image preview
 /// #48: Uses passed-in style description instead of resolving from storyboard
 /// #49: Character turn-around prompt for characters
+/// #53: Jobs now carry modelID
 
 struct AssetsDetailView: View {
     @Binding var assets: AssetsFile
@@ -11,6 +12,7 @@ struct AssetsDetailView: View {
     @Binding var generationQueue: [GenerationJob]
     let config: AppConfig
     let assetStyleDescription: String
+    var assetModelID: String = ""
 
     private var selectedIndex: Int? {
         guard let id = selectedAssetID else { return nil }
@@ -24,6 +26,7 @@ struct AssetsDetailView: View {
                 generationQueue: $generationQueue,
                 config: config,
                 assetStyleDescription: assetStyleDescription,
+                assetModelID: assetModelID,
                 onDelete: {
                     assets.assets.remove(at: idx)
                 }
@@ -45,6 +48,7 @@ private struct AssetEditorView: View {
     @Binding var generationQueue: [GenerationJob]
     let config: AppConfig
     let assetStyleDescription: String
+    let assetModelID: String
     let onDelete: () -> Void
     @State private var showDeleteConfirmation = false
     @State private var showLargeImageSheet = false
@@ -282,7 +286,7 @@ private struct AssetEditorView: View {
         asset.setVariant(at: idx, v)
     }
 
-    /// #49: Build prompt with character turn-around for characters.
+    /// #49/#53: Build prompt + carry modelID
     private func generateLargeImage() {
         guard asset.hasApprovedVariant, let approvedIdx = asset.approvedVariantIndex else { return }
         let approvedSeed = asset.variant(at: approvedIdx).seed
@@ -301,7 +305,8 @@ private struct AssetEditorView: View {
             itemIcon: asset.isCharacter ? "person.fill" : "map",
             seed: approvedSeed, width: config.largeImageWidth, height: config.largeImageHeight,
             combinedPrompt: prompt, variantCount: 1,
-            assetType: asset.type, assetSubType: asset.subType, assetID: asset.assetID
+            assetType: asset.type, assetSubType: asset.subType, assetID: asset.assetID,
+            modelID: assetModelID
         )
         generationQueue.append(job)
     }

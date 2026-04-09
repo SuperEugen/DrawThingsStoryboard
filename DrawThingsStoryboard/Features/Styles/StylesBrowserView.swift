@@ -1,12 +1,15 @@
 import SwiftUI
 
 // MARK: - Styles browser
+/// #53: Style jobs carry modelID
 
 struct StylesBrowserView: View {
     @Binding var styles: StylesFile
     @Binding var selectedStyleID: String?
     @Binding var generationQueue: [GenerationJob]
     let config: AppConfig
+    let models: ModelsFile
+    let selectedModelID: String?
     private let columns = [GridItem(.adaptive(minimum: 288, maximum: 320), spacing: 12)]
 
     private var ungeneratedCount: Int {
@@ -77,10 +80,10 @@ struct StylesBrowserView: View {
         }
     }
 
-    // #7: Generate all missing examples
+    // #7/#53: Generate all missing examples with modelID
     private func generateAllExamples() {
+        let resolvedModelID = selectedModelID ?? models.models.first?.modelID ?? ""
         for style in styles.styles where !style.isGenerated {
-            // Skip if already queued
             guard !generationQueue.contains(where: { $0.styleID == style.styleID && $0.jobType == .generateStyle }) else { continue }
             let combined = [style.style, config.stylePrompt]
                 .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
@@ -98,7 +101,8 @@ struct StylesBrowserView: View {
                 width: config.smallImageWidth,
                 height: config.smallImageHeight,
                 combinedPrompt: combined,
-                styleID: style.styleID
+                styleID: style.styleID,
+                modelID: resolvedModelID
             )
             generationQueue.append(job)
         }
