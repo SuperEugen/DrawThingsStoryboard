@@ -101,6 +101,24 @@ private struct ModelEditorView: View {
                 }
                 .padding(.bottom, 12)
 
+                // #51: Sampler
+                VStack(alignment: .leading, spacing: 6) {
+                    sectionLabel("Sampler")
+                    TextField("e.g. UniPC Trailing", text: $model.sampler)
+                        .textFieldStyle(.roundedBorder)
+                }
+                .padding(.bottom, 12)
+
+                // #51: Img2Img Capable
+                VStack(alignment: .leading, spacing: 6) {
+                    sectionLabel("Img2Img")
+                    Toggle("Img2Img Capable", isOn: $model.isImg2ImgCapable)
+                        .toggleStyle(.switch)
+                }
+                .padding(.bottom, 12)
+
+                Divider().padding(.vertical, 8)
+
                 // Gen times
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Default Generation Times")

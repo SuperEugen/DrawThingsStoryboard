@@ -5,6 +5,7 @@ import SwiftUI
 /// #5: "Generate all Large Images" button
 /// #48: Style picker for asset generation
 /// #49: Character turn-around prompt for characters
+/// #52: Model picker for asset generation
 
 struct AssetsBrowserView: View {
     @Binding var assets: AssetsFile
@@ -13,6 +14,8 @@ struct AssetsBrowserView: View {
     let config: AppConfig
     let styles: StylesFile
     @Binding var assetStyleID: String
+    let models: ModelsFile
+    @Binding var assetModelID: String
 
     private var characters: [AssetEntry] {
         assets.assets.filter { $0.isCharacter }
@@ -45,6 +48,14 @@ struct AssetsBrowserView: View {
                 Image(systemName: "photo.stack").font(.title2).foregroundStyle(.secondary)
                 Text("Assets").font(.title2.bold())
                 Spacer()
+
+                // #52: Model picker
+                Picker("Model", selection: $assetModelID) {
+                    ForEach(models.models) { m in
+                        Text(m.name).tag(m.modelID)
+                    }
+                }
+                .pickerStyle(.menu).labelsHidden().frame(maxWidth: 160)
 
                 Picker("Style", selection: $assetStyleID) {
                     ForEach(styles.styles) { s in

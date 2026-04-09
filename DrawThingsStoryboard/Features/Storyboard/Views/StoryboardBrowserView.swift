@@ -13,6 +13,7 @@ enum StoryboardSelection: Hashable {
 
 // MARK: - StoryboardBrowserView
 /// #45: Storyboard picker, move up/down for all tree levels
+/// #52: Model picker in storyboard header
 
 struct StoryboardBrowserView: View {
 
@@ -21,6 +22,8 @@ struct StoryboardBrowserView: View {
     @Binding var selection: StoryboardSelection?
     let styles: StylesFile
     @Binding var currentStyleID: String
+    let models: ModelsFile
+    @Binding var currentModelID: String
     var onFountainImport: (([ActEntry], String) -> Void)? = nil
 
     /// The acts of the currently selected storyboard.
@@ -91,6 +94,13 @@ struct StoryboardBrowserView: View {
                 }
                 .pickerStyle(.menu).labelsHidden().frame(maxWidth: 180)
             }
+            // #52: Model picker
+            Picker("Model", selection: $currentModelID) {
+                ForEach(models.models) { m in
+                    Text(m.name).tag(m.modelID)
+                }
+            }
+            .pickerStyle(.menu).labelsHidden().frame(maxWidth: 160)
             Picker("Style", selection: $currentStyleID) {
                 ForEach(styles.styles) { s in
                     Text(s.name).tag(s.styleID)
@@ -152,7 +162,7 @@ struct StoryboardBrowserView: View {
 
     private func addStoryboard() {
         let name = "Storyboard \(storyboards.storyboards.count + 1)"
-        let modelID = "M1"
+        let modelID = models.models.first?.modelID ?? "M1"
         let styleID = styles.styles.first?.styleID ?? "S1"
         storyboards.storyboards.append(StoryboardEntry(name: name, acts: [], modelID: modelID, styleID: styleID))
         selectedStoryboardIndex = storyboards.storyboards.count - 1

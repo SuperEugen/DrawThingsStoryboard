@@ -33,6 +33,10 @@ struct ModelEntry: Codable, Identifiable {
     var steps: Int
     var defaultGenTimeSmall: Int = 60
     var defaultGenTimeLarge: Int = 180
+    // #51: Sampler name (free text, e.g. "UniPC Trailing")
+    var sampler: String = ""
+    // #51: Whether this model supports img2img generation
+    var isImg2ImgCapable: Bool = false
 
     var id: String { modelID }
 }

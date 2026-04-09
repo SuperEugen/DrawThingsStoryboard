@@ -3,6 +3,7 @@ import SwiftUI
 /// Root layout: three-pane NavigationSplitView.
 /// #45: Storyboard picker wiring
 /// #48: Asset style picker wiring
+/// #52: Model picker wiring for assets + storyboard
 struct ContentView: View {
 
     // MARK: - Navigation
@@ -25,6 +26,8 @@ struct ContentView: View {
     @State private var storyboardSelection: StoryboardSelection? = nil
     /// #48: Style used for asset generation (independent of storyboard style).
     @State private var assetStyleID: String = ""
+    /// #52: Model used for asset generation (independent of storyboard model).
+    @State private var assetModelID: String = ""
 
     // MARK: - Production Queue
     @State private var generationQueue: [GenerationJob] = []
@@ -52,6 +55,14 @@ struct ContentView: View {
             return .constant("")
         }
         return $storyboards.storyboards[selectedStoryboardIndex].styleID
+    }
+
+    /// #52: Binding to the current storyboard's modelID.
+    private var currentModelIDBinding: Binding<String> {
+        guard storyboards.storyboards.indices.contains(selectedStoryboardIndex) else {
+            return .constant("")
+        }
+        return $storyboards.storyboards[selectedStoryboardIndex].modelID
     }
 
     private var resolvedStyleName: String? {
@@ -139,6 +150,8 @@ struct ContentView: View {
                 selection: $storyboardSelection,
                 styles: styles,
                 currentStyleID: currentStyleIDBinding,
+                models: models,
+                currentModelID: currentModelIDBinding,
                 onFountainImport: { importedActs, name in
                     handleFountainImport(acts: importedActs, name: name)
                 }
@@ -150,7 +163,9 @@ struct ContentView: View {
                 generationQueue: $generationQueue,
                 config: config,
                 styles: styles,
-                assetStyleID: $assetStyleID
+                assetStyleID: $assetStyleID,
+                models: models,
+                assetModelID: $assetModelID
             )
         case .styles:
             StylesBrowserView(
@@ -378,6 +393,15 @@ struct ContentView: View {
                 assetStyleID = sb.styleID
             } else {
                 assetStyleID = styles.styles.first?.styleID ?? ""
+            }
+        }
+        // #52: Default asset model to first model or current storyboard's model
+        if assetModelID.isEmpty {
+            if let sb = storyboards.storyboards.first,
+               models.models.contains(where: { $0.modelID == sb.modelID }) {
+                assetModelID = sb.modelID
+            } else {
+                assetModelID = models.models.first?.modelID ?? ""
             }
         }
     }

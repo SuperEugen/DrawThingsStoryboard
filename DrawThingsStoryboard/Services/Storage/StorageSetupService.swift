@@ -25,7 +25,7 @@ final class StorageSetupService {
         let config = AppConfig()
         storage.write(config, to: storage.configURL)
 
-        // models.json
+        // models.json — #51: sampler + isImg2ImgCapable
         let models = ModelsFile(models: [
             ModelEntry(
                 modelID: "M1",
@@ -34,7 +34,9 @@ final class StorageSetupService {
                 model: "flux_2_klein_9b_kv_q8p.ckpt",
                 steps: 6,
                 defaultGenTimeSmall: 60,
-                defaultGenTimeLarge: 180
+                defaultGenTimeLarge: 180,
+                sampler: "UniPC Trailing",
+                isImg2ImgCapable: true
             )
         ])
         storage.write(models, to: storage.modelsURL)
