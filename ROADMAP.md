@@ -57,6 +57,7 @@ Completed: April 2026
 - [x] Character images → moodboard/shuffle hints for consistent appearance
 - [x] Export storyboard as PDF (panels in 2×3 grid, A4)
 - [x] Character turn-around prompt prepended to character asset descriptions
+- [x] Add prompt fragments to character assets to create proper turn-around sheets
 
 ## v0.6 — Multi-Model Support & Notifications ✅
 
@@ -85,7 +86,6 @@ Completed: April 2026
 Character turn-around sheets improve panel creation and asset export.
 
 - [ ] Create assets for all styles
-- [ ] Add prompt fragments to character assets to create proper turn-around sheets
 - [ ] Export one or all character turn-around sheets
 - [ ] Add prompt fragment to character assets to separate body parts for 2D animation
 - [ ] Export one or all character parts sheets
