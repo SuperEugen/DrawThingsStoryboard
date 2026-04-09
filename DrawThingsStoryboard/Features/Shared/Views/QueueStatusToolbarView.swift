@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 /// #55: Compact queue status shown in the app toolbar.
 /// Shows spinner + job count + estimated finish time when queue is running.
