@@ -2,6 +2,7 @@ import SwiftUI
 
 // MARK: - Assets browser
 /// #57: Per-style variants, header redesign (Filter | Generate | Add)
+/// Model picker moved to Generate group
 
 struct AssetsBrowserView: View {
     @Binding var assets: AssetsFile
@@ -32,7 +33,6 @@ struct AssetsBrowserView: View {
 
     // MARK: - Generate helpers
 
-    /// Assets that still need variants in the selected style.
     private var assetsNeedingVariants: [AssetEntry] {
         assets.assets.filter { asset in
             let sv = asset.variantsFor(style: assetStyleID)
@@ -41,7 +41,6 @@ struct AssetsBrowserView: View {
         }
     }
 
-    /// Assets that have an approved variant in the selected style but no large image.
     private var assetsNeedingLargeImage: [AssetEntry] {
         assets.assets.filter { asset in
             let sv = asset.variantsFor(style: assetStyleID)
@@ -82,23 +81,22 @@ struct AssetsBrowserView: View {
                             }
                         }
                         .pickerStyle(.menu).labelsHidden().frame(minWidth: 120)
-
-                        Text("Model").font(.caption).foregroundStyle(.secondary)
-                        Picker("Model", selection: $assetModelID) {
-                            ForEach(models.models) { m in
-                                Text(m.name).tag(m.modelID)
-                            }
-                        }
-                        .pickerStyle(.menu).labelsHidden().frame(minWidth: 120)
                     }
                 } label: {
                     Label("Filter", systemImage: "line.3.horizontal.decrease")
                         .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
                 }
 
-                // GROUP 2: Generate
+                // GROUP 2: Generate (with Model picker)
                 GroupBox {
                     HStack(spacing: 8) {
+                        Picker("Model", selection: $assetModelID) {
+                            ForEach(models.models) { m in
+                                Text(m.name).tag(m.modelID)
+                            }
+                        }
+                        .pickerStyle(.menu).labelsHidden().frame(minWidth: 120)
+
                         Button {
                             generateAllVariants()
                         } label: {
@@ -195,7 +193,6 @@ struct AssetsBrowserView: View {
         let thumbType: ThumbnailItemType = asset.isCharacter
             ? .character(subType: asset.subType)
             : .location(subType: asset.subType)
-        // Show best image for selected style, fallback to any style
         let displayImageID: String = {
             let styleImg = asset.bestImageID(forStyle: assetStyleID)
             if !styleImg.isEmpty { return styleImg }

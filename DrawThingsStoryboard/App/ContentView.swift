@@ -3,6 +3,7 @@ import SwiftUI
 /// Root layout: three-pane NavigationSplitView.
 /// #57: Per-style asset variants
 /// #59: Pushover notification wiring
+/// Fix: Production log uses per-image timestamps from QueueRunner
 struct ContentView: View {
 
     // MARK: - Navigation
@@ -30,7 +31,6 @@ struct ContentView: View {
     // MARK: - Production Queue
     @State private var generationQueue: [GenerationJob] = []
     @State private var doneQueue: [GenerationJob] = []
-    /// #59: Pushover notifications toggle (persisted in UserDefaults)
     @AppStorage("notificationsEnabled") private var notificationsEnabled: Bool = false
 
     // MARK: - Queue Runner
@@ -78,7 +78,6 @@ struct ContentView: View {
         currentStoryboard?.modelID ?? models.models.first?.modelID ?? ""
     }
 
-    /// #59: Whether Pushover credentials are configured
     private var pushoverConfigured: Bool {
         !config.pushoverToken.isEmpty && !config.pushoverUser.isEmpty
     }
@@ -112,7 +111,6 @@ struct ContentView: View {
         .onChange(of: storyboards) { _, _ in
             StorageLoadService.shared.saveStoryboards(storyboards)
         }
-        // #59: Keep notification flag in sync with QueueRunner
         .onChange(of: notificationsEnabled) { _, enabled in
             queueRunner.notificationsEnabled = enabled
         }
@@ -294,6 +292,7 @@ struct ContentView: View {
 
     // MARK: - Job completion
     /// #57: Asset jobs write to styleVariants[styleID]
+    /// Fix: Uses per-image start/end times from QueueRunner for accurate production log
 
     private func handleJobCompleted(_ job: GenerationJob) {
         var done = job
@@ -302,8 +301,6 @@ struct ContentView: View {
         generationQueue.removeAll { $0.id == job.id }
 
         let isoFormatter = ISO8601DateFormatter()
-        let startTimeStr = job.startedAt.map { isoFormatter.string(from: $0) } ?? ""
-        let endTimeStr = isoFormatter.string(from: done.completedAt ?? Date())
         let resolvedModelID = job.modelID.isEmpty
             ? (selectedModelID ?? models.models.first?.modelID ?? "")
             : job.modelID
@@ -313,14 +310,25 @@ struct ContentView: View {
             return ""
         }()
 
-        for imgID in job.savedImageIDs {
+        // Write production log entries with per-image timestamps
+        for (i, imgID) in job.savedImageIDs.enumerated() {
+            let startStr: String
+            let endStr: String
+            if i < queueRunner.perImageStartTimes.count && i < queueRunner.perImageEndTimes.count {
+                startStr = isoFormatter.string(from: queueRunner.perImageStartTimes[i])
+                endStr = isoFormatter.string(from: queueRunner.perImageEndTimes[i])
+            } else {
+                // Fallback: use job-level timestamps
+                startStr = job.startedAt.map { isoFormatter.string(from: $0) } ?? ""
+                endStr = isoFormatter.string(from: done.completedAt ?? Date())
+            }
             let entry = GeneratedImageEntry(
                 imageID: imgID,
                 type: job.jobType.rawValue,
                 modelID: resolvedModelID,
                 styleID: resolvedStyleID,
-                startTime: startTimeStr,
-                endTime: endTimeStr,
+                startTime: startStr,
+                endTime: endStr,
                 size: job.size.rawValue,
                 seed: job.seed,
                 combinedPrompt: job.combinedPrompt

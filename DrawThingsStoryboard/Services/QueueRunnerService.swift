@@ -4,6 +4,7 @@ import DrawThingsClient
 
 /// Runs the production queue automatically, processing one job at a time.
 /// #59: Sends Pushover notifications on job completion and queue finish
+/// Fix: Track per-image start/end times for accurate time estimation
 @MainActor
 final class QueueRunnerService: ObservableObject {
 
@@ -17,6 +18,11 @@ final class QueueRunnerService: ObservableObject {
     @Published var errorMessage: String? = nil
     @Published var currentStep: Int = 0
     @Published var stepsPerVariant: Int = 1
+
+    // MARK: - Per-image timing (for accurate production log)
+    /// Start/end times for each individual image in the current job.
+    var perImageStartTimes: [Date] = []
+    var perImageEndTimes: [Date] = []
 
     // MARK: - Internal
     private var isBusy: Bool = false
@@ -72,6 +78,8 @@ final class QueueRunnerService: ObservableObject {
         errorMessage = nil
         generationStage = ""
         currentStep = 0
+        perImageStartTimes = []
+        perImageEndTimes = []
 
         let count: Int
         if job.jobType == .generateAsset && job.size == .small {
@@ -129,6 +137,9 @@ final class QueueRunnerService: ObservableObject {
             currentVariant = i
             currentStep = 0
 
+            let imageStartTime = Date()
+            perImageStartTimes.append(imageStartTime)
+
             let vm = ImageGenerationViewModel()
             vm.prompt = job.combinedPrompt
             vm.width = job.width
@@ -172,6 +183,9 @@ final class QueueRunnerService: ObservableObject {
             await vm.generate()
             cancellable.cancel()
 
+            let imageEndTime = Date()
+            perImageEndTimes.append(imageEndTime)
+
             if let image = vm.generatedImage {
                 generatedImages.append(image)
                 do {
@@ -182,6 +196,7 @@ final class QueueRunnerService: ObservableObject {
                 }
             } else {
                 errorMessage = vm.errorMessage ?? "No image returned"
+                perImageEndTimes.append(imageEndTime) // ensure arrays stay aligned
                 break
             }
         }
@@ -201,11 +216,9 @@ final class QueueRunnerService: ObservableObject {
                 return m > 0 ? "\(m)m \(sec)s" : "\(sec)s"
             }()
             let images = done.savedImageIDs.count
-            // remainingQueueCount was set before this job started; subtract 1 for this job
             let remaining = max(0, remainingQueueCount - 1)
 
             if remaining == 0 {
-                // Last job — queue finished
                 PushoverService.send(
                     title: "\u{2705} Queue finished",
                     message: "\(job.itemName) done (\(duration), \(images) img). Queue complete!",
