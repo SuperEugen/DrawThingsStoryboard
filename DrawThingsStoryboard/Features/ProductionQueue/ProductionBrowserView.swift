@@ -2,6 +2,7 @@ import SwiftUI
 import Combine
 
 // MARK: - Production browser
+/// #56: Header icon updated to square.and.arrow.down.on.square
 /// #59: Notifications toggle in header
 
 struct ProductionBrowserView: View {
@@ -106,7 +107,7 @@ private struct QueueSection: View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Image(systemName: "film.stack").font(.title2).foregroundStyle(.secondary)
+                    Image(systemName: "square.and.arrow.down.on.square").font(.title2).foregroundStyle(.secondary)
                     Text("Production Queue").font(.title2.bold())
                     Spacer()
                     // #59: Notifications toggle

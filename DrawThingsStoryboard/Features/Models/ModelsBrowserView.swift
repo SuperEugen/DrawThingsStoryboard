@@ -1,6 +1,7 @@
 import SwiftUI
 
 // MARK: - Models browser
+/// #56: Icons updated to SF Symbols 7 (camera)
 
 struct ModelsBrowserView: View {
     @Binding var models: ModelsFile
@@ -9,7 +10,7 @@ struct ModelsBrowserView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Image(systemName: "gearshape").font(.title2).foregroundStyle(.secondary)
+                Image(systemName: "camera").font(.title2).foregroundStyle(.secondary)
                 Text("Models").font(.title2.bold())
                 Spacer()
                 Button(action: addModel) {
@@ -26,7 +27,7 @@ struct ModelsBrowserView: View {
                         .fill(Color.purple.opacity(0.15))
                         .frame(width: 32, height: 32)
                         .overlay {
-                            Image(systemName: "gearshape.fill")
+                            Image(systemName: "camera.fill")
                                 .font(.system(size: 14))
                                 .foregroundStyle(Color.purple.opacity(0.7))
                         }
