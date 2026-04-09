@@ -61,18 +61,22 @@ To get consistent images over several panels it is crucial to use the moodboard 
 - [x] Moodboard images sent via gRPC for consistent character appearance
 - [x] Export storyboard as PDF (panels in sequence with scene descriptions)
 
-## v0.6 - Improved Character Assets Handling
+## v0.6 - Model Selectable per Job and Notifications
+
+- [ ] Add prompt fragments to character assets to create a proper turn-around sheet.
+- [ ] Added Pushover notifications.
+
+## v0.7 - Improved Character Assets Handling
 
 Character turn-around sheets improve panel creation and asset export.
 
 - [ ] UI Updates
 - [ ] Create assets for all styles.
-- [ ] Add prompt fragments to character assets to create a proper turn-around sheet.
 - [ ] Export one or all character turn-around sheets.
 - [ ] Add prompt fragment to character assets to separate body parts for 2d animation use.
 - [ ] Export one or all character parts sheets.
 
-## v0.7 — Fountain Import Phase 2
+## v0.8 — Fountain Import Phase 2
 
 Deeper integration with Fountain screenplay files.
 
@@ -82,13 +86,13 @@ Deeper integration with Fountain screenplay files.
 - [ ] Panel fields for dialogue, action instruction, camera movement already exist in data model
 - [ ] UI polish for these fields in the Storyboard detail view and export.
 
-## v0.8 — Customization for Storyboard PDFs
+## v0.9 — Customization for Storyboard PDFs
 
 Custom option for the exported storyboard.
 
 - [ ] Columns, rows, title etc.
 
-## v0.9 — Clean Up
+## v1.0 — Clean Up
 
 The user interface and the code must be checked for a proper v1.
 
