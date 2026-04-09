@@ -1,6 +1,7 @@
 import SwiftUI
 
 /// Root layout: three-pane NavigationSplitView.
+/// #57: Per-style asset variants
 /// #59: Pushover notification wiring
 struct ContentView: View {
 
@@ -71,14 +72,6 @@ struct ContentView: View {
     private var resolvedStyleDescription: String {
         guard let sb = currentStoryboard else { return "" }
         return styles.styles.first { $0.styleID == sb.styleID }?.style ?? ""
-    }
-
-    private var resolvedAssetStyleDescription: String {
-        styles.styles.first { $0.styleID == assetStyleID }?.style ?? ""
-    }
-
-    private var resolvedAssetStyleName: String {
-        styles.styles.first { $0.styleID == assetStyleID }?.name ?? ""
     }
 
     private var resolvedStoryboardModelID: String {
@@ -236,7 +229,8 @@ struct ContentView: View {
                 resolvedStyleName: resolvedStyleName,
                 styleDescription: resolvedStyleDescription,
                 config: config,
-                modelID: resolvedStoryboardModelID
+                modelID: resolvedStoryboardModelID,
+                storyboardStyleID: currentStoryboard?.styleID ?? ""
             )
         case .assets:
             AssetsDetailView(
@@ -244,8 +238,7 @@ struct ContentView: View {
                 selectedAssetID: selectedAssetID,
                 generationQueue: $generationQueue,
                 config: config,
-                assetStyleDescription: resolvedAssetStyleDescription,
-                assetStyleName: resolvedAssetStyleName,
+                styles: styles,
                 assetModelID: assetModelID
             )
         case .styles:
@@ -300,6 +293,7 @@ struct ContentView: View {
     }
 
     // MARK: - Job completion
+    /// #57: Asset jobs write to styleVariants[styleID]
 
     private func handleJobCompleted(_ job: GenerationJob) {
         var done = job
@@ -347,28 +341,24 @@ struct ContentView: View {
 
         case .generateAsset:
             if let idx = assets.assets.firstIndex(where: { $0.assetID == job.assetID }) {
+                let targetStyleID = job.styleID.isEmpty ? resolvedStyleID : job.styleID
+                var sv = assets.assets[idx].variantsFor(style: targetStyleID)
+
                 if job.size == .large {
-                    assets.assets[idx].largeImageID = firstImageID
+                    sv.largeImageID = firstImageID
                 } else {
-                    let imageIDs = job.savedImageIDs
-                    var filled = 0
-                    for imgID in imageIDs {
-                        for vi in 0..<4 {
-                            let existing = assets.assets[idx].variant(at: vi)
-                            if !existing.hasImage {
-                                let effectiveSeed = job.seed == 0 ? SeedHelper.randomSeed() : job.seed + filled
-                                let newVariant = AssetVariant(
-                                    smallImageID: imgID,
-                                    seed: effectiveSeed,
-                                    isApproved: false
-                                )
-                                assets.assets[idx].setVariant(at: vi, newVariant)
-                                filled += 1
-                                break
-                            }
-                        }
+                    for imgID in job.savedImageIDs {
+                        guard sv.variants.count < 4 else { break }
+                        let effectiveSeed = job.seed == 0 ? SeedHelper.randomSeed() : job.seed + sv.variants.count
+                        sv.variants.append(AssetVariant(
+                            smallImageID: imgID,
+                            seed: effectiveSeed,
+                            isApproved: false
+                        ))
                     }
                 }
+
+                assets.assets[idx].styleVariants[targetStyleID] = sv
                 StorageLoadService.shared.saveAssets(assets)
             }
 

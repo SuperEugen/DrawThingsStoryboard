@@ -1,6 +1,7 @@
 import Foundation
 
 // MARK: - StorageSetupService
+/// #57: Demo assets use new styleVariants structure (no pre-generated variants)
 
 final class StorageSetupService {
 
@@ -25,7 +26,7 @@ final class StorageSetupService {
         let config = AppConfig()
         storage.write(config, to: storage.configURL)
 
-        // models.json — #51: sampler + isImg2ImgCapable; #56: renamed F2K KV + new ZIB model
+        // models.json
         let models = ModelsFile(models: [
             ModelEntry(
                 modelID: "M1",
@@ -96,7 +97,7 @@ final class StorageSetupService {
         ])
         storage.write(storyboards, to: storage.storyboardsURL)
 
-        // assets.json
+        // assets.json — #57: new structure with empty styleVariants
         let assets = AssetsFile(assets: [
             AssetEntry(assetID: "A1", name: "SuperEugen", type: "character", subType: "male",
                        description: "A 60yo man with a slight belly and a prominent chin wearing black glasses with a thick frame."),

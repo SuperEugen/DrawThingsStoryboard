@@ -3,7 +3,7 @@ import SwiftUI
 /// Right pane for the Storyboard section.
 /// #45: Panel list for parent nodes (Act, Sequence, Scene)
 /// #53: Panel jobs now carry modelID
-/// #56: SF Symbols 7 icons for storyboard sections
+/// #57: bestImageID uses storyboard styleID
 struct StoryboardDetailView: View {
 
     @Binding var acts: [ActEntry]
@@ -14,6 +14,7 @@ struct StoryboardDetailView: View {
     var styleDescription: String = ""
     var config: AppConfig = AppConfig()
     var modelID: String = ""
+    var storyboardStyleID: String = ""
 
     var body: some View {
         if let selection {
@@ -66,7 +67,8 @@ struct StoryboardDetailView: View {
                         resolvedStyleName: resolvedStyleName,
                         styleDescription: styleDescription,
                         config: config,
-                        modelID: modelID
+                        modelID: modelID,
+                        storyboardStyleID: storyboardStyleID
                     )
                 } else { emptyState }
             }
@@ -168,12 +170,10 @@ private struct NodeDetailWithPanels: View {
 
                 Divider().padding(.vertical, 8)
 
-                // Panel list with export button
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         sectionLabel("Panels (\(panels.count))")
                         Spacer()
-                        // #47: PDF export button
                         Button {
                             let headerTitle = "\(level) \u{2014} \(name)"
                             let filename = "\(name.replacingOccurrences(of: " ", with: "_")).pdf"
@@ -214,8 +214,7 @@ private struct NodeDetailWithPanels: View {
     }
 }
 
-// MARK: - Compact panel row for parent detail views
-/// #56: Panel placeholder icon → list.and.film
+// MARK: - Compact panel row
 
 private struct CompactPanelRow: View {
     let panel: PanelEntry
@@ -272,7 +271,7 @@ private struct CompactPanelRow: View {
 // MARK: - Panel detail
 /// #42: Interactive asset slots with location-first constraint
 /// #53: Panel jobs carry modelID
-/// #56: SF Symbols 7 icons for panel generation + asset type icons
+/// #57: bestImageID uses storyboard styleID
 
 private struct PanelDetailView: View {
     @Binding var panel: PanelEntry
@@ -282,6 +281,7 @@ private struct PanelDetailView: View {
     var styleDescription: String = ""
     var config: AppConfig = AppConfig()
     var modelID: String = ""
+    var storyboardStyleID: String = ""
 
     @State private var showLargeImageSheet = false
 
@@ -293,17 +293,9 @@ private struct PanelDetailView: View {
         assets.assets.first { $0.assetID == id }
     }
 
+    /// #57: Uses storyboard styleID to pick the right variant
     private func bestImageID(for entry: AssetEntry) -> String {
-        if entry.hasLargeImage { return entry.largeImageID }
-        if let idx = entry.approvedVariantIndex {
-            let v = entry.variant(at: idx)
-            if v.hasImage { return v.smallImageID }
-        }
-        for i in 0..<4 {
-            let v = entry.variant(at: i)
-            if v.hasImage { return v.smallImageID }
-        }
-        return ""
+        entry.bestImageID(forStyle: storyboardStyleID)
     }
 
     private var hasLocation: Bool {
@@ -526,7 +518,6 @@ private struct PanelDetailView: View {
         }
     }
 
-    /// #56: Asset picker menu uses new SF Symbols for asset types
     @ViewBuilder private var assetPickerMenu: some View {
         Menu {
             if !availableLocations.isEmpty {
@@ -591,7 +582,6 @@ private struct PanelDetailView: View {
         panel.ref4ID = ids.count > 3 ? ids[3] : ""
     }
 
-    /// #56: Generate Small icon → paintbrush.pointed (consistent with style generation)
     @ViewBuilder private var smallImageStatusRow: some View {
         HStack(spacing: 8) {
             Text("S").font(.system(size: 10, weight: .bold, design: .monospaced))
@@ -615,7 +605,6 @@ private struct PanelDetailView: View {
         .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
     }
 
-    /// #56: Generate Large icon → arrow.up.left.and.arrow.down.right.rectangle
     @ViewBuilder private var largeImageStatusRow: some View {
         HStack(spacing: 8) {
             Text("L").font(.system(size: 10, weight: .bold, design: .monospaced))
@@ -645,8 +634,6 @@ private struct PanelDetailView: View {
         .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
     }
 
-    /// #53: Panel jobs now carry modelID
-    /// #56: itemIcon → list.and.film
     private func generateImage(size: GenerationSize) {
         guard hasDescription else { return }
         let seed = panel.seed == 0 ? SeedHelper.randomSeed() : panel.seed
@@ -657,6 +644,7 @@ private struct PanelDetailView: View {
             size: size, styleName: resolvedStyleName ?? "", queuedAt: Date(),
             estimatedDuration: size == .large ? 180 : 60, itemIcon: "list.and.film",
             seed: seed, width: w, height: h, combinedPrompt: combinedPrompt,
+            styleID: storyboardStyleID,
             panelID: panel.panelID, modelID: modelID,
             initImageID: locationImageID,
             moodboardImageIDs: characterImageIDs
@@ -666,7 +654,6 @@ private struct PanelDetailView: View {
 }
 
 // MARK: - Asset slot row
-/// #56: Asset slot icons use new SF Symbols
 
 private struct AssetSlotRow: View {
     let asset: AssetEntry

@@ -1,14 +1,7 @@
 import SwiftUI
 
 // MARK: - Assets browser
-/// #4: "Generate all Variants" button
-/// #5: "Generate all Large Images" button
-/// #48: Style picker for asset generation
-/// #49: Character turn-around prompt for characters
-/// #52: Model picker for asset generation
-/// #53: Jobs now carry modelID
-/// #56: SF Symbols 7 icons, Generate Large → arrow.up.left.and.arrow.down.right.rectangle
-/// #57: styleName uses resolved name (not description)
+/// #57: Per-style variants, header redesign (Filter | Generate | Add)
 
 struct AssetsBrowserView: View {
     @Binding var assets: AssetsFile
@@ -33,132 +26,180 @@ struct AssetsBrowserView: View {
         styles.styles.first(where: { $0.styleID == assetStyleID })?.style ?? ""
     }
 
-    /// #57: Resolved style name (not description) for job display
     private var resolvedStyleName: String {
         styles.styles.first(where: { $0.styleID == assetStyleID })?.name ?? ""
     }
 
-    private func emptyVariantCount(for asset: AssetEntry) -> Int {
-        (0..<4).filter { !asset.variant(at: $0).hasImage }.count
-    }
+    // MARK: - Generate helpers
 
+    /// Assets that still need variants in the selected style.
     private var assetsNeedingVariants: [AssetEntry] {
-        assets.assets.filter { !$0.hasApprovedVariant && emptyVariantCount(for: $0) > 0 }
+        assets.assets.filter { asset in
+            let sv = asset.variantsFor(style: assetStyleID)
+            return !sv.hasApprovedVariant && sv.emptySlotCount > 0
+                && !asset.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
     }
 
+    /// Assets that have an approved variant in the selected style but no large image.
     private var assetsNeedingLargeImage: [AssetEntry] {
-        assets.assets.filter { $0.hasApprovedVariant && !$0.hasLargeImage }
+        assets.assets.filter { asset in
+            let sv = asset.variantsFor(style: assetStyleID)
+            return sv.hasApprovedVariant && !sv.hasLargeImage
+        }
     }
 
     var body: some View {
+        VStack(spacing: 0) {
+            headerBar
+            Divider()
+            assetGrid
+        }
+        .background(Color(NSColor.windowBackgroundColor))
+        .onAppear { ensureSelection() }
+    }
+
+    // MARK: - Header (3 groups: Filter | Generate | Add)
+
+    @ViewBuilder
+    private var headerBar: some View {
         VStack(spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "person.crop.square.on.square.angled").font(.title2).foregroundStyle(.secondary)
                 Text("Assets").font(.title2.bold())
                 Spacer()
-
-                Picker("Model", selection: $assetModelID) {
-                    ForEach(models.models) { m in
-                        Text(m.name).tag(m.modelID)
-                    }
-                }
-                .pickerStyle(.menu).labelsHidden().frame(maxWidth: 160)
-
-                Picker("Style", selection: $assetStyleID) {
-                    ForEach(styles.styles) { s in
-                        Text(s.name).tag(s.styleID)
-                    }
-                }
-                .pickerStyle(.menu).labelsHidden().frame(maxWidth: 160)
-
-                Button {
-                    generateAllVariants()
-                } label: {
-                    Image(systemName: "square.grid.2x2")
-                        .frame(width: 22, height: 22)
-                }
-                .buttonStyle(.borderless)
-                .help("Generate all missing variants for all assets")
-                .disabled(assetsNeedingVariants.isEmpty)
-
-                Button {
-                    generateAllLargeImages()
-                } label: {
-                    Image(systemName: "arrow.up.left.and.arrow.down.right.rectangle")
-                        .frame(width: 22, height: 22)
-                }
-                .buttonStyle(.borderless)
-                .help("Generate all missing large images of approved variants")
-                .disabled(assetsNeedingLargeImage.isEmpty)
-
-                Menu {
-                    Button { addAsset(type: "character", subType: "male") } label: {
-                        Label("New Character", systemImage: "figure.stand")
-                    }
-                    Button { addAsset(type: "location", subType: "interior") } label: {
-                        Label("New Location", systemImage: "sofa")
-                    }
-                } label: {
-                    Image(systemName: "plus").frame(width: 22, height: 22)
-                }
-                .menuStyle(.borderlessButton)
-                .frame(width: 30)
             }
-            .padding(.horizontal, 14).padding(.vertical, 12)
-            Divider()
+            .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 8)
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    if !characters.isEmpty {
-                        Text("Characters").font(.subheadline.weight(.medium))
-                            .foregroundStyle(.secondary).padding(.horizontal, 16).padding(.top, 8)
-                        LazyVGrid(columns: columns, spacing: 12) {
-                            ForEach(characters) { asset in
-                                assetTile(asset)
+            HStack(spacing: 16) {
+                // GROUP 1: Filter
+                GroupBox {
+                    HStack(spacing: 8) {
+                        Text("Style").font(.caption).foregroundStyle(.secondary)
+                        Picker("Style", selection: $assetStyleID) {
+                            ForEach(styles.styles) { s in
+                                Text(s.name).tag(s.styleID)
                             }
                         }
-                        .padding(.horizontal, 16)
-                    }
+                        .pickerStyle(.menu).labelsHidden().frame(minWidth: 120)
 
-                    if !locations.isEmpty {
-                        Text("Locations").font(.subheadline.weight(.medium))
-                            .foregroundStyle(.secondary).padding(.horizontal, 16).padding(.top, 8)
-                        LazyVGrid(columns: columns, spacing: 12) {
-                            ForEach(locations) { asset in
-                                assetTile(asset)
+                        Text("Model").font(.caption).foregroundStyle(.secondary)
+                        Picker("Model", selection: $assetModelID) {
+                            ForEach(models.models) { m in
+                                Text(m.name).tag(m.modelID)
                             }
                         }
-                        .padding(.horizontal, 16)
+                        .pickerStyle(.menu).labelsHidden().frame(minWidth: 120)
                     }
-
-                    if assets.assets.isEmpty {
-                        ContentUnavailableView("No assets yet", systemImage: "person.crop.square.on.square.angled",
-                            description: Text("Add a character or location using the + button above."))
-                            .padding(.top, 40)
-                    }
+                } label: {
+                    Label("Filter", systemImage: "line.3.horizontal.decrease")
+                        .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
                 }
-                .padding(.bottom, 16)
+
+                // GROUP 2: Generate
+                GroupBox {
+                    HStack(spacing: 8) {
+                        Button {
+                            generateAllVariants()
+                        } label: {
+                            Label("Variants (\(assetsNeedingVariants.count))", systemImage: "square.grid.2x2")
+                                .font(.callout)
+                        }
+                        .buttonStyle(.bordered).controlSize(.regular)
+                        .disabled(assetsNeedingVariants.isEmpty)
+                        .help("Generate missing variants for all assets in style \u{201c}\(resolvedStyleName)\u{201d}")
+
+                        Button {
+                            generateAllLargeImages()
+                        } label: {
+                            Label("Large (\(assetsNeedingLargeImage.count))", systemImage: "arrow.up.left.and.arrow.down.right.rectangle")
+                                .font(.callout)
+                        }
+                        .buttonStyle(.bordered).controlSize(.regular)
+                        .disabled(assetsNeedingLargeImage.isEmpty)
+                        .help("Generate missing large images for approved variants in style \u{201c}\(resolvedStyleName)\u{201d}")
+                    }
+                } label: {
+                    Label("Generate", systemImage: "paintbrush.pointed")
+                        .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
+                }
+
+                // GROUP 3: Add
+                GroupBox {
+                    Menu {
+                        Button { addAsset(type: "character", subType: "male") } label: {
+                            Label("New Character", systemImage: "figure.stand")
+                        }
+                        Button { addAsset(type: "location", subType: "interior") } label: {
+                            Label("New Location", systemImage: "sofa")
+                        }
+                    } label: {
+                        Label("Add", systemImage: "plus")
+                            .font(.callout)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .frame(width: 60)
+                } label: {
+                    Label("Add", systemImage: "plus.circle")
+                        .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
+                }
+
+                Spacer()
             }
+            .padding(.horizontal, 14).padding(.bottom, 10)
         }
-        .background(Color(NSColor.windowBackgroundColor))
-        .onAppear { ensureSelection() }
     }
+
+    // MARK: - Asset grid
+
+    @ViewBuilder
+    private var assetGrid: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                if !characters.isEmpty {
+                    Text("Characters").font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary).padding(.horizontal, 16).padding(.top, 8)
+                    LazyVGrid(columns: columns, spacing: 12) {
+                        ForEach(characters) { asset in
+                            assetTile(asset)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+
+                if !locations.isEmpty {
+                    Text("Locations").font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary).padding(.horizontal, 16).padding(.top, 8)
+                    LazyVGrid(columns: columns, spacing: 12) {
+                        ForEach(locations) { asset in
+                            assetTile(asset)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+
+                if assets.assets.isEmpty {
+                    ContentUnavailableView("No assets yet", systemImage: "person.crop.square.on.square.angled",
+                        description: Text("Add a character or location using the Add button above."))
+                        .padding(.top, 40)
+                }
+            }
+            .padding(.bottom, 16)
+        }
+    }
+
+    // MARK: - Tile
 
     private func assetTile(_ asset: AssetEntry) -> some View {
         let isSelected = selectedAssetID == asset.assetID
         let thumbType: ThumbnailItemType = asset.isCharacter
             ? .character(subType: asset.subType)
             : .location(subType: asset.subType)
+        // Show best image for selected style, fallback to any style
         let displayImageID: String = {
-            if let approvedIdx = asset.approvedVariantIndex {
-                return asset.variant(at: approvedIdx).smallImageID
-            }
-            for i in 0..<4 {
-                if asset.variant(at: i).hasImage {
-                    return asset.variant(at: i).smallImageID
-                }
-            }
-            return ""
+            let styleImg = asset.bestImageID(forStyle: assetStyleID)
+            if !styleImg.isEmpty { return styleImg }
+            return asset.bestDisplayImageID
         }()
         return UnifiedThumbnailView(
             itemType: thumbType,
@@ -185,11 +226,10 @@ struct AssetsBrowserView: View {
         selectedAssetID = id
     }
 
-    /// #56: itemIcon uses new SF Symbol for asset type
-    /// #57: styleName uses resolved name (not description)
     private func generateAllVariants() {
         for asset in assetsNeedingVariants {
-            let count = emptyVariantCount(for: asset)
+            let sv = asset.variantsFor(style: assetStyleID)
+            let count = sv.emptySlotCount
             let prompt = buildAssetPrompt(asset)
             let icon = asset.isCharacter ? "figure.stand" : "tree"
             let job = GenerationJob(
@@ -199,21 +239,17 @@ struct AssetsBrowserView: View {
                 itemIcon: icon,
                 seed: 0, width: config.smallImageWidth, height: config.smallImageHeight,
                 combinedPrompt: prompt, variantCount: count,
-                assetType: asset.type, assetSubType: asset.subType, assetID: asset.assetID,
+                assetType: asset.type, assetSubType: asset.subType,
+                styleID: assetStyleID, assetID: asset.assetID,
                 modelID: assetModelID
             )
             generationQueue.append(job)
         }
     }
 
-    /// #56: itemIcon uses new SF Symbol for asset type
-    /// #57: styleName uses resolved name (not description)
     private func generateAllLargeImages() {
         for asset in assetsNeedingLargeImage {
-            let approvedSeed: Int = {
-                if let idx = asset.approvedVariantIndex { return asset.variant(at: idx).seed }
-                return 0
-            }()
+            let sv = asset.variantsFor(style: assetStyleID)
             let prompt = buildAssetPrompt(asset)
             let icon = asset.isCharacter ? "figure.stand" : "tree"
             let job = GenerationJob(
@@ -221,9 +257,10 @@ struct AssetsBrowserView: View {
                 size: .large, styleName: resolvedStyleName, queuedAt: Date(),
                 estimatedDuration: 180,
                 itemIcon: icon,
-                seed: approvedSeed, width: config.largeImageWidth, height: config.largeImageHeight,
+                seed: sv.approvedSeed, width: config.largeImageWidth, height: config.largeImageHeight,
                 combinedPrompt: prompt, variantCount: 1,
-                assetType: asset.type, assetSubType: asset.subType, assetID: asset.assetID,
+                assetType: asset.type, assetSubType: asset.subType,
+                styleID: assetStyleID, assetID: asset.assetID,
                 modelID: assetModelID
             )
             generationQueue.append(job)

@@ -1,20 +1,14 @@
 import SwiftUI
 
 // MARK: - Assets detail
-/// #40: Generate Large Image button + Large Image preview
-/// #48: Uses passed-in style description instead of resolving from storyboard
-/// #49: Character turn-around prompt for characters
-/// #53: Jobs now carry modelID
-/// #56: SF Symbols 7 icons: asset type icons, generate button icons
-/// #57: styleName uses passed-in name (not description)
+/// #57: Per-style variants — shows all styles with their variants
 
 struct AssetsDetailView: View {
     @Binding var assets: AssetsFile
     let selectedAssetID: String?
     @Binding var generationQueue: [GenerationJob]
     let config: AppConfig
-    let assetStyleDescription: String
-    var assetStyleName: String = ""
+    let styles: StylesFile
     var assetModelID: String = ""
 
     private var selectedIndex: Int? {
@@ -28,8 +22,7 @@ struct AssetsDetailView: View {
                 asset: $assets.assets[idx],
                 generationQueue: $generationQueue,
                 config: config,
-                assetStyleDescription: assetStyleDescription,
-                assetStyleName: assetStyleName,
+                styles: styles,
                 assetModelID: assetModelID,
                 onDelete: {
                     assets.assets.remove(at: idx)
@@ -46,41 +39,19 @@ struct AssetsDetailView: View {
 }
 
 // MARK: - Asset editor
-/// #56: Asset type icons updated to SF Symbols 7
+/// #57: Shows all per-style variant sections
 
 private struct AssetEditorView: View {
     @Binding var asset: AssetEntry
     @Binding var generationQueue: [GenerationJob]
     let config: AppConfig
-    let assetStyleDescription: String
-    let assetStyleName: String
+    let styles: StylesFile
     let assetModelID: String
     let onDelete: () -> Void
     @State private var showDeleteConfirmation = false
     @State private var showLargeImageSheet = false
+    @State private var largeImageSheetStyleID: String = ""
 
-    private var isLargeQueued: Bool {
-        generationQueue.contains {
-            $0.assetID == asset.assetID && $0.jobType == .generateAsset && $0.size == .large
-        }
-    }
-
-    private var isVariantsQueued: Bool {
-        generationQueue.contains {
-            $0.assetID == asset.assetID && $0.jobType == .generateAsset && $0.size == .small
-        }
-    }
-
-    private var emptyVariantCount: Int {
-        (0..<4).filter { !asset.variant(at: $0).hasImage }.count
-    }
-
-    private var largeImage: NSImage? {
-        guard asset.hasLargeImage else { return nil }
-        return StorageService.shared.loadImage(id: asset.largeImageID)
-    }
-
-    /// #56: Returns the appropriate SF Symbol for the asset's type/subType
     private var assetTypeIcon: String {
         if asset.isCharacter {
             switch asset.subType {
@@ -93,7 +64,6 @@ private struct AssetEditorView: View {
         }
     }
 
-    /// #56: itemIcon for generation jobs
     private var jobItemIcon: String {
         asset.isCharacter ? "figure.stand" : "tree"
     }
@@ -101,13 +71,8 @@ private struct AssetEditorView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                let headerImageID: String = {
-                    if asset.hasLargeImage { return asset.largeImageID }
-                    if let idx = asset.approvedVariantIndex {
-                        return asset.variant(at: idx).smallImageID
-                    }
-                    return asset.smallImageID
-                }()
+                // Header image: best image from any style
+                let headerImageID = asset.bestDisplayImageID
                 let thumbType: ThumbnailItemType = asset.isCharacter
                     ? .character(subType: asset.subType)
                     : .location(subType: asset.subType)
@@ -116,16 +81,7 @@ private struct AssetEditorView: View {
                 )
                 .padding(.bottom, 16)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    sectionLabel("Status")
-                    variantsStatusRow
-                    statusRow("S", "Small Image", asset.hasSmallImage)
-                    largeImageStatusRow
-                }
-                .padding(.bottom, 12)
-
-                Divider().padding(.vertical, 8)
-
+                // Type
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Type")
                     HStack(spacing: 6) {
@@ -177,35 +133,24 @@ private struct AssetEditorView: View {
 
                 Divider().padding(.vertical, 8)
 
-                if asset.hasLargeImage {
-                    VStack(alignment: .leading, spacing: 6) {
-                        sectionLabel("Large Image")
-                        if let img = largeImage {
-                            Button { showLargeImageSheet = true } label: {
-                                Image(nsImage: img)
-                                    .resizable().scaledToFit()
-                                    .frame(maxWidth: .infinity).frame(maxHeight: 200)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
-                            .buttonStyle(.plain).help("Click to view full size")
+                // MARK: - Per-style sections
+                ForEach(styles.styles) { style in
+                    StyleVariantsSection(
+                        asset: $asset,
+                        style: style,
+                        generationQueue: $generationQueue,
+                        config: config,
+                        assetModelID: assetModelID,
+                        jobItemIcon: jobItemIcon,
+                        onViewLargeImage: { styleID in
+                            largeImageSheetStyleID = styleID
+                            showLargeImageSheet = true
                         }
-                    }
-                    .padding(.bottom, 12)
-                    Divider().padding(.vertical, 8)
+                    )
+                    Divider().padding(.vertical, 6)
                 }
 
-                VStack(alignment: .leading, spacing: 6) {
-                    sectionLabel("Variants")
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                        ForEach(0..<4, id: \.self) { idx in
-                            variantTile(index: idx)
-                        }
-                    }
-                }
-                .padding(.bottom, 12)
-
-                Divider().padding(.vertical, 8)
-
+                // Delete
                 Button(role: .destructive) {
                     showDeleteConfirmation = true
                 } label: {
@@ -225,167 +170,189 @@ private struct AssetEditorView: View {
         }
         .background(Color(NSColor.windowBackgroundColor))
         .sheet(isPresented: $showLargeImageSheet) {
-            LargeImageSheet(image: largeImage, assetName: asset.name, isPresented: $showLargeImageSheet)
+            let sv = asset.variantsFor(style: largeImageSheetStyleID)
+            let img = sv.hasLargeImage ? StorageService.shared.loadImage(id: sv.largeImageID) : nil
+            LargeImageSheet(image: img, assetName: asset.name, isPresented: $showLargeImageSheet)
+        }
+    }
+}
+
+// MARK: - Per-style variants section
+
+private struct StyleVariantsSection: View {
+    @Binding var asset: AssetEntry
+    let style: StyleEntry
+    @Binding var generationQueue: [GenerationJob]
+    let config: AppConfig
+    let assetModelID: String
+    let jobItemIcon: String
+    let onViewLargeImage: (String) -> Void
+
+    private var sv: AssetStyleVariants {
+        asset.variantsFor(style: style.styleID)
+    }
+
+    private var isVariantsQueued: Bool {
+        generationQueue.contains {
+            $0.assetID == asset.assetID && $0.styleID == style.styleID
+                && $0.jobType == .generateAsset && $0.size == .small
         }
     }
 
-    @ViewBuilder
-    private var variantsStatusRow: some View {
-        HStack(spacing: 8) {
-            Text("V").font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundStyle(asset.hasApprovedVariant ? .green : .gray)
-            Text("Variants:").font(.callout)
-            Text(asset.hasApprovedVariant ? "approved" : "not yet").font(.callout)
-                .foregroundStyle(asset.hasApprovedVariant ? .green : .secondary)
-            Spacer()
-            if emptyVariantCount > 0 && !asset.hasApprovedVariant {
-                if isVariantsQueued {
-                    Text("Queued").font(.caption).foregroundStyle(.purple)
-                } else {
-                    Button { generateVariants() } label: {
-                        Label("Generate \(emptyVariantCount)", systemImage: "square.grid.2x2").font(.caption)
+    private var isLargeQueued: Bool {
+        generationQueue.contains {
+            $0.assetID == asset.assetID && $0.styleID == style.styleID
+                && $0.jobType == .generateAsset && $0.size == .large
+        }
+    }
+
+    private var hasDescription: Bool {
+        !asset.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            // Style header with status
+            HStack(spacing: 8) {
+                Image(systemName: "paintpalette").foregroundStyle(.orange).font(.caption)
+                Text(style.name).font(.callout.weight(.semibold))
+                Spacer()
+
+                // Generate variants button
+                if sv.emptySlotCount > 0 && !sv.hasApprovedVariant {
+                    if isVariantsQueued {
+                        Text("Queued").font(.caption).foregroundStyle(.purple)
+                    } else {
+                        Button { generateVariants() } label: {
+                            Label("Generate \(sv.emptySlotCount)", systemImage: "square.grid.2x2").font(.caption)
+                        }
+                        .buttonStyle(.bordered).controlSize(.mini)
+                        .disabled(!hasDescription)
                     }
-                    .buttonStyle(.bordered).controlSize(.mini)
-                    .disabled(asset.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-            }
-        }
-        .padding(.vertical, 5).padding(.horizontal, 8)
-        .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
-    }
 
-    @ViewBuilder
-    private var largeImageStatusRow: some View {
-        HStack(spacing: 8) {
-            Text("L").font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundStyle(asset.hasLargeImage ? .green : .gray)
-            Text("Large Image:").font(.callout)
-            Text(asset.hasLargeImage ? "yes" : "not yet").font(.callout)
-                .foregroundStyle(asset.hasLargeImage ? .green : .secondary)
-            Spacer()
-            if asset.hasApprovedVariant && !asset.hasLargeImage {
-                if isLargeQueued {
-                    Text("Queued").font(.caption).foregroundStyle(.purple)
-                } else {
-                    Button { generateLargeImage() } label: {
-                        Label("Generate", systemImage: "arrow.up.left.and.arrow.down.right.rectangle").font(.caption)
+                // Generate large button
+                if sv.hasApprovedVariant && !sv.hasLargeImage {
+                    if isLargeQueued {
+                        Text("Queued").font(.caption).foregroundStyle(.purple)
+                    } else {
+                        Button { generateLargeImage() } label: {
+                            Label("Large", systemImage: "arrow.up.left.and.arrow.down.right.rectangle").font(.caption)
+                        }
+                        .buttonStyle(.bordered).controlSize(.mini)
                     }
-                    .buttonStyle(.bordered).controlSize(.mini)
                 }
-            }
-            if asset.hasLargeImage {
-                Button { showLargeImageSheet = true } label: {
-                    Image(systemName: "eye").font(.caption)
-                }
-                .buttonStyle(.bordered).controlSize(.mini).help("View large image")
-            }
-        }
-        .padding(.vertical, 5).padding(.horizontal, 8)
-        .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
-    }
 
-    @ViewBuilder
-    private func statusRow(_ letter: String, _ label: String, _ active: Bool) -> some View {
-        HStack(spacing: 8) {
-            Text(letter).font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundStyle(active ? .green : .gray)
-            Text("\(label):").font(.callout)
-            Text(active ? "yes" : "not yet").font(.callout)
-                .foregroundStyle(active ? .green : .secondary)
-            Spacer()
+                // View large image
+                if sv.hasLargeImage {
+                    Button { onViewLargeImage(style.styleID) } label: {
+                        Image(systemName: "eye").font(.caption)
+                    }
+                    .buttonStyle(.bordered).controlSize(.mini).help("View large image")
+                }
+            }
+            .padding(.vertical, 5).padding(.horizontal, 8)
+            .background(RoundedRectangle(cornerRadius: 7).fill(Color.orange.opacity(0.07)))
+
+            // Variant tiles (show existing + empty slots up to 4)
+            if !sv.variants.isEmpty || sv.emptySlotCount < 4 {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                    ForEach(0..<4, id: \.self) { idx in
+                        variantTile(index: idx)
+                    }
+                }
+            } else {
+                Text("No variants generated yet.")
+                    .font(.caption).foregroundStyle(.tertiary).padding(.vertical, 4)
+            }
+
+            // Large image preview
+            if sv.hasLargeImage, let img = StorageService.shared.loadImage(id: sv.largeImageID) {
+                Button { onViewLargeImage(style.styleID) } label: {
+                    Image(nsImage: img)
+                        .resizable().scaledToFit()
+                        .frame(maxWidth: .infinity).frame(maxHeight: 120)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain).help("Click to view full size")
+            }
         }
-        .padding(.vertical, 5).padding(.horizontal, 8)
-        .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
     }
 
     private func variantTile(index idx: Int) -> some View {
-        let variant = asset.variant(at: idx)
-        return VStack(spacing: 4) {
-            let thumbType: ThumbnailItemType = asset.isCharacter
-                ? .character(subType: asset.subType)
-                : .location(subType: asset.subType)
+        let variant: AssetVariant? = idx < sv.variants.count ? sv.variants[idx] : nil
+        let thumbType: ThumbnailItemType = asset.isCharacter
+            ? .character(subType: asset.subType)
+            : .location(subType: asset.subType)
+
+        return VStack(spacing: 2) {
             UnifiedThumbnailView(
-                itemType: thumbType, name: "", sizeMode: .standard,
-                badges: ThumbnailBadges(showApprovedBadge: variant.isApproved),
-                imageID: variant.smallImageID
+                itemType: thumbType, name: "", sizeMode: .compact,
+                badges: ThumbnailBadges(showApprovedBadge: variant?.isApproved ?? false),
+                imageID: variant?.smallImageID ?? ""
             )
-            .opacity(variant.hasImage ? 1.0 : 0.4)
+            .opacity(variant?.hasImage ?? false ? 1.0 : 0.3)
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(variant.isApproved ? Color.green : Color.clear, lineWidth: 1.5)
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(variant?.isApproved ?? false ? Color.green : Color.clear, lineWidth: 1.5)
             )
 
-            if variant.hasImage {
-                HStack(spacing: 8) {
-                    Button { approveVariant(at: idx) } label: {
-                        Image(systemName: variant.isApproved ? "hand.thumbsup.fill" : "hand.thumbsup")
-                            .font(.caption2)
-                            .foregroundStyle(variant.isApproved ? .green : .secondary)
-                    }
-                    .buttonStyle(.plain)
-
-                    Text("Seed: \(variant.seed)")
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(.tertiary)
+            if let v = variant, v.hasImage {
+                Button { approveVariant(at: idx) } label: {
+                    Image(systemName: v.isApproved ? "hand.thumbsup.fill" : "hand.thumbsup")
+                        .font(.system(size: 9))
+                        .foregroundStyle(v.isApproved ? .green : .secondary)
                 }
-            } else {
-                Text("Empty").font(.caption2).foregroundStyle(.quaternary)
+                .buttonStyle(.plain)
             }
         }
     }
 
     private func approveVariant(at idx: Int) {
-        for i in 0..<4 {
-            var v = asset.variant(at: i)
-            v.isApproved = false
-            asset.setVariant(at: i, v)
+        var current = sv
+        for i in current.variants.indices {
+            current.variants[i].isApproved = (i == idx)
         }
-        var v = asset.variant(at: idx)
-        v.isApproved = true
-        asset.setVariant(at: idx, v)
+        asset.styleVariants[style.styleID] = current
     }
 
-    /// #56: itemIcon uses new SF Symbols
-    /// #57: styleName uses name not description
     private func generateVariants() {
-        let count = emptyVariantCount
+        let count = sv.emptySlotCount
         guard count > 0 else { return }
-        let prompt = buildAssetPrompt()
+        let prompt = buildPrompt()
         let job = GenerationJob(
             id: UUID().uuidString, itemName: asset.name, jobType: .generateAsset,
-            size: .small, styleName: assetStyleName, queuedAt: Date(),
+            size: .small, styleName: style.name, queuedAt: Date(),
             estimatedDuration: TimeInterval(count * 60),
             itemIcon: jobItemIcon,
             seed: 0, width: config.smallImageWidth, height: config.smallImageHeight,
             combinedPrompt: prompt, variantCount: count,
-            assetType: asset.type, assetSubType: asset.subType, assetID: asset.assetID,
+            assetType: asset.type, assetSubType: asset.subType,
+            styleID: style.styleID, assetID: asset.assetID,
             modelID: assetModelID
         )
         generationQueue.append(job)
     }
 
-    /// #56: itemIcon uses new SF Symbols
-    /// #57: styleName uses name not description
     private func generateLargeImage() {
-        guard asset.hasApprovedVariant, let approvedIdx = asset.approvedVariantIndex else { return }
-        let approvedSeed = asset.variant(at: approvedIdx).seed
-        let prompt = buildAssetPrompt()
+        let prompt = buildPrompt()
         let job = GenerationJob(
             id: UUID().uuidString, itemName: asset.name, jobType: .generateAsset,
-            size: .large, styleName: assetStyleName, queuedAt: Date(),
+            size: .large, styleName: style.name, queuedAt: Date(),
             estimatedDuration: 180,
             itemIcon: jobItemIcon,
-            seed: approvedSeed, width: config.largeImageWidth, height: config.largeImageHeight,
+            seed: sv.approvedSeed, width: config.largeImageWidth, height: config.largeImageHeight,
             combinedPrompt: prompt, variantCount: 1,
-            assetType: asset.type, assetSubType: asset.subType, assetID: asset.assetID,
+            assetType: asset.type, assetSubType: asset.subType,
+            styleID: style.styleID, assetID: asset.assetID,
             modelID: assetModelID
         )
         generationQueue.append(job)
     }
 
-    private func buildAssetPrompt() -> String {
+    private func buildPrompt() -> String {
         var parts: [String] = []
-        if !assetStyleDescription.isEmpty { parts.append(assetStyleDescription) }
+        if !style.style.isEmpty { parts.append(style.style) }
         if asset.isCharacter && !config.characterTurnAround.isEmpty {
             parts.append(config.characterTurnAround)
         }

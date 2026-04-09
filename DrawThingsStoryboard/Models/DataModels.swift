@@ -124,10 +124,45 @@ struct PanelEntry: Codable, Identifiable, Equatable {
 }
 
 // MARK: - assets.json
+/// #57: Per-style asset variants
 
 struct AssetsFile: Codable {
     var assets: [AssetEntry]
     var version: Int = 1
+}
+
+/// Per-style collection of up to 4 variants + one large image.
+struct AssetStyleVariants: Codable {
+    var variants: [AssetVariant] = []
+    var largeImageID: String = ""
+
+    var hasLargeImage: Bool { !largeImageID.isEmpty }
+
+    var approvedVariantIndex: Int? {
+        variants.firstIndex { $0.isApproved }
+    }
+
+    var hasApprovedVariant: Bool { approvedVariantIndex != nil }
+
+    /// Number of empty variant slots (max 4).
+    var emptySlotCount: Int {
+        max(0, 4 - variants.count)
+    }
+
+    /// Approved variant’s seed, or 0 if none.
+    var approvedSeed: Int {
+        guard let idx = approvedVariantIndex else { return 0 }
+        return variants[idx].seed
+    }
+
+    /// Best available image ID: large > approved variant > first variant with image.
+    var bestImageID: String {
+        if hasLargeImage { return largeImageID }
+        if let idx = approvedVariantIndex, variants[idx].hasImage {
+            return variants[idx].smallImageID
+        }
+        return variants.first(where: { $0.hasImage })?.smallImageID ?? ""
+    }
 }
 
 struct AssetEntry: Codable, Identifiable {
@@ -136,50 +171,55 @@ struct AssetEntry: Codable, Identifiable {
     var type: String
     var subType: String
     var description: String
-    var smallImageID: String = ""
-    var largeImageID: String = ""
-    var seed: Int = 0
-    var variant1: AssetVariant = AssetVariant()
-    var variant2: AssetVariant = AssetVariant()
-    var variant3: AssetVariant = AssetVariant()
-    var variant4: AssetVariant = AssetVariant()
+    /// #57: Per-style variants. Key = styleID.
+    var styleVariants: [String: AssetStyleVariants] = [:]
 
     var id: String { assetID }
 
     var isCharacter: Bool { type == "character" }
     var isLocation: Bool { type == "location" }
 
-    var hasSmallImage: Bool { !smallImageID.isEmpty }
-    var hasLargeImage: Bool { !largeImageID.isEmpty }
+    // MARK: - Style-aware accessors
 
-    var variants: [AssetVariant] {
-        [variant1, variant2, variant3, variant4]
+    /// Get or create the AssetStyleVariants for a given style.
+    func variantsFor(style styleID: String) -> AssetStyleVariants {
+        styleVariants[styleID] ?? AssetStyleVariants()
     }
 
-    var approvedVariantIndex: Int? {
-        variants.firstIndex { $0.isApproved }
+    /// Best image for a given style (large > approved > first variant).
+    func bestImageID(forStyle styleID: String) -> String {
+        variantsFor(style: styleID).bestImageID
     }
 
-    var hasApprovedVariant: Bool { approvedVariantIndex != nil }
+    /// Whether this asset has an approved variant for a given style.
+    func hasApprovedVariant(forStyle styleID: String) -> Bool {
+        variantsFor(style: styleID).hasApprovedVariant
+    }
 
-    mutating func setVariant(at index: Int, _ variant: AssetVariant) {
-        switch index {
-        case 0: variant1 = variant
-        case 1: variant2 = variant
-        case 2: variant3 = variant
-        case 3: variant4 = variant
-        default: break
+    /// Whether this asset has a large image for a given style.
+    func hasLargeImage(forStyle styleID: String) -> Bool {
+        variantsFor(style: styleID).hasLargeImage
+    }
+
+    /// All style IDs that have at least one generated image.
+    var generatedStyleIDs: [String] {
+        styleVariants.filter { !$0.value.variants.isEmpty || $0.value.hasLargeImage }
+            .map { $0.key }
+            .sorted()
+    }
+
+    /// Whether any style has any image at all.
+    var hasAnyImage: Bool {
+        styleVariants.values.contains { !$0.variants.isEmpty || $0.hasLargeImage }
+    }
+
+    /// Best display image across all styles (for tiles when no style filter is active).
+    var bestDisplayImageID: String {
+        for sv in styleVariants.values {
+            let img = sv.bestImageID
+            if !img.isEmpty { return img }
         }
-    }
-
-    func variant(at index: Int) -> AssetVariant {
-        switch index {
-        case 0: return variant1
-        case 1: return variant2
-        case 2: return variant3
-        case 3: return variant4
-        default: return AssetVariant()
-        }
+        return ""
     }
 }
 
