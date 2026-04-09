@@ -5,6 +5,7 @@ import DrawThingsClient
 /// Runs the production queue automatically, processing one job at a time.
 /// Lives as a @StateObject in ContentView.
 /// #57: Uses job.modelID instead of global selectedModelID for model lookup
+/// #58: Publishes per-step progress for fine-grained progress bar
 @MainActor
 final class QueueRunnerService: ObservableObject {
 
@@ -16,6 +17,10 @@ final class QueueRunnerService: ObservableObject {
     @Published var generationStage: String = ""
     @Published var generatedImages: [NSImage] = []
     @Published var errorMessage: String? = nil
+    /// #58: Current step within the current variant (parsed from generationStage)
+    @Published var currentStep: Int = 0
+    /// #58: Steps per variant (from model config)
+    @Published var stepsPerVariant: Int = 1
 
     // MARK: - Internal
     private var isBusy: Bool = false
@@ -49,8 +54,6 @@ final class QueueRunnerService: ObservableObject {
     }
 
     // MARK: - Process a single job
-    /// #50: Fresh random seeds per variant, canvas/moodboard only for panels
-    /// #57: Use job.modelID for model lookup (not global selectedModelID)
 
     private func processJob(
         _ job: GenerationJob,
@@ -62,6 +65,7 @@ final class QueueRunnerService: ObservableObject {
         generatedImages = []
         errorMessage = nil
         generationStage = ""
+        currentStep = 0
 
         let count: Int
         if job.jobType == .generateAsset && job.size == .small {
@@ -75,7 +79,6 @@ final class QueueRunnerService: ObservableObject {
         var savedImageIDs: [String] = []
         let startedAt = Date()
 
-        // #50: Only load canvas/moodboard for panel generation
         let isPanelJob = job.jobType == .generatePanel
         var initImage: NSImage? = nil
         var moodboardImages: [NSImage] = []
@@ -102,7 +105,6 @@ final class QueueRunnerService: ObservableObject {
             }
         }
 
-        // #57: Resolve model from job.modelID first, then fallback to selectedModelID, then first model
         let model: ModelEntry? = {
             if !job.modelID.isEmpty {
                 if let m = models.models.first(where: { $0.modelID == job.modelID }) { return m }
@@ -113,13 +115,15 @@ final class QueueRunnerService: ObservableObject {
             return models.models.first
         }()
 
-        print("[QueueRunner] Job '\(job.itemName)' \u{2014} type: \(job.jobType.rawValue), model: \(model?.name ?? "none") (\(job.modelID)), variants: \(count), initImage: \(initImage != nil), moodboard: \(moodboardImages.count)")
+        // #58: Publish steps per variant from model config
+        stepsPerVariant = model?.steps ?? 20
 
-        // Generate images sequentially
+        print("[QueueRunner] Job '\(job.itemName)' \u{2014} type: \(job.jobType.rawValue), model: \(model?.name ?? "none") (\(job.modelID)), variants: \(count), stepsPerVariant: \(stepsPerVariant), initImage: \(initImage != nil), moodboard: \(moodboardImages.count)")
+
         for i in 0..<count {
             currentVariant = i
+            currentStep = 0
 
-            // #50: Fresh VM per variant to avoid any accumulated state
             let vm = ImageGenerationViewModel()
             vm.prompt = job.combinedPrompt
             vm.width = job.width
@@ -127,7 +131,6 @@ final class QueueRunnerService: ObservableObject {
             vm.grpcAddress = config.grpcAddress
             vm.grpcPort = config.grpcPort
 
-            // #57: Apply resolved model settings
             if let model {
                 vm.steps = model.steps
                 vm.guidanceScale = model.guidanceScale
@@ -148,8 +151,19 @@ final class QueueRunnerService: ObservableObject {
 
             print("[QueueRunner] Generation #\(i) \u{2014} seed: \(vm.seed), model: \(vm.model), sampler: \(vm.sampler), steps: \(vm.steps), cfg: \(vm.guidanceScale)")
 
+            // #58: Parse step number from generationStage string
             let cancellable = vm.$generationStage.sink { [weak self] stage in
                 self?.generationStage = stage
+                // Parse "Generating image (step N)..." or "Second pass generation (step N)..."
+                if let range = stage.range(of: "step "), let self {
+                    let afterStep = stage[range.upperBound...]
+                    if let endParen = afterStep.firstIndex(of: ")") {
+                        let stepStr = afterStep[..<endParen]
+                        if let step = Int(stepStr) {
+                            self.currentStep = step
+                        }
+                    }
+                }
             }
 
             await vm.generate()
@@ -169,17 +183,17 @@ final class QueueRunnerService: ObservableObject {
             }
         }
 
-        // Report completion
         var done = job
         done.startedAt = startedAt
         done.completedAt = Date()
         done.savedImageIDs = savedImageIDs
         onJobCompleted?(done)
 
-        // Reset state
         currentJobID = nil
         currentVariant = 0
         totalVariants = 1
+        currentStep = 0
+        stepsPerVariant = 1
         generationStage = ""
         generatedImages = []
         isBusy = false

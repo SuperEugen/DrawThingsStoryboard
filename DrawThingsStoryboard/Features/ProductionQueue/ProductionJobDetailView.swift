@@ -2,6 +2,7 @@ import SwiftUI
 
 // MARK: - Production job detail
 /// #53: Shows modelID in job info
+/// #58: Step-level progress bar
 
 struct ProductionJobDetailView: View {
     let queue: [GenerationJob]
@@ -65,7 +66,6 @@ struct ProductionJobDetailView: View {
 
                     Divider().padding(.vertical, 8)
 
-                    // Live progress from QueueRunner
                     GenerationProgressPanel(
                         isCurrentJob: isCurrentlyRunning,
                         queueRunner: queueRunner,
@@ -99,11 +99,22 @@ struct ProductionJobDetailView: View {
 }
 
 // MARK: - Generation progress panel
+/// #58: Step-level progress bar instead of variant-level
 
 private struct GenerationProgressPanel: View {
     let isCurrentJob: Bool
     @ObservedObject var queueRunner: QueueRunnerService
     let queuePosition: Int
+
+    /// Total steps across all variants
+    private var totalSteps: Int {
+        queueRunner.totalVariants * queueRunner.stepsPerVariant
+    }
+
+    /// Global step position (completed variant steps + current step)
+    private var globalStep: Int {
+        queueRunner.currentVariant * queueRunner.stepsPerVariant + queueRunner.currentStep
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -118,12 +129,19 @@ private struct GenerationProgressPanel: View {
                         .foregroundStyle(.blue)
                 }
 
-                ProgressView(value: Double(queueRunner.currentVariant), total: Double(queueRunner.totalVariants))
+                // #58: Step-level progress bar
+                ProgressView(value: Double(globalStep), total: Double(max(1, totalSteps)))
                     .progressViewStyle(.linear)
 
-                if !queueRunner.generationStage.isEmpty {
-                    Text(queueRunner.generationStage)
-                        .font(.caption).foregroundStyle(.secondary)
+                // Step counter + stage text
+                HStack(spacing: 4) {
+                    Text("Step \(globalStep)/\(totalSteps)")
+                        .font(.caption).foregroundStyle(.tertiary)
+                    if !queueRunner.generationStage.isEmpty {
+                        Text("\u{2014}").font(.caption).foregroundStyle(.quaternary)
+                        Text(queueRunner.generationStage)
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
 
                 if !queueRunner.generatedImages.isEmpty {
