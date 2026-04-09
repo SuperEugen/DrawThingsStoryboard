@@ -2,6 +2,7 @@ import SwiftUI
 
 // MARK: - Styles browser
 /// #53: Style jobs carry modelID
+/// #56: Model picker in styles header
 
 struct StylesBrowserView: View {
     @Binding var styles: StylesFile
@@ -9,7 +10,7 @@ struct StylesBrowserView: View {
     @Binding var generationQueue: [GenerationJob]
     let config: AppConfig
     let models: ModelsFile
-    let selectedModelID: String?
+    @Binding var stylesModelID: String
     private let columns = [GridItem(.adaptive(minimum: 288, maximum: 320), spacing: 12)]
 
     private var ungeneratedCount: Int {
@@ -26,6 +27,13 @@ struct StylesBrowserView: View {
                         .font(.caption).foregroundStyle(.tertiary)
                 }
                 Spacer()
+                // #56: Model picker
+                Picker("Model", selection: $stylesModelID) {
+                    ForEach(models.models) { m in
+                        Text(m.name).tag(m.modelID)
+                    }
+                }
+                .pickerStyle(.menu).labelsHidden().frame(maxWidth: 160)
                 // #7: Generate all missing examples
                 if ungeneratedCount > 0 {
                     Button { generateAllExamples() } label: {
@@ -82,7 +90,6 @@ struct StylesBrowserView: View {
 
     // #7/#53: Generate all missing examples with modelID
     private func generateAllExamples() {
-        let resolvedModelID = selectedModelID ?? models.models.first?.modelID ?? ""
         for style in styles.styles where !style.isGenerated {
             guard !generationQueue.contains(where: { $0.styleID == style.styleID && $0.jobType == .generateStyle }) else { continue }
             let combined = [style.style, config.stylePrompt]
@@ -102,7 +109,7 @@ struct StylesBrowserView: View {
                 height: config.smallImageHeight,
                 combinedPrompt: combined,
                 styleID: style.styleID,
-                modelID: resolvedModelID
+                modelID: stylesModelID
             )
             generationQueue.append(job)
         }
@@ -152,7 +159,6 @@ struct StyleTile: View {
                 .stroke(isSelected ? Color.accentColor : Color.secondary.opacity(0.2),
                         lineWidth: isSelected ? 2 : 0.5))
 
-            // E badge overlay (bottom-left)
             VStack {
                 Spacer()
                 HStack {

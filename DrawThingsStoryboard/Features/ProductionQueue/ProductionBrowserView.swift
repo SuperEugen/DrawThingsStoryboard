@@ -2,15 +2,15 @@ import SwiftUI
 import Combine
 
 // MARK: - Production browser
-/// #53: Jobs now carry modelID; shown in row
+/// #53: Jobs carry modelID; shown in row
 /// #54: Model-aware estimated running times
+/// #56: Removed Model Selector from header (jobs carry their own modelID)
 
 struct ProductionBrowserView: View {
     @Binding var queue: [GenerationJob]
     @Binding var selectedJobID: String?
     @Binding var doneQueue: [GenerationJob]
-    @Binding var models: ModelsFile
-    @Binding var selectedModelID: String?
+    let models: ModelsFile
     @ObservedObject var queueRunner: QueueRunnerService
     let productionLog: ProductionLogFile
 
@@ -20,8 +20,7 @@ struct ProductionBrowserView: View {
                 queue: $queue,
                 selectedJobID: $selectedJobID,
                 doneQueue: $doneQueue,
-                models: $models,
-                selectedModelID: $selectedModelID,
+                models: models,
                 queueRunner: queueRunner,
                 productionLog: productionLog
             )
@@ -49,20 +48,15 @@ private struct QueueSection: View {
     @Binding var queue: [GenerationJob]
     @Binding var selectedJobID: String?
     @Binding var doneQueue: [GenerationJob]
-    @Binding var models: ModelsFile
-    @Binding var selectedModelID: String?
+    let models: ModelsFile
     @ObservedObject var queueRunner: QueueRunnerService
     let productionLog: ProductionLogFile
-    // #27: Timer for live finish time updates
     @State private var timerTick: Int = 0
     let timer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
-    /// #54: Estimate seconds per image from production log (last 3 entries matching model + size).
-    /// Fallback chain: log average -> model defaults -> hardcoded 60/180s.
     private func estimatedPerImage(size: GenerationSize, modelID: String) -> TimeInterval {
         let sizeStr = size.rawValue
         let isoFormatter = ISO8601DateFormatter()
-        // Filter by both modelID and size for accurate per-model estimates
         let matching = productionLog.generatedImages.filter { entry in
             entry.size == sizeStr && entry.modelID == modelID
                 && !entry.startTime.isEmpty && !entry.endTime.isEmpty
@@ -76,11 +70,9 @@ private struct QueueSection: View {
             }
             return totalDuration / Double(recent.count)
         }
-        // Fallback: model defaults
         if let model = models.models.first(where: { $0.modelID == modelID }) {
             return TimeInterval(size == .large ? model.defaultGenTimeLarge : model.defaultGenTimeSmall)
         }
-        // Last resort
         return size == .large ? 180 : 60
     }
 
@@ -98,7 +90,6 @@ private struct QueueSection: View {
         return fmt.string(from: finish)
     }
 
-    /// Number of waiting (non-running) jobs in the queue.
     private var waitingCount: Int {
         queue.filter { $0.id != queueRunner.currentJobID }.count
     }
@@ -114,7 +105,6 @@ private struct QueueSection: View {
                     Image(systemName: "film.stack").font(.title2).foregroundStyle(.secondary)
                     Text("Production Queue").font(.title2.bold())
                     Spacer()
-                    // Stop button: removes all waiting jobs
                     if queueRunner.isRunning && waitingCount > 0 {
                         Button {
                             queueRunner.stopQueue(queue: &queue)
@@ -128,13 +118,6 @@ private struct QueueSection: View {
                     if queueRunner.isRunning {
                         ProgressView().controlSize(.small)
                     }
-                    Picker("Model", selection: Binding(
-                        get: { selectedModelID ?? models.models.first?.modelID ?? "" },
-                        set: { selectedModelID = $0 }
-                    )) {
-                        ForEach(models.models) { m in Text(m.name).tag(m.modelID) }
-                    }
-                    .pickerStyle(.menu).labelsHidden().frame(maxWidth: 160)
                 }
                 if !queue.isEmpty {
                     Text("Estimated finish: \(estimatedFinishString)")
@@ -208,7 +191,6 @@ private struct DoneSection: View {
 }
 
 // MARK: - Job row
-/// #53: Shows model name in job row
 
 private struct JobRow: View {
     let job: GenerationJob
@@ -257,7 +239,6 @@ private struct JobRow: View {
 }
 
 // MARK: - Done job row
-/// #53: Shows model name in done row
 
 private struct DoneJobRow: View {
     let job: GenerationJob

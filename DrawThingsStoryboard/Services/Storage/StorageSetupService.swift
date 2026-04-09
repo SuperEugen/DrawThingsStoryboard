@@ -25,11 +25,11 @@ final class StorageSetupService {
         let config = AppConfig()
         storage.write(config, to: storage.configURL)
 
-        // models.json — #51: sampler + isImg2ImgCapable
+        // models.json — #51: sampler + isImg2ImgCapable; #56: renamed F2K KV + new ZIB model
         let models = ModelsFile(models: [
             ModelEntry(
                 modelID: "M1",
-                name: "FLUX 2 klein KV",
+                name: "F2K KV",
                 guidanceScale: 1,
                 model: "flux_2_klein_9b_kv_q8p.ckpt",
                 steps: 6,
@@ -37,6 +37,17 @@ final class StorageSetupService {
                 defaultGenTimeLarge: 180,
                 sampler: "UniPC Trailing",
                 isImg2ImgCapable: true
+            ),
+            ModelEntry(
+                modelID: "M2",
+                name: "ZIB",
+                guidanceScale: 4,
+                model: "z_image_1.0_q8p.ckpt",
+                steps: 35,
+                defaultGenTimeSmall: 360,
+                defaultGenTimeLarge: 900,
+                sampler: "UniPC Trailing",
+                isImg2ImgCapable: false
             )
         ])
         storage.write(models, to: storage.modelsURL)
@@ -85,7 +96,7 @@ final class StorageSetupService {
         ])
         storage.write(storyboards, to: storage.storyboardsURL)
 
-        // assets.json — #39: proper descriptions for location assets
+        // assets.json
         let assets = AssetsFile(assets: [
             AssetEntry(assetID: "A1", name: "SuperEugen", type: "character", subType: "male",
                        description: "A 60yo man with a slight belly and a prominent chin wearing black glasses with a thick frame."),

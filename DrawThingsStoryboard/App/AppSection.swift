@@ -1,11 +1,12 @@
 import Foundation
 
 /// Top-level navigation sections shown in the sidebar.
+/// #56: Reordered: Models, Styles, Assets, Storyboards, Production Queue, Settings
 enum AppSection: String, CaseIterable, Identifiable, Hashable {
 
+    case models
     case styles
     case assets
-    case models
     case storyboard
     case productionQueue
     case settings
@@ -14,9 +15,9 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
+        case .models:          return "Models"
         case .styles:          return "Styles"
         case .assets:          return "Assets"
-        case .models:          return "Models"
         case .storyboard:      return "Storyboards"
         case .productionQueue: return "Production Queue"
         case .settings:        return "Settings"
@@ -25,9 +26,9 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
 
     var icon: String {
         switch self {
+        case .models:          return "gearshape"
         case .styles:          return "paintpalette"
         case .assets:          return "photo.stack"
-        case .models:          return "gearshape"
         case .storyboard:      return "pencil.and.list.clipboard"
         case .productionQueue: return "film.stack"
         case .settings:        return "slider.horizontal.3"

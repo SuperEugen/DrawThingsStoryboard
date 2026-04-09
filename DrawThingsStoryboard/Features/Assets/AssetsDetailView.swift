@@ -5,6 +5,7 @@ import SwiftUI
 /// #48: Uses passed-in style description instead of resolving from storyboard
 /// #49: Character turn-around prompt for characters
 /// #53: Jobs now carry modelID
+/// #56: Generate Variants button for single asset
 
 struct AssetsDetailView: View {
     @Binding var assets: AssetsFile
@@ -59,6 +60,17 @@ private struct AssetEditorView: View {
         }
     }
 
+    /// #56: Check if variants are already queued for this asset
+    private var isVariantsQueued: Bool {
+        generationQueue.contains {
+            $0.assetID == asset.assetID && $0.jobType == .generateAsset && $0.size == .small
+        }
+    }
+
+    private var emptyVariantCount: Int {
+        (0..<4).filter { !asset.variant(at: $0).hasImage }.count
+    }
+
     private var largeImage: NSImage? {
         guard asset.hasLargeImage else { return nil }
         return StorageService.shared.loadImage(id: asset.largeImageID)
@@ -84,7 +96,7 @@ private struct AssetEditorView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Status")
-                    statusRow("V", "Variants", asset.hasApprovedVariant)
+                    variantsStatusRow
                     statusRow("S", "Small Image", asset.hasSmallImage)
                     largeImageStatusRow
                 }
@@ -195,6 +207,32 @@ private struct AssetEditorView: View {
         }
     }
 
+    /// #56: Variants status row with Generate button
+    @ViewBuilder
+    private var variantsStatusRow: some View {
+        HStack(spacing: 8) {
+            Text("V").font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundStyle(asset.hasApprovedVariant ? .green : .gray)
+            Text("Variants:").font(.callout)
+            Text(asset.hasApprovedVariant ? "approved" : "not yet").font(.callout)
+                .foregroundStyle(asset.hasApprovedVariant ? .green : .secondary)
+            Spacer()
+            if emptyVariantCount > 0 && !asset.hasApprovedVariant {
+                if isVariantsQueued {
+                    Text("Queued").font(.caption).foregroundStyle(.purple)
+                } else {
+                    Button { generateVariants() } label: {
+                        Label("Generate \(emptyVariantCount)", systemImage: "square.grid.2x2").font(.caption)
+                    }
+                    .buttonStyle(.bordered).controlSize(.mini)
+                    .disabled(asset.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+        .padding(.vertical, 5).padding(.horizontal, 8)
+        .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
+    }
+
     @ViewBuilder
     private var largeImageStatusRow: some View {
         HStack(spacing: 8) {
@@ -286,18 +324,28 @@ private struct AssetEditorView: View {
         asset.setVariant(at: idx, v)
     }
 
-    /// #49/#53: Build prompt + carry modelID
+    /// #56: Generate missing variants for this single asset
+    private func generateVariants() {
+        let count = emptyVariantCount
+        guard count > 0 else { return }
+        let prompt = buildAssetPrompt()
+        let job = GenerationJob(
+            id: UUID().uuidString, itemName: asset.name, jobType: .generateAsset,
+            size: .small, styleName: assetStyleDescription, queuedAt: Date(),
+            estimatedDuration: TimeInterval(count * 60),
+            itemIcon: asset.isCharacter ? "person.fill" : "map",
+            seed: 0, width: config.smallImageWidth, height: config.smallImageHeight,
+            combinedPrompt: prompt, variantCount: count,
+            assetType: asset.type, assetSubType: asset.subType, assetID: asset.assetID,
+            modelID: assetModelID
+        )
+        generationQueue.append(job)
+    }
+
     private func generateLargeImage() {
         guard asset.hasApprovedVariant, let approvedIdx = asset.approvedVariantIndex else { return }
         let approvedSeed = asset.variant(at: approvedIdx).seed
-        var parts: [String] = []
-        if !assetStyleDescription.isEmpty { parts.append(assetStyleDescription) }
-        if asset.isCharacter && !config.characterTurnAround.isEmpty {
-            parts.append(config.characterTurnAround)
-        }
-        parts.append(asset.description)
-        let prompt = parts.joined(separator: ", ")
-
+        let prompt = buildAssetPrompt()
         let job = GenerationJob(
             id: UUID().uuidString, itemName: asset.name, jobType: .generateAsset,
             size: .large, styleName: assetStyleDescription, queuedAt: Date(),
@@ -309,6 +357,16 @@ private struct AssetEditorView: View {
             modelID: assetModelID
         )
         generationQueue.append(job)
+    }
+
+    private func buildAssetPrompt() -> String {
+        var parts: [String] = []
+        if !assetStyleDescription.isEmpty { parts.append(assetStyleDescription) }
+        if asset.isCharacter && !config.characterTurnAround.isEmpty {
+            parts.append(config.characterTurnAround)
+        }
+        parts.append(asset.description)
+        return parts.joined(separator: ", ")
     }
 }
 

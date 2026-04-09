@@ -6,10 +6,11 @@ import SwiftUI
 /// #52: Model picker wiring for assets + storyboard
 /// #53: Pass modelID context to job creation views
 /// #55: Queue status toolbar indicator
+/// #56: Styles model picker, Production Queue without model selector, stylesModelID state
 struct ContentView: View {
 
     // MARK: - Navigation
-    @State private var selectedSection: AppSection? = .storyboard
+    @State private var selectedSection: AppSection? = .models
 
     // MARK: - Data state
     @State private var config: AppConfig = AppConfig()
@@ -30,6 +31,8 @@ struct ContentView: View {
     @State private var assetStyleID: String = ""
     /// #52: Model used for asset generation (independent of storyboard model).
     @State private var assetModelID: String = ""
+    /// #56: Model used for style example generation.
+    @State private var stylesModelID: String = ""
 
     // MARK: - Production Queue
     @State private var generationQueue: [GenerationJob] = []
@@ -59,7 +62,6 @@ struct ContentView: View {
         return $storyboards.storyboards[selectedStoryboardIndex].styleID
     }
 
-    /// #52: Binding to the current storyboard's modelID.
     private var currentModelIDBinding: Binding<String> {
         guard storyboards.storyboards.indices.contains(selectedStoryboardIndex) else {
             return .constant("")
@@ -77,12 +79,10 @@ struct ContentView: View {
         return styles.styles.first { $0.styleID == sb.styleID }?.style ?? ""
     }
 
-    /// #48: Resolved style description for asset generation.
     private var resolvedAssetStyleDescription: String {
         styles.styles.first { $0.styleID == assetStyleID }?.style ?? ""
     }
 
-    /// #53: Resolved modelID for storyboard panel jobs.
     private var resolvedStoryboardModelID: String {
         currentStoryboard?.modelID ?? models.models.first?.modelID ?? ""
     }
@@ -119,7 +119,6 @@ struct ContentView: View {
         .frame(minWidth: 1100, minHeight: 680)
         .navigationTitle(windowTitle)
         .toolbar {
-            // #55: Queue status indicator
             ToolbarItem(placement: .automatic) {
                 QueueStatusToolbarView(
                     queue: generationQueue,
@@ -190,7 +189,7 @@ struct ContentView: View {
                 generationQueue: $generationQueue,
                 config: config,
                 models: models,
-                selectedModelID: selectedModelID
+                stylesModelID: $stylesModelID
             )
         case .models:
             ModelsBrowserView(
@@ -202,8 +201,7 @@ struct ContentView: View {
                 queue: $generationQueue,
                 selectedJobID: $selectedJobID,
                 doneQueue: $doneQueue,
-                models: $models,
-                selectedModelID: $selectedModelID,
+                models: models,
                 queueRunner: queueRunner,
                 productionLog: productionLog
             )
@@ -244,7 +242,8 @@ struct ContentView: View {
                 styles: $styles,
                 selectedStyleID: $selectedStyleID,
                 generationQueue: $generationQueue,
-                config: config
+                config: config,
+                stylesModelID: stylesModelID
             )
         case .models:
             ModelsDetailView(
@@ -300,7 +299,6 @@ struct ContentView: View {
         let isoFormatter = ISO8601DateFormatter()
         let startTimeStr = job.startedAt.map { isoFormatter.string(from: $0) } ?? ""
         let endTimeStr = isoFormatter.string(from: done.completedAt ?? Date())
-        // #53: Use job's modelID for production log (more accurate than selectedModelID)
         let resolvedModelID = job.modelID.isEmpty
             ? (selectedModelID ?? models.models.first?.modelID ?? "")
             : job.modelID
@@ -409,7 +407,7 @@ struct ContentView: View {
         if selectedStyleID == nil { selectedStyleID = styles.styles.first?.styleID }
         if selectedModelID == nil { selectedModelID = models.models.first?.modelID }
         if selectedAssetID == nil { selectedAssetID = assets.assets.first?.assetID }
-        // #48: Default asset style to first style or current storyboard's style
+        // #48: Default asset style
         if assetStyleID.isEmpty {
             if let sb = storyboards.storyboards.first,
                styles.styles.contains(where: { $0.styleID == sb.styleID }) {
@@ -418,7 +416,7 @@ struct ContentView: View {
                 assetStyleID = styles.styles.first?.styleID ?? ""
             }
         }
-        // #52: Default asset model to first model or current storyboard's model
+        // #52: Default asset model
         if assetModelID.isEmpty {
             if let sb = storyboards.storyboards.first,
                models.models.contains(where: { $0.modelID == sb.modelID }) {
@@ -426,6 +424,10 @@ struct ContentView: View {
             } else {
                 assetModelID = models.models.first?.modelID ?? ""
             }
+        }
+        // #56: Default styles model
+        if stylesModelID.isEmpty {
+            stylesModelID = models.models.first?.modelID ?? ""
         }
     }
 }

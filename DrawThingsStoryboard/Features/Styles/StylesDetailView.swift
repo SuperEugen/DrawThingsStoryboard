@@ -1,12 +1,14 @@
 import SwiftUI
 
 // MARK: - Styles detail
+/// #56: Style detail example generation carries modelID
 
 struct StylesDetailView: View {
     @Binding var styles: StylesFile
     @Binding var selectedStyleID: String?
     @Binding var generationQueue: [GenerationJob]
     let config: AppConfig
+    var stylesModelID: String = ""
 
     private var selectedIndex: Int? {
         guard let id = selectedStyleID else { return nil }
@@ -18,7 +20,8 @@ struct StylesDetailView: View {
             StyleEditorView(
                 style: $styles.styles[idx],
                 generationQueue: $generationQueue,
-                config: config
+                config: config,
+                stylesModelID: stylesModelID
             )
         } else {
             ContentUnavailableView(
@@ -36,10 +39,10 @@ private struct StyleEditorView: View {
     @Binding var style: StyleEntry
     @Binding var generationQueue: [GenerationJob]
     let config: AppConfig
+    let stylesModelID: String
 
     @State private var exampleImage: NSImage? = nil
 
-    // #26: Check if already queued
     private var isQueued: Bool {
         generationQueue.contains { $0.styleID == style.styleID && $0.jobType == .generateStyle }
     }
@@ -120,7 +123,6 @@ private struct StyleEditorView: View {
     }
 
     private func generateExample() {
-        // #26: Prevent duplicate queue entries
         guard !isQueued else { return }
         let combined = [style.style, config.stylePrompt]
             .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
@@ -138,7 +140,8 @@ private struct StyleEditorView: View {
             width: config.smallImageWidth,
             height: config.smallImageHeight,
             combinedPrompt: combined,
-            styleID: style.styleID
+            styleID: style.styleID,
+            modelID: stylesModelID
         )
         generationQueue.append(job)
     }
