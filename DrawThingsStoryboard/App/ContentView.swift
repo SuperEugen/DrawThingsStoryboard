@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Root layout: three-pane NavigationSplitView.
-/// #57: Pass assetStyleName to AssetsDetailView
+/// #59: Pushover notification wiring
 struct ContentView: View {
 
     // MARK: - Navigation
@@ -29,6 +29,8 @@ struct ContentView: View {
     // MARK: - Production Queue
     @State private var generationQueue: [GenerationJob] = []
     @State private var doneQueue: [GenerationJob] = []
+    /// #59: Pushover notifications toggle (persisted in UserDefaults)
+    @AppStorage("notificationsEnabled") private var notificationsEnabled: Bool = false
 
     // MARK: - Queue Runner
     @StateObject private var queueRunner = QueueRunnerService()
@@ -75,13 +77,17 @@ struct ContentView: View {
         styles.styles.first { $0.styleID == assetStyleID }?.style ?? ""
     }
 
-    /// #57: Resolved style name for asset jobs
     private var resolvedAssetStyleName: String {
         styles.styles.first { $0.styleID == assetStyleID }?.name ?? ""
     }
 
     private var resolvedStoryboardModelID: String {
         currentStoryboard?.modelID ?? models.models.first?.modelID ?? ""
+    }
+
+    /// #59: Whether Pushover credentials are configured
+    private var pushoverConfigured: Bool {
+        !config.pushoverToken.isEmpty && !config.pushoverUser.isEmpty
     }
 
     private var windowTitle: String {
@@ -113,6 +119,10 @@ struct ContentView: View {
         .onChange(of: storyboards) { _, _ in
             StorageLoadService.shared.saveStoryboards(storyboards)
         }
+        // #59: Keep notification flag in sync with QueueRunner
+        .onChange(of: notificationsEnabled) { _, enabled in
+            queueRunner.notificationsEnabled = enabled
+        }
         .frame(minWidth: 1100, minHeight: 680)
         .navigationTitle(windowTitle)
         .toolbar {
@@ -133,6 +143,7 @@ struct ContentView: View {
         }
         .onAppear {
             loadFromDisk()
+            queueRunner.notificationsEnabled = notificationsEnabled
             queueRunner.configure { completedJob in
                 handleJobCompleted(completedJob)
             }
@@ -200,7 +211,9 @@ struct ContentView: View {
                 doneQueue: $doneQueue,
                 models: models,
                 queueRunner: queueRunner,
-                productionLog: productionLog
+                productionLog: productionLog,
+                notificationsEnabled: $notificationsEnabled,
+                pushoverConfigured: pushoverConfigured
             )
         case .settings:
             SettingsContentView(config: $config)

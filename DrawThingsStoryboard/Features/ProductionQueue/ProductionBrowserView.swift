@@ -2,9 +2,7 @@ import SwiftUI
 import Combine
 
 // MARK: - Production browser
-/// #53: Jobs carry modelID; shown in row
-/// #54: Model-aware estimated running times
-/// #56: Removed Model Selector from header (jobs carry their own modelID)
+/// #59: Notifications toggle in header
 
 struct ProductionBrowserView: View {
     @Binding var queue: [GenerationJob]
@@ -13,6 +11,8 @@ struct ProductionBrowserView: View {
     let models: ModelsFile
     @ObservedObject var queueRunner: QueueRunnerService
     let productionLog: ProductionLogFile
+    @Binding var notificationsEnabled: Bool
+    let pushoverConfigured: Bool
 
     var body: some View {
         VSplitView {
@@ -22,7 +22,9 @@ struct ProductionBrowserView: View {
                 doneQueue: $doneQueue,
                 models: models,
                 queueRunner: queueRunner,
-                productionLog: productionLog
+                productionLog: productionLog,
+                notificationsEnabled: $notificationsEnabled,
+                pushoverConfigured: pushoverConfigured
             )
             .frame(minHeight: 120)
 
@@ -51,6 +53,8 @@ private struct QueueSection: View {
     let models: ModelsFile
     @ObservedObject var queueRunner: QueueRunnerService
     let productionLog: ProductionLogFile
+    @Binding var notificationsEnabled: Bool
+    let pushoverConfigured: Bool
     @State private var timerTick: Int = 0
     let timer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
@@ -105,6 +109,18 @@ private struct QueueSection: View {
                     Image(systemName: "film.stack").font(.title2).foregroundStyle(.secondary)
                     Text("Production Queue").font(.title2.bold())
                     Spacer()
+                    // #59: Notifications toggle
+                    Toggle(isOn: $notificationsEnabled) {
+                        Image(systemName: notificationsEnabled ? "bell.fill" : "bell.slash")
+                            .font(.caption)
+                            .foregroundStyle(notificationsEnabled ? .blue : .secondary)
+                    }
+                    .toggleStyle(.switch).controlSize(.mini)
+                    .disabled(!pushoverConfigured)
+                    .help(pushoverConfigured
+                          ? "Send Pushover notifications when jobs complete"
+                          : "Configure Pushover token and user in Settings first")
+
                     if queueRunner.isRunning && waitingCount > 0 {
                         Button {
                             queueRunner.stopQueue(queue: &queue)

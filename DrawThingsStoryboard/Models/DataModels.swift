@@ -15,6 +15,9 @@ struct AppConfig: Codable, Equatable {
     var grpcPort: Int = 7859
     // #49: Character turn-around prompt fragment
     var characterTurnAround: String = "Character turn-around sheet with exactly two views: frontal and side looking to the right. Full body-view, neutral grey background."
+    // #59: Pushover notification credentials
+    var pushoverToken: String = ""
+    var pushoverUser: String = ""
     var version: Int = 1
 }
 

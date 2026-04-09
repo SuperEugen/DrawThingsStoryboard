@@ -3,9 +3,7 @@ import Combine
 import DrawThingsClient
 
 /// Runs the production queue automatically, processing one job at a time.
-/// Lives as a @StateObject in ContentView.
-/// #57: Uses job.modelID instead of global selectedModelID for model lookup
-/// #58: Publishes per-step progress for fine-grained progress bar
+/// #59: Sends Pushover notifications on job completion and queue finish
 @MainActor
 final class QueueRunnerService: ObservableObject {
 
@@ -17,14 +15,18 @@ final class QueueRunnerService: ObservableObject {
     @Published var generationStage: String = ""
     @Published var generatedImages: [NSImage] = []
     @Published var errorMessage: String? = nil
-    /// #58: Current step within the current variant (parsed from generationStage)
     @Published var currentStep: Int = 0
-    /// #58: Steps per variant (from model config)
     @Published var stepsPerVariant: Int = 1
 
     // MARK: - Internal
     private var isBusy: Bool = false
     private var onJobCompleted: ((GenerationJob) -> Void)?
+
+    /// #59: Notification config — set by ContentView before each run
+    var notificationsEnabled: Bool = false
+    var notificationConfig: AppConfig = AppConfig()
+    /// Remaining queue count (set by caller so we know when queue is done)
+    var remainingQueueCount: Int = 0
 
     func configure(onJobCompleted: @escaping (GenerationJob) -> Void) {
         self.onJobCompleted = onJobCompleted
@@ -36,6 +38,10 @@ final class QueueRunnerService: ObservableObject {
         models: ModelsFile,
         selectedModelID: String?
     ) {
+        // #59: Keep notification context up to date
+        notificationConfig = config
+        remainingQueueCount = queue.count
+
         guard !isBusy, let nextJob = queue.first else { return }
         isBusy = true
         isRunning = true
@@ -115,10 +121,9 @@ final class QueueRunnerService: ObservableObject {
             return models.models.first
         }()
 
-        // #58: Publish steps per variant from model config
         stepsPerVariant = model?.steps ?? 20
 
-        print("[QueueRunner] Job '\(job.itemName)' \u{2014} type: \(job.jobType.rawValue), model: \(model?.name ?? "none") (\(job.modelID)), variants: \(count), stepsPerVariant: \(stepsPerVariant), initImage: \(initImage != nil), moodboard: \(moodboardImages.count)")
+        print("[QueueRunner] Job '\(job.itemName)' \u{2014} type: \(job.jobType.rawValue), model: \(model?.name ?? "none") (\(job.modelID)), variants: \(count), stepsPerVariant: \(stepsPerVariant)")
 
         for i in 0..<count {
             currentVariant = i
@@ -151,10 +156,8 @@ final class QueueRunnerService: ObservableObject {
 
             print("[QueueRunner] Generation #\(i) \u{2014} seed: \(vm.seed), model: \(vm.model), sampler: \(vm.sampler), steps: \(vm.steps), cfg: \(vm.guidanceScale)")
 
-            // #58: Parse step number from generationStage string
             let cancellable = vm.$generationStage.sink { [weak self] stage in
                 self?.generationStage = stage
-                // Parse "Generating image (step N)..." or "Second pass generation (step N)..."
                 if let range = stage.range(of: "step "), let self {
                     let afterStep = stage[range.upperBound...]
                     if let endParen = afterStep.firstIndex(of: ")") {
@@ -188,6 +191,34 @@ final class QueueRunnerService: ObservableObject {
         done.completedAt = Date()
         done.savedImageIDs = savedImageIDs
         onJobCompleted?(done)
+
+        // #59: Send Pushover notification for completed job
+        if notificationsEnabled {
+            let duration: String = {
+                guard let s = done.startedAt, let e = done.completedAt else { return "" }
+                let secs = Int(e.timeIntervalSince(s))
+                let m = secs / 60; let sec = secs % 60
+                return m > 0 ? "\(m)m \(sec)s" : "\(sec)s"
+            }()
+            let images = done.savedImageIDs.count
+            // remainingQueueCount was set before this job started; subtract 1 for this job
+            let remaining = max(0, remainingQueueCount - 1)
+
+            if remaining == 0 {
+                // Last job — queue finished
+                PushoverService.send(
+                    title: "\u{2705} Queue finished",
+                    message: "\(job.itemName) done (\(duration), \(images) img). Queue complete!",
+                    config: notificationConfig
+                )
+            } else {
+                PushoverService.send(
+                    title: "\u{1f3ac} \(job.itemName) done",
+                    message: "\(duration), \(images) img. \(remaining) job(s) remaining.",
+                    config: notificationConfig
+                )
+            }
+        }
 
         currentJobID = nil
         currentVariant = 0

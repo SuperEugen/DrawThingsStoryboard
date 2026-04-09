@@ -2,6 +2,7 @@ import SwiftUI
 
 // MARK: - Settings content (shown as center pane when Settings selected)
 /// #49: Assets section with Character Turn-Around setting
+/// #59: Pushover notification settings
 
 struct SettingsContentView: View {
     @Binding var config: AppConfig
@@ -113,6 +114,19 @@ struct SettingsContentView: View {
                             Text("seconds").foregroundStyle(.secondary)
                         }
                     }
+                }
+                // #59: Pushover notification settings
+                Section("Pushover Notifications") {
+                    LabeledContent("API Token") {
+                        SecureField("Application Token", text: $config.pushoverToken)
+                            .textFieldStyle(.roundedBorder).frame(maxWidth: 300)
+                    }
+                    LabeledContent("User Key") {
+                        SecureField("User/Group Key", text: $config.pushoverUser)
+                            .textFieldStyle(.roundedBorder).frame(maxWidth: 300)
+                    }
+                    Text("Get your token and key at pushover.net. Enable notifications in the Production Queue.")
+                        .font(.caption2).foregroundStyle(.secondary)
                 }
             }
             .formStyle(.grouped)
