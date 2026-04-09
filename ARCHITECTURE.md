@@ -4,7 +4,7 @@
 
 DrawThingsStoryboard is a native macOS SwiftUI app (macOS 14.0+) built on strict MVVM. All state lives in `ContentView` as `@State` and flows down through `@Binding`. There is no SwiftData, no CoreData, and no global singletons beyond `StorageService.shared` and `QueueRunnerService` (held as `@StateObject` in ContentView).
 
-Current version: **v0.4** (April 2026).
+Current version: **v0.6** (April 2026).
 
 ## Layer overview
 
@@ -13,24 +13,30 @@ UI (SwiftUI Views)
     ↓ @Binding
 ViewModels (@MainActor ObservableObject)
     ↓ protocol
-Services (DrawThingsClient, StorageService, QueueRunnerService, FountainParser)
+Services (DrawThingsClient, StorageService, QueueRunnerService, FountainParser, PushoverService)
     ↓
-External (Draw Things via gRPC, ~/Pictures filesystem, .fountain files)
+External (Draw Things via gRPC, ~/Pictures filesystem, .fountain files, Pushover API)
 ```
 
 ## Navigation
 
 A three-pane `NavigationSplitView` with six sidebar sections (`AppSection`).
-Sidebar order: Assets, Styles, Models, **Storyboard**, Production Queue, Settings.
+Sidebar order: **Models, Styles, Assets, Storyboard, Production Queue, Settings**.
 
 | Section | Content pane | Detail pane |
 |---------|-------------|-------------|
-| assets | AssetsBrowserView | AssetsDetailView |
-| styles | StylesBrowserView | StylesDetailView |
 | models | ModelsBrowserView | ModelsDetailView |
+| styles | StylesBrowserView | StylesDetailView |
+| assets | AssetsBrowserView | AssetsDetailView |
 | storyboard | StoryboardBrowserView | StoryboardDetailView |
 | productionQueue | ProductionBrowserView | ProductionJobDetailView |
 | settings | SettingsContentView | — |
+
+## Toolbar
+
+The main toolbar (right side of the title bar) shows:
+1. **QueueStatusToolbarView** — live queue status (spinner + job count + estimated finish time when running)
+2. **ConnectionStatusView** — Draw Things gRPC connection indicator (green/red dot)
 
 ## Data model
 
@@ -42,10 +48,12 @@ ERD diagram: [`docs/data-model.mermaid`](docs/data-model.mermaid)
 
 ```
 config.json        → AppConfig
-                     (image sizes, panel duration, style prompt, gRPC address/port)
+                     (image sizes, panel duration, style prompt, gRPC address/port,
+                      characterTurnAround, pushoverToken, pushoverUser)
 
 models.json        → ModelsFile
-                     └── [ModelEntry]  (modelID, name, model filename, steps, guidanceScale, gen times)
+                     └── [ModelEntry]  (modelID, name, model filename, steps, guidanceScale,
+                                        sampler, isImg2ImgCapable, gen times)
 
 styles.json        → StylesFile
                      └── [StyleEntry]  (styleID, name, style prompt, smallImageID, isGenerated)
@@ -70,17 +78,6 @@ production-log.json → ProductionLogFile
                                                    startTime, endTime, size, seed, combinedPrompt)
 ```
 
-### Image references
-
-All image fields (`smallImageID`, `largeImageID`, variant `smallImageID`) store UUID strings that correspond to `<UUID>.png` files in the root folder.
-
-### Seed handling
-
-- `seed = 0` means "not yet assigned" (ungenerated)
-- The app generates random seeds via `SeedHelper.randomSeed()` before sending to Draw Things
-- Draw Things receives actual seed values (never 0)
-- Large image generation copies the seed from the approved variant
-
 ## Draw Things integration
 
 Communication with Draw Things runs over **gRPC** using the [euphoriacyberware-ai/DT-gRPC-Swift-Client](https://github.com/euphoriacyberware-ai/DT-gRPC-Swift-Client) package.
@@ -92,61 +89,45 @@ DrawThingsClientProtocol
   └── DrawThingsMockClient   previews / tests
 ```
 
-Connection status is shown in the toolbar via `ConnectionStatusView` using `NWConnection` TCP check.
+### Sampler mapping
 
-## Generation flow (v0.4 — fully automatic)
+`DrawThingsGRPCClient` maps human-readable sampler names (e.g. "UniPC Trailing") to the `SamplerType` enum from the gRPC package. All 20 sampler types are supported via a static lookup table.
 
-1. User clicks Generate button (Style, Asset, Panel) or batch button ("Generate all Variants", "Generate all Large Images")
-2. A `GenerationJob` is created and added to `generationQueue`
-3. `QueueRunnerService` auto-starts: picks first job, creates a **fresh** `ImageGenerationViewModel`
-4. Generates image(s) via Draw Things gRPC, saves as `<UUID>.png`
-5. `onJobCompleted` passes the job back to `ContentView.handleJobCompleted()`
-6. `handleJobCompleted` writes the image UUID into the data model, writes to production-log.json, persists all relevant JSONs
-7. QueueRunner picks next job automatically
-8. Stop button removes all waiting jobs (running job finishes normally)
+### Model resolution in QueueRunner
 
-### Job completion wiring:
+Jobs carry their own `modelID`. The QueueRunner resolves the model with this priority:
+1. `job.modelID` (from the model picker active when the job was created)
+2. `selectedModelID` (global fallback)
+3. First model in models.json (last resort)
 
-| Job type | Size | What gets updated |
-|----------|------|------------------|
-| generateStyle | small | StyleEntry.smallImageID + isGenerated |
-| generateAsset | small | Next empty AssetEntry.variant1–4.smallImageID |
-| generateAsset | large | AssetEntry.largeImageID (uses approved variant seed) |
-| generatePanel | small | PanelEntry.smallImageID |
-| generatePanel | large | PanelEntry.largeImageID |
+## Generation flow (v0.6 — fully automatic with notifications)
 
-### Time estimation:
+1. User clicks Generate button (Style, Asset, Panel) or batch button
+2. A `GenerationJob` is created (carrying modelID, styleID, combined prompt)
+3. `QueueRunnerService` auto-starts: picks first job, resolves model from `job.modelID`
+4. Creates fresh `ImageGenerationViewModel`, sets model/steps/CFG/sampler from resolved ModelEntry
+5. Generates image(s) via Draw Things gRPC, saves as `<UUID>.png`
+6. Sends Pushover notification (if enabled): per-job progress + queue-complete message
+7. `onJobCompleted` passes the job back to `ContentView.handleJobCompleted()`
+8. QueueRunner picks next job automatically
+
+### Step-level progress
+
+The `generationStage` string from the gRPC client ("Generating image (step N)...") is parsed to extract the current step number. Combined with `stepsPerVariant` (from model config) and `totalVariants`, this provides a fine-grained progress bar showing e.g. step 47/140.
+
+### Time estimation (model-aware)
+
 - Production log records ISO8601 start/end times per generated image
-- Estimated duration = average of last 3 log entries matching the size (small/large)
-- Fallback when no log data: 60s for small, 180s for large
+- `estimatedPerImage` filters by **modelID + size** for accurate per-model estimates
+- Fallback chain: log average → model.defaultGenTimeSmall/Large → hardcoded 60/180s
 
-## Prompt assembly
+## Pushover notifications
 
-| Job type | Combined prompt |
-|----------|----------------|
-| Style example | `style.style` + `config.stylePrompt` |
-| Asset | `style.style` + `asset.description` |
-| Panel | `style.style` + `panel.description` + `panel.cameraMovement` |
-
-## Fountain import
-
-`FountainParser` (in Services/) parses `.fountain` screenplay files:
-- `#` → ActEntry
-- `##` → SequenceEntry
-- `###` → SceneEntry (each scene gets one empty PanelEntry)
-- Beat metadata blocks (`/* ... */`) are stripped
-- Storyboard name derived from filename
-- Import button in StoryboardBrowserView header, uses NSOpenPanel
-
-## File storage
-
-`StorageService.shared` writes to `~/Pictures/DrawThings-Storyboard/`.
-
-All files are flat in the root folder:
-- 6 JSON files for data
-- `<UUID>.png` for all generated images
-
-On first launch, `StorageSetupService` creates the folder and all 6 JSON files with demo data (4 characters, 4 locations, 3 styles, 1 model, 1 storyboard).
+`PushoverService` sends fire-and-forget HTTP POST notifications to pushover.net.
+- Credentials (token + user) stored in `AppConfig` (config.json)
+- Toggle in Production Queue header (persisted via @AppStorage)
+- Per-job notification: item name, duration, image count, remaining jobs
+- Queue-complete notification: final summary
 
 ## File structure
 
@@ -161,13 +142,13 @@ DrawThingsStoryboard/
 │   ├── ProductionQueue/    # ProductionBrowserView, ProductionJobDetailView
 │   ├── Settings/           # SettingsView (Cmd+,), SettingsContentView (in-app)
 │   ├── ImageGeneration/    # ImageGenerationViewModel
-│   └── Shared/Views/       # UnifiedThumbnailView, ConnectionStatusView, sectionLabel()
+│   └── Shared/Views/       # UnifiedThumbnailView, ConnectionStatusView, QueueStatusToolbarView
 ├── Models/                 # DataModels.swift, GenerationJob.swift, GenerationRequest/Response.swift
-├── Services/
-│   ├── DrawThingsClient/   # Protocol + gRPC/HTTP/Mock clients
-│   ├── Storage/            # StorageService, StorageSetupService, StorageLoadService
-│   ├── QueueRunnerService.swift
-│   └── FountainParser.swift
-└── docs/
-    └── data-model.mermaid  # ERD of all 6 JSON files (renders on GitHub)
+└── Services/
+    ├── DrawThingsClient/   # Protocol + gRPC/HTTP/Mock clients
+    ├── Storage/            # StorageService, StorageSetupService, StorageLoadService
+    ├── QueueRunnerService.swift
+    ├── PushoverService.swift
+    ├── PDFExportService.swift
+    └── FountainParser.swift
 ```

@@ -40,41 +40,55 @@ Completed: April 2026
 - [x] Manual Generate button removed — queue is fully automatic
 - [x] Stop button removes all waiting jobs (running job finishes)
 - [x] Production log persistence — time estimation from last 3 jobs per size (small/large)
-- [x] Fallback estimation: 60s small, 180s large when no log data
 - [x] "Generate Large Image" button per asset in detail view (with seed from approved variant)
 - [x] Large image preview with full-size sheet viewer (800×500)
 - [x] Import Fountain screenplay files (.fountain) → Act/Sequence/Scene structure
-- [x] FountainParser strips Beat metadata blocks
 - [x] Style selector picker in Storyboard Browser header
-- [x] Generate Small/Large Image buttons in Panel detail view (enabled when description exists)
+- [x] Generate Small/Large Image buttons in Panel detail view
 - [x] +/Delete buttons for Acts, Sequences, Scenes, and Panels in storyboard tree
-- [x] Sidebar reordered: Assets, Styles, Models, Storyboard, Production Queue, Settings
-- [x] Proper default descriptions for location assets in demo data
-- [x] Race condition fix: synchronous isBusy flag prevents duplicate job generation
-- [x] Fresh ImageGenerationViewModel per job (no accumulated state between jobs)
+- [x] Fresh ImageGenerationViewModel per job (no accumulated state)
 
-## v0.5 — More Draw Things Control
+## v0.5 — Moodboard & PDF Export ✅
 
-To get consistent images over several panels it is crucial to use the moodboard feature.
+Completed: April 2026
 
 - [x] Generate panel uses reference images (approved asset variants) attached to the job
-- [x] Moodboard images sent via gRPC for consistent character appearance
-- [x] Export storyboard as PDF (panels in sequence with scene descriptions)
+- [x] Location image → canvas/init image for consistent backgrounds
+- [x] Character images → moodboard/shuffle hints for consistent appearance
+- [x] Export storyboard as PDF (panels in 2×3 grid, A4)
+- [x] Character turn-around prompt prepended to character asset descriptions
 
-## v0.6 - Model Selectable per Job and Notifications
+## v0.6 — Multi-Model Support & Notifications ✅
 
-- [ ] Add prompt fragments to character assets to create a proper turn-around sheet.
-- [ ] Added Pushover notifications.
+Completed: April 2026
 
-## v0.7 - Improved Character Assets Handling
+- [x] ModelEntry: sampler (text field) + isImg2ImgCapable (boolean)
+- [x] Two default models: F2K KV (Flux, 6 steps) + ZIB (35 steps, CFG 4)
+- [x] Model Selector in Assets, Styles, and Storyboard headers
+- [x] Jobs carry their own modelID (set at creation time from active model picker)
+- [x] QueueRunner resolves model from job.modelID (not global selectedModelID)
+- [x] Sampler mapped to SamplerType enum for gRPC (all 20 Draw Things samplers)
+- [x] Model-aware time estimation (filters production log by modelID + size)
+- [x] Queue status indicator in app toolbar (spinner + job count + estimated finish)
+- [x] Step-level progress bar (e.g. 47/140 for 4×35 steps)
+- [x] Pushover notification integration (per-job + queue-complete messages)
+- [x] Notification toggle in Production Queue header (persisted via @AppStorage)
+- [x] Pushover credentials (token + user) in Settings as SecureField
+- [x] Model name shown in queue job rows and detail view
+- [x] Style name (not description) shown in job rows
+- [x] Generate Variants button per individual asset in detail view
+- [x] Sidebar reordered: Models, Styles, Assets, Storyboards, Production Queue, Settings
+- [x] Removed global Model Selector from Production Queue (jobs carry own model)
+
+## v0.7 — Improved Character Assets Handling
 
 Character turn-around sheets improve panel creation and asset export.
 
-- [ ] UI Updates
-- [ ] Create assets for all styles.
-- [ ] Export one or all character turn-around sheets.
-- [ ] Add prompt fragment to character assets to separate body parts for 2d animation use.
-- [ ] Export one or all character parts sheets.
+- [ ] Create assets for all styles
+- [ ] Add prompt fragments to character assets to create proper turn-around sheets
+- [ ] Export one or all character turn-around sheets
+- [ ] Add prompt fragment to character assets to separate body parts for 2D animation
+- [ ] Export one or all character parts sheets
 
 ## v0.8 — Fountain Import Phase 2
 
@@ -83,14 +97,13 @@ Deeper integration with Fountain screenplay files.
 - [ ] Import dialogue lines from Fountain files into panel dialogue fields
 - [ ] Auto-create character assets from Fountain character names
 - [ ] Map Fountain scene headings to location assets
-- [ ] Panel fields for dialogue, action instruction, camera movement already exist in data model
-- [ ] UI polish for these fields in the Storyboard detail view and export.
+- [ ] UI polish for dialogue/action/camera fields in Storyboard detail and export
 
 ## v0.9 — Customization for Storyboard PDFs
 
-Custom option for the exported storyboard.
+Custom options for the exported storyboard.
 
-- [ ] Columns, rows, title etc.
+- [ ] Configurable columns, rows, title etc.
 
 ## v1.0 — Clean Up
 
