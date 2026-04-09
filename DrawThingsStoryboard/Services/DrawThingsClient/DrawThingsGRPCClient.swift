@@ -3,7 +3,7 @@ import DrawThingsClient
 
 /// Production client that talks to Draw Things via gRPC.
 /// Supports prompt-based generation AND moodboard reference images (shuffle hints).
-/// #57: Passes sampler to DrawThingsConfiguration
+/// #57: Passes sampler as SamplerType enum to DrawThingsConfiguration
 ///
 /// Draw Things must be running with:
 /// Advanced → API Server → Protocol: gRPC, Port: 7859, TLS: on
@@ -44,23 +44,23 @@ final class DrawThingsGRPCClient: DrawThingsClientProtocol {
         let hints = buildHints(from: moodboardImages)
 
         let seedValue: Int64? = request.seed == -1 ? nil : Int64(request.seed)
-        var config = DrawThingsConfiguration(
+
+        // #57: Resolve sampler string to SamplerType enum
+        let resolvedSampler = Self.samplerType(from: request.sampler)
+
+        let config = DrawThingsConfiguration(
             width: Int32(request.width),
             height: Int32(request.height),
             steps: Int32(request.steps),
             model: request.model,
+            sampler: resolvedSampler,
             guidanceScale: Float(request.guidanceScale),
             seed: seedValue
         )
-        // #57: Set sampler if provided and if the configuration supports it
-        if !request.sampler.isEmpty {
-            config.sampler = request.sampler
-            print("[GRPCClient] Sampler set to '\(request.sampler)'")
-        }
 
         let canvasImage: NSImage? = initImage
 
-        print("[GRPCClient] Sending \u{2014} prompt: '\(request.prompt.prefix(60))\u{2026}', model: '\(request.model)', sampler: '\(request.sampler)', \(request.width)\u{00d7}\(request.height), steps: \(request.steps), cfg: \(request.guidanceScale), hints: \(hints.count), initImage: \(canvasImage != nil)")
+        print("[GRPCClient] Sending \u{2014} prompt: '\(request.prompt.prefix(60))\u{2026}', model: '\(request.model)', sampler: \(resolvedSampler) ('\(request.sampler)'), \(request.width)\u{00d7}\(request.height), steps: \(request.steps), cfg: \(request.guidanceScale), hints: \(hints.count), initImage: \(canvasImage != nil)")
 
         let images = try await dtClient.generateImage(
             prompt: request.prompt,
@@ -76,6 +76,45 @@ final class DrawThingsGRPCClient: DrawThingsClientProtocol {
             throw DrawThingsGRPCError.noImageReturned
         }
         return first
+    }
+
+    // MARK: - Sampler mapping
+
+    /// Maps a human-readable sampler name (e.g. "UniPC Trailing") to a SamplerType enum case.
+    /// Falls back to .dpmpp2mkarras if not recognized.
+    static func samplerType(from name: String) -> SamplerType {
+        let lookup: [String: SamplerType] = [
+            "DPM++ 2M Karras":      .dpmpp2mkarras,
+            "Euler a":              .eulera,
+            "DDIM":                 .ddim,
+            "PLMS":                 .plms,
+            "DPM++ SDE Karras":     .dpmppsdekarras,
+            "UniPC":                .unipc,
+            "LCM":                  .lcm,
+            "Euler a Substep":      .eulerasubstep,
+            "DPM++ SDE Substep":    .dpmppsdesubstep,
+            "TCD":                  .tcd,
+            "Euler a Trailing":     .euleratrailing,
+            "DPM++ SDE Trailing":   .dpmppsdetrailing,
+            "DPM++ 2M AYS":        .dpmpp2mays,
+            "Euler a AYS":          .euleraays,
+            "DPM++ SDE AYS":       .dpmppsdeays,
+            "DPM++ 2M Trailing":   .dpmpp2mtrailing,
+            "DDIM Trailing":        .ddimtrailing,
+            "UniPC Trailing":       .unipctrailing,
+            "UniPC AYS":            .unipcays,
+            "TCD Trailing":         .tcdtrailing,
+        ]
+        if let match = lookup[name] {
+            return match
+        }
+        // Case-insensitive fallback
+        let lower = name.lowercased()
+        for (key, value) in lookup {
+            if key.lowercased() == lower { return value }
+        }
+        print("[GRPCClient] Unknown sampler '\(name)', falling back to dpmpp2mkarras")
+        return .dpmpp2mkarras
     }
 
     // MARK: - Private helpers
