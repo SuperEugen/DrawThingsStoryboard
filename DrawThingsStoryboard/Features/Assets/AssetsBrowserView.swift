@@ -7,6 +7,7 @@ import SwiftUI
 /// #49: Character turn-around prompt for characters
 /// #52: Model picker for asset generation
 /// #53: Jobs now carry modelID
+/// #57: styleName uses resolved name (not description)
 
 struct AssetsBrowserView: View {
     @Binding var assets: AssetsFile
@@ -31,6 +32,11 @@ struct AssetsBrowserView: View {
         styles.styles.first(where: { $0.styleID == assetStyleID })?.style ?? ""
     }
 
+    /// #57: Resolved style name (not description) for job display
+    private var resolvedStyleName: String {
+        styles.styles.first(where: { $0.styleID == assetStyleID })?.name ?? ""
+    }
+
     private func emptyVariantCount(for asset: AssetEntry) -> Int {
         (0..<4).filter { !asset.variant(at: $0).hasImage }.count
     }
@@ -50,7 +56,6 @@ struct AssetsBrowserView: View {
                 Text("Assets").font(.title2.bold())
                 Spacer()
 
-                // #52: Model picker
                 Picker("Model", selection: $assetModelID) {
                     ForEach(models.models) { m in
                         Text(m.name).tag(m.modelID)
@@ -179,14 +184,14 @@ struct AssetsBrowserView: View {
         selectedAssetID = id
     }
 
-    /// #53: Asset batch jobs carry modelID
+    /// #57: styleName uses resolved name (not description)
     private func generateAllVariants() {
         for asset in assetsNeedingVariants {
             let count = emptyVariantCount(for: asset)
             let prompt = buildAssetPrompt(asset)
             let job = GenerationJob(
                 id: UUID().uuidString, itemName: asset.name, jobType: .generateAsset,
-                size: .small, styleName: resolvedStyleDescription, queuedAt: Date(),
+                size: .small, styleName: resolvedStyleName, queuedAt: Date(),
                 estimatedDuration: TimeInterval(count * 60),
                 itemIcon: asset.isCharacter ? "person.fill" : "map",
                 seed: 0, width: config.smallImageWidth, height: config.smallImageHeight,
@@ -198,7 +203,7 @@ struct AssetsBrowserView: View {
         }
     }
 
-    /// #53: Asset batch jobs carry modelID
+    /// #57: styleName uses resolved name (not description)
     private func generateAllLargeImages() {
         for asset in assetsNeedingLargeImage {
             let approvedSeed: Int = {
@@ -208,7 +213,7 @@ struct AssetsBrowserView: View {
             let prompt = buildAssetPrompt(asset)
             let job = GenerationJob(
                 id: UUID().uuidString, itemName: asset.name, jobType: .generateAsset,
-                size: .large, styleName: resolvedStyleDescription, queuedAt: Date(),
+                size: .large, styleName: resolvedStyleName, queuedAt: Date(),
                 estimatedDuration: 180,
                 itemIcon: asset.isCharacter ? "person.fill" : "map",
                 seed: approvedSeed, width: config.largeImageWidth, height: config.largeImageHeight,
@@ -220,7 +225,6 @@ struct AssetsBrowserView: View {
         }
     }
 
-    /// #49: Build prompt with character turn-around for characters.
     private func buildAssetPrompt(_ asset: AssetEntry) -> String {
         var parts: [String] = []
         if !resolvedStyleDescription.isEmpty { parts.append(resolvedStyleDescription) }

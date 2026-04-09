@@ -1,12 +1,7 @@
 import SwiftUI
 
 /// Root layout: three-pane NavigationSplitView.
-/// #45: Storyboard picker wiring
-/// #48: Asset style picker wiring
-/// #52: Model picker wiring for assets + storyboard
-/// #53: Pass modelID context to job creation views
-/// #55: Queue status toolbar indicator
-/// #56: Styles model picker, Production Queue without model selector, stylesModelID state
+/// #57: Pass assetStyleName to AssetsDetailView
 struct ContentView: View {
 
     // MARK: - Navigation
@@ -27,11 +22,8 @@ struct ContentView: View {
     @State private var selectedAssetID: String? = nil
     @State private var selectedJobID: String? = nil
     @State private var storyboardSelection: StoryboardSelection? = nil
-    /// #48: Style used for asset generation (independent of storyboard style).
     @State private var assetStyleID: String = ""
-    /// #52: Model used for asset generation (independent of storyboard model).
     @State private var assetModelID: String = ""
-    /// #56: Model used for style example generation.
     @State private var stylesModelID: String = ""
 
     // MARK: - Production Queue
@@ -81,6 +73,11 @@ struct ContentView: View {
 
     private var resolvedAssetStyleDescription: String {
         styles.styles.first { $0.styleID == assetStyleID }?.style ?? ""
+    }
+
+    /// #57: Resolved style name for asset jobs
+    private var resolvedAssetStyleName: String {
+        styles.styles.first { $0.styleID == assetStyleID }?.name ?? ""
     }
 
     private var resolvedStoryboardModelID: String {
@@ -235,6 +232,7 @@ struct ContentView: View {
                 generationQueue: $generationQueue,
                 config: config,
                 assetStyleDescription: resolvedAssetStyleDescription,
+                assetStyleName: resolvedAssetStyleName,
                 assetModelID: assetModelID
             )
         case .styles:
@@ -407,7 +405,6 @@ struct ContentView: View {
         if selectedStyleID == nil { selectedStyleID = styles.styles.first?.styleID }
         if selectedModelID == nil { selectedModelID = models.models.first?.modelID }
         if selectedAssetID == nil { selectedAssetID = assets.assets.first?.assetID }
-        // #48: Default asset style
         if assetStyleID.isEmpty {
             if let sb = storyboards.storyboards.first,
                styles.styles.contains(where: { $0.styleID == sb.styleID }) {
@@ -416,7 +413,6 @@ struct ContentView: View {
                 assetStyleID = styles.styles.first?.styleID ?? ""
             }
         }
-        // #52: Default asset model
         if assetModelID.isEmpty {
             if let sb = storyboards.storyboards.first,
                models.models.contains(where: { $0.modelID == sb.modelID }) {
@@ -425,7 +421,6 @@ struct ContentView: View {
                 assetModelID = models.models.first?.modelID ?? ""
             }
         }
-        // #56: Default styles model
         if stylesModelID.isEmpty {
             stylesModelID = models.models.first?.modelID ?? ""
         }

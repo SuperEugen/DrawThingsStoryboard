@@ -3,6 +3,7 @@ import DrawThingsClient
 
 /// Production client that talks to Draw Things via gRPC.
 /// Supports prompt-based generation AND moodboard reference images (shuffle hints).
+/// #57: Passes sampler to DrawThingsConfiguration
 ///
 /// Draw Things must be running with:
 /// Advanced → API Server → Protocol: gRPC, Port: 7859, TLS: on
@@ -43,7 +44,7 @@ final class DrawThingsGRPCClient: DrawThingsClientProtocol {
         let hints = buildHints(from: moodboardImages)
 
         let seedValue: Int64? = request.seed == -1 ? nil : Int64(request.seed)
-        let config = DrawThingsConfiguration(
+        var config = DrawThingsConfiguration(
             width: Int32(request.width),
             height: Int32(request.height),
             steps: Int32(request.steps),
@@ -51,11 +52,15 @@ final class DrawThingsGRPCClient: DrawThingsClientProtocol {
             guidanceScale: Float(request.guidanceScale),
             seed: seedValue
         )
+        // #57: Set sampler if provided and if the configuration supports it
+        if !request.sampler.isEmpty {
+            config.sampler = request.sampler
+            print("[GRPCClient] Sampler set to '\(request.sampler)'")
+        }
 
-        // Convert initImage to NSImage for the gRPC call
         let canvasImage: NSImage? = initImage
 
-        print("[GRPCClient] Sending — prompt: '\(request.prompt.prefix(60))…', \(request.width)×\(request.height), steps: \(request.steps), hints: \(hints.count), initImage: \(canvasImage != nil)")
+        print("[GRPCClient] Sending \u{2014} prompt: '\(request.prompt.prefix(60))\u{2026}', model: '\(request.model)', sampler: '\(request.sampler)', \(request.width)\u{00d7}\(request.height), steps: \(request.steps), cfg: \(request.guidanceScale), hints: \(hints.count), initImage: \(canvasImage != nil)")
 
         let images = try await dtClient.generateImage(
             prompt: request.prompt,

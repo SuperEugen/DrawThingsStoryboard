@@ -6,6 +6,7 @@ import SwiftUI
 /// #49: Character turn-around prompt for characters
 /// #53: Jobs now carry modelID
 /// #56: Generate Variants button for single asset
+/// #57: styleName uses passed-in name (not description)
 
 struct AssetsDetailView: View {
     @Binding var assets: AssetsFile
@@ -13,6 +14,7 @@ struct AssetsDetailView: View {
     @Binding var generationQueue: [GenerationJob]
     let config: AppConfig
     let assetStyleDescription: String
+    var assetStyleName: String = ""
     var assetModelID: String = ""
 
     private var selectedIndex: Int? {
@@ -27,6 +29,7 @@ struct AssetsDetailView: View {
                 generationQueue: $generationQueue,
                 config: config,
                 assetStyleDescription: assetStyleDescription,
+                assetStyleName: assetStyleName,
                 assetModelID: assetModelID,
                 onDelete: {
                     assets.assets.remove(at: idx)
@@ -49,6 +52,7 @@ private struct AssetEditorView: View {
     @Binding var generationQueue: [GenerationJob]
     let config: AppConfig
     let assetStyleDescription: String
+    let assetStyleName: String
     let assetModelID: String
     let onDelete: () -> Void
     @State private var showDeleteConfirmation = false
@@ -60,7 +64,6 @@ private struct AssetEditorView: View {
         }
     }
 
-    /// #56: Check if variants are already queued for this asset
     private var isVariantsQueued: Bool {
         generationQueue.contains {
             $0.assetID == asset.assetID && $0.jobType == .generateAsset && $0.size == .small
@@ -207,7 +210,6 @@ private struct AssetEditorView: View {
         }
     }
 
-    /// #56: Variants status row with Generate button
     @ViewBuilder
     private var variantsStatusRow: some View {
         HStack(spacing: 8) {
@@ -324,14 +326,14 @@ private struct AssetEditorView: View {
         asset.setVariant(at: idx, v)
     }
 
-    /// #56: Generate missing variants for this single asset
+    /// #57: styleName uses name not description
     private func generateVariants() {
         let count = emptyVariantCount
         guard count > 0 else { return }
         let prompt = buildAssetPrompt()
         let job = GenerationJob(
             id: UUID().uuidString, itemName: asset.name, jobType: .generateAsset,
-            size: .small, styleName: assetStyleDescription, queuedAt: Date(),
+            size: .small, styleName: assetStyleName, queuedAt: Date(),
             estimatedDuration: TimeInterval(count * 60),
             itemIcon: asset.isCharacter ? "person.fill" : "map",
             seed: 0, width: config.smallImageWidth, height: config.smallImageHeight,
@@ -342,13 +344,14 @@ private struct AssetEditorView: View {
         generationQueue.append(job)
     }
 
+    /// #57: styleName uses name not description
     private func generateLargeImage() {
         guard asset.hasApprovedVariant, let approvedIdx = asset.approvedVariantIndex else { return }
         let approvedSeed = asset.variant(at: approvedIdx).seed
         let prompt = buildAssetPrompt()
         let job = GenerationJob(
             id: UUID().uuidString, itemName: asset.name, jobType: .generateAsset,
-            size: .large, styleName: assetStyleDescription, queuedAt: Date(),
+            size: .large, styleName: assetStyleName, queuedAt: Date(),
             estimatedDuration: 180,
             itemIcon: asset.isCharacter ? "person.fill" : "map",
             seed: approvedSeed, width: config.largeImageWidth, height: config.largeImageHeight,

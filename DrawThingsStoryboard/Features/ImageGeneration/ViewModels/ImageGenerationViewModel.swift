@@ -3,6 +3,7 @@ import Combine
 import DrawThingsClient
 
 /// ViewModel for the Image Generation feature.
+/// #57: Added sampler property
 @MainActor
 final class ImageGenerationViewModel: ObservableObject {
 
@@ -17,6 +18,8 @@ final class ImageGenerationViewModel: ObservableObject {
     @Published var width: Int = 512
     @Published var height: Int = 512
     @Published var model: String = ""
+    /// #57: Sampler name (e.g. "UniPC Trailing"), passed through to gRPC
+    @Published var sampler: String = ""
 
     // MARK: - Connection (from AppConfig)
     @Published var grpcAddress: String = "localhost"
@@ -73,7 +76,8 @@ final class ImageGenerationViewModel: ObservableObject {
             seed: effectiveSeed,
             width: width,
             height: height,
-            model: model
+            model: model,
+            sampler: sampler
         )
 
         let activeClient = getClient()

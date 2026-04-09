@@ -4,6 +4,7 @@ import DrawThingsClient
 
 /// Runs the production queue automatically, processing one job at a time.
 /// Lives as a @StateObject in ContentView.
+/// #57: Uses job.modelID instead of global selectedModelID for model lookup
 @MainActor
 final class QueueRunnerService: ObservableObject {
 
@@ -49,6 +50,7 @@ final class QueueRunnerService: ObservableObject {
 
     // MARK: - Process a single job
     /// #50: Fresh random seeds per variant, canvas/moodboard only for panels
+    /// #57: Use job.modelID for model lookup (not global selectedModelID)
 
     private func processJob(
         _ job: GenerationJob,
@@ -79,7 +81,6 @@ final class QueueRunnerService: ObservableObject {
         var moodboardImages: [NSImage] = []
 
         if isPanelJob {
-            // #43: Load init image (e.g. location asset)
             if !job.initImageID.isEmpty {
                 initImage = StorageService.shared.loadImage(id: job.initImageID)
                 if let img = initImage {
@@ -88,7 +89,6 @@ final class QueueRunnerService: ObservableObject {
                     print("[QueueRunner] \u{26a0}\u{fe0f} Init image '\(job.initImageID)' not found on disk!")
                 }
             }
-            // #44: Load moodboard images (e.g. character assets)
             if !job.moodboardImageIDs.isEmpty {
                 for imgID in job.moodboardImageIDs {
                     if let img = StorageService.shared.loadImage(id: imgID) {
@@ -102,7 +102,18 @@ final class QueueRunnerService: ObservableObject {
             }
         }
 
-        print("[QueueRunner] Job '\(job.itemName)' \u{2014} type: \(job.jobType.rawValue), variants: \(count), initImage: \(initImage != nil), moodboard: \(moodboardImages.count)")
+        // #57: Resolve model from job.modelID first, then fallback to selectedModelID, then first model
+        let model: ModelEntry? = {
+            if !job.modelID.isEmpty {
+                if let m = models.models.first(where: { $0.modelID == job.modelID }) { return m }
+            }
+            if let sid = selectedModelID {
+                if let m = models.models.first(where: { $0.modelID == sid }) { return m }
+            }
+            return models.models.first
+        }()
+
+        print("[QueueRunner] Job '\(job.itemName)' \u{2014} type: \(job.jobType.rawValue), model: \(model?.name ?? "none") (\(job.modelID)), variants: \(count), initImage: \(initImage != nil), moodboard: \(moodboardImages.count)")
 
         // Generate images sequentially
         for i in 0..<count {
@@ -116,31 +127,26 @@ final class QueueRunnerService: ObservableObject {
             vm.grpcAddress = config.grpcAddress
             vm.grpcPort = config.grpcPort
 
-            let model = models.models.first { $0.modelID == selectedModelID } ?? models.models.first
+            // #57: Apply resolved model settings
             if let model {
                 vm.steps = model.steps
                 vm.guidanceScale = model.guidanceScale
                 vm.model = model.model
+                vm.sampler = model.sampler
             }
 
-            // #50: Always use fresh random seeds for multi-variant jobs
-            // For single-image jobs (panels, large assets): use job seed or random
             if count > 1 {
-                // Multi-variant: always completely random per variant
                 vm.seed = SeedHelper.randomSeed()
             } else {
-                // Single image: use job seed (0 = random in ViewModel)
                 vm.seed = job.seed
             }
 
-            // #50: Only set canvas/moodboard for panel jobs (clean slate for assets)
             if isPanelJob {
                 vm.initImage = initImage
                 vm.moodboardImages = moodboardImages
             }
-            // For asset/style jobs: vm.initImage and vm.moodboardImages stay nil/empty
 
-            print("[QueueRunner] Generation #\(i) \u{2014} seed: \(vm.seed), initImage: \(vm.initImage != nil), moodboard: \(vm.moodboardImages.count)")
+            print("[QueueRunner] Generation #\(i) \u{2014} seed: \(vm.seed), model: \(vm.model), sampler: \(vm.sampler), steps: \(vm.steps), cfg: \(vm.guidanceScale)")
 
             let cancellable = vm.$generationStage.sink { [weak self] stage in
                 self?.generationStage = stage
