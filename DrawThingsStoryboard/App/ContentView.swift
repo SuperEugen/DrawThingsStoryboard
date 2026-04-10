@@ -1,9 +1,7 @@
 import SwiftUI
 
 /// Root layout: three-pane NavigationSplitView.
-/// #57: Per-style asset variants
-/// #59: Pushover notification wiring
-/// Fix: Production log uses per-image timestamps from QueueRunner
+/// Cleaned up: no more resolved style/model helpers — Storyboard detail resolves its own context
 struct ContentView: View {
 
     // MARK: - Navigation
@@ -38,44 +36,11 @@ struct ContentView: View {
 
     // MARK: - Helpers
 
-    private var currentStoryboard: StoryboardEntry? {
-        guard storyboards.storyboards.indices.contains(selectedStoryboardIndex) else { return nil }
-        return storyboards.storyboards[selectedStoryboardIndex]
-    }
-
     private var currentActsBinding: Binding<[ActEntry]> {
         guard storyboards.storyboards.indices.contains(selectedStoryboardIndex) else {
             return .constant([])
         }
         return $storyboards.storyboards[selectedStoryboardIndex].acts
-    }
-
-    private var currentStyleIDBinding: Binding<String> {
-        guard storyboards.storyboards.indices.contains(selectedStoryboardIndex) else {
-            return .constant("")
-        }
-        return $storyboards.storyboards[selectedStoryboardIndex].styleID
-    }
-
-    private var currentModelIDBinding: Binding<String> {
-        guard storyboards.storyboards.indices.contains(selectedStoryboardIndex) else {
-            return .constant("")
-        }
-        return $storyboards.storyboards[selectedStoryboardIndex].modelID
-    }
-
-    private var resolvedStyleName: String? {
-        guard let sb = currentStoryboard else { return nil }
-        return styles.styles.first { $0.styleID == sb.styleID }?.name
-    }
-
-    private var resolvedStyleDescription: String {
-        guard let sb = currentStoryboard else { return "" }
-        return styles.styles.first { $0.styleID == sb.styleID }?.style ?? ""
-    }
-
-    private var resolvedStoryboardModelID: String {
-        currentStoryboard?.modelID ?? models.models.first?.modelID ?? ""
     }
 
     private var pushoverConfigured: Bool {
@@ -155,10 +120,8 @@ struct ContentView: View {
                 storyboards: $storyboards,
                 selectedStoryboardIndex: $selectedStoryboardIndex,
                 selection: $storyboardSelection,
-                styles: styles,
-                currentStyleID: currentStyleIDBinding,
                 models: models,
-                currentModelID: currentModelIDBinding,
+                styles: styles,
                 onFountainImport: { importedActs, name in
                     handleFountainImport(acts: importedActs, name: name)
                 }
@@ -213,15 +176,14 @@ struct ContentView: View {
         switch selectedSection {
         case .storyboard:
             StoryboardDetailView(
-                acts: currentActsBinding,
+                storyboards: $storyboards,
+                selectedStoryboardIndex: selectedStoryboardIndex,
                 selection: storyboardSelection,
                 generationQueue: $generationQueue,
                 assets: assets,
-                resolvedStyleName: resolvedStyleName,
-                styleDescription: resolvedStyleDescription,
-                config: config,
-                modelID: resolvedStoryboardModelID,
-                storyboardStyleID: currentStoryboard?.styleID ?? ""
+                styles: styles,
+                models: models,
+                config: config
             )
         case .assets:
             AssetsDetailView(
@@ -284,8 +246,7 @@ struct ContentView: View {
     }
 
     // MARK: - Job completion
-    /// #57: Asset jobs write to styleVariants[styleID]
-    /// Fix: Uses per-image start/end times from QueueRunner for accurate production log
+    /// Jobs always carry styleID and modelID — no fallback needed
 
     private func handleJobCompleted(_ job: GenerationJob) {
         var done = job
@@ -294,14 +255,6 @@ struct ContentView: View {
         generationQueue.removeAll { $0.id == job.id }
 
         let isoFormatter = ISO8601DateFormatter()
-        let resolvedModelID = job.modelID.isEmpty
-            ? (selectedModelID ?? models.models.first?.modelID ?? "")
-            : job.modelID
-        let resolvedStyleID: String = {
-            if !job.styleID.isEmpty { return job.styleID }
-            if let sb = currentStoryboard { return sb.styleID }
-            return ""
-        }()
 
         // Write production log entries with per-image timestamps
         for (i, imgID) in job.savedImageIDs.enumerated() {
@@ -311,15 +264,14 @@ struct ContentView: View {
                 startStr = isoFormatter.string(from: queueRunner.perImageStartTimes[i])
                 endStr = isoFormatter.string(from: queueRunner.perImageEndTimes[i])
             } else {
-                // Fallback: use job-level timestamps
                 startStr = job.startedAt.map { isoFormatter.string(from: $0) } ?? ""
                 endStr = isoFormatter.string(from: done.completedAt ?? Date())
             }
             let entry = GeneratedImageEntry(
                 imageID: imgID,
                 type: job.jobType.rawValue,
-                modelID: resolvedModelID,
-                styleID: resolvedStyleID,
+                modelID: job.modelID,
+                styleID: job.styleID,
                 startTime: startStr,
                 endTime: endStr,
                 size: job.size.rawValue,
@@ -342,8 +294,7 @@ struct ContentView: View {
 
         case .generateAsset:
             if let idx = assets.assets.firstIndex(where: { $0.assetID == job.assetID }) {
-                let targetStyleID = job.styleID.isEmpty ? resolvedStyleID : job.styleID
-                var sv = assets.assets[idx].variantsFor(style: targetStyleID)
+                var sv = assets.assets[idx].variantsFor(style: job.styleID)
 
                 if job.size == .large {
                     sv.largeImageID = firstImageID
@@ -359,7 +310,7 @@ struct ContentView: View {
                     }
                 }
 
-                assets.assets[idx].styleVariants[targetStyleID] = sv
+                assets.assets[idx].styleVariants[job.styleID] = sv
                 StorageLoadService.shared.saveAssets(assets)
             }
 

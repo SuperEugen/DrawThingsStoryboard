@@ -1,79 +1,166 @@
 import SwiftUI
 
 /// Right pane for the Storyboard section.
-/// #45: Panel list for parent nodes (Act, Sequence, Scene)
-/// #53: Panel jobs now carry modelID
-/// #57: bestImageID uses storyboard styleID
+/// Now receives full storyboards binding and resolves style/model itself.
+/// Model/Style pickers shown in Storyboard detail header.
 struct StoryboardDetailView: View {
 
-    @Binding var acts: [ActEntry]
+    @Binding var storyboards: StoryboardsFile
+    let selectedStoryboardIndex: Int
     let selection: StoryboardSelection?
     @Binding var generationQueue: [GenerationJob]
     let assets: AssetsFile
-    var resolvedStyleName: String? = nil
-    var styleDescription: String = ""
+    let styles: StylesFile
+    let models: ModelsFile
     var config: AppConfig = AppConfig()
-    var modelID: String = ""
-    var storyboardStyleID: String = ""
+
+    // MARK: - Resolved from storyboard
+
+    private var storyboard: StoryboardEntry? {
+        guard storyboards.storyboards.indices.contains(selectedStoryboardIndex) else { return nil }
+        return storyboards.storyboards[selectedStoryboardIndex]
+    }
+
+    private var acts: Binding<[ActEntry]> {
+        guard storyboards.storyboards.indices.contains(selectedStoryboardIndex) else {
+            return .constant([])
+        }
+        return $storyboards.storyboards[selectedStoryboardIndex].acts
+    }
+
+    private var storyboardStyleID: String {
+        storyboard?.styleID ?? ""
+    }
+
+    private var storyboardModelID: String {
+        storyboard?.modelID ?? ""
+    }
+
+    private var resolvedStyleName: String {
+        styles.styles.first { $0.styleID == storyboardStyleID }?.name ?? ""
+    }
+
+    private var resolvedStyleDescription: String {
+        styles.styles.first { $0.styleID == storyboardStyleID }?.style ?? ""
+    }
 
     var body: some View {
         if let selection {
             switch selection {
             case .act(let name):
-                if let idx = acts.firstIndex(where: { $0.name == name }) {
+                if let idx = acts.wrappedValue.firstIndex(where: { $0.name == name }) {
                     NodeDetailWithPanels(
-                        level: "Act", name: $acts[idx].name, color: .purple,
+                        level: "Act", name: acts[idx].name, color: .purple,
                         icon: "theatermasks",
-                        panels: panelsForAct(acts[idx]),
-                        selection: Binding(
-                            get: { self.selection },
-                            set: { _ in }
-                        )
+                        panels: panelsForAct(acts.wrappedValue[idx]),
+                        selection: Binding(get: { self.selection }, set: { _ in })
                     )
                 } else { emptyState }
 
             case .sequence(let name):
                 if let (ai, si) = findSequence(name) {
                     NodeDetailWithPanels(
-                        level: "Sequence", name: $acts[ai].sequences[si].name, color: .orange,
+                        level: "Sequence", name: acts[ai].sequences[si].name, color: .orange,
                         icon: "ellipsis.rectangle",
-                        panels: panelsForSequence(acts[ai].sequences[si]),
-                        selection: Binding(
-                            get: { self.selection },
-                            set: { _ in }
-                        )
+                        panels: panelsForSequence(acts.wrappedValue[ai].sequences[si]),
+                        selection: Binding(get: { self.selection }, set: { _ in })
                     )
                 } else { emptyState }
 
             case .scene(let name):
                 if let (ai, si, sci) = findScene(name) {
                     NodeDetailWithPanels(
-                        level: "Scene", name: $acts[ai].sequences[si].scenes[sci].name, color: .teal,
+                        level: "Scene", name: acts[ai].sequences[si].scenes[sci].name, color: .teal,
                         icon: "photo",
-                        panels: acts[ai].sequences[si].scenes[sci].panels,
-                        selection: Binding(
-                            get: { self.selection },
-                            set: { _ in }
-                        )
+                        panels: acts.wrappedValue[ai].sequences[si].scenes[sci].panels,
+                        selection: Binding(get: { self.selection }, set: { _ in })
                     )
                 } else { emptyState }
 
             case .panel(let id):
                 if let (ai, si, sci, pi) = findPanel(id) {
                     PanelDetailView(
-                        panel: $acts[ai].sequences[si].scenes[sci].panels[pi],
+                        panel: acts[ai].sequences[si].scenes[sci].panels[pi],
                         generationQueue: $generationQueue,
                         assets: assets,
-                        resolvedStyleName: resolvedStyleName,
-                        styleDescription: styleDescription,
+                        styles: styles,
+                        models: models,
                         config: config,
-                        modelID: modelID,
-                        storyboardStyleID: storyboardStyleID
+                        storyboardStyleID: storyboardStyleID,
+                        storyboardModelID: storyboardModelID
                     )
                 } else { emptyState }
             }
+        } else if storyboard != nil {
+            storyboardSettingsView
         } else {
             emptyState
+        }
+    }
+
+    // MARK: - Storyboard settings (shown when no tree node selected)
+
+    @ViewBuilder
+    private var storyboardSettingsView: some View {
+        if storyboards.storyboards.indices.contains(selectedStoryboardIndex) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    ZStack(alignment: .topLeading) {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.indigo.opacity(0.12))
+                            .frame(maxWidth: .infinity).frame(height: 100)
+                            .overlay {
+                                Image(systemName: "film").font(.system(size: 40))
+                                    .foregroundStyle(Color.indigo.opacity(0.6))
+                            }
+                        Text("Storyboard").font(.caption.weight(.medium))
+                            .padding(.horizontal, 8).padding(.vertical, 4)
+                            .background(.thinMaterial, in: Capsule())
+                            .foregroundStyle(.secondary).padding(10)
+                    }
+
+                    Divider().padding(.vertical, 8)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        sectionLabel("Name")
+                        TextField("Storyboard name", text: $storyboards.storyboards[selectedStoryboardIndex].name)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    .padding(.bottom, 16)
+
+                    Divider().padding(.vertical, 8)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        sectionLabel("Model")
+                        Text("The model used for generating all panels in this storyboard.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Picker("Model", selection: $storyboards.storyboards[selectedStoryboardIndex].modelID) {
+                            ForEach(models.models) { m in
+                                Text(m.name).tag(m.modelID)
+                            }
+                        }
+                        .pickerStyle(.menu).labelsHidden().frame(maxWidth: 240)
+                    }
+                    .padding(.bottom, 16)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        sectionLabel("Style")
+                        Text("The style applied to all panels in this storyboard. Assets must have variants generated for this style.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Picker("Style", selection: $storyboards.storyboards[selectedStoryboardIndex].styleID) {
+                            ForEach(styles.styles) { s in
+                                Text(s.name).tag(s.styleID)
+                            }
+                        }
+                        .pickerStyle(.menu).labelsHidden().frame(maxWidth: 240)
+                    }
+                    .padding(.bottom, 16)
+
+                    Spacer(minLength: 20)
+                }
+                .padding(14)
+            }
+            .background(Color(NSColor.windowBackgroundColor))
         }
     }
 
@@ -86,9 +173,7 @@ struct StoryboardDetailView: View {
     // MARK: - Panel collection helpers
 
     private func panelsForAct(_ act: ActEntry) -> [PanelEntry] {
-        act.sequences.flatMap { seq in
-            seq.scenes.flatMap { $0.panels }
-        }
+        act.sequences.flatMap { seq in seq.scenes.flatMap { $0.panels } }
     }
 
     private func panelsForSequence(_ seq: SequenceEntry) -> [PanelEntry] {
@@ -98,19 +183,19 @@ struct StoryboardDetailView: View {
     // MARK: - Find helpers
 
     private func findSequence(_ name: String) -> (Int, Int)? {
-        for ai in acts.indices {
-            for si in acts[ai].sequences.indices {
-                if acts[ai].sequences[si].name == name { return (ai, si) }
+        for ai in acts.wrappedValue.indices {
+            for si in acts.wrappedValue[ai].sequences.indices {
+                if acts.wrappedValue[ai].sequences[si].name == name { return (ai, si) }
             }
         }
         return nil
     }
 
     private func findScene(_ name: String) -> (Int, Int, Int)? {
-        for ai in acts.indices {
-            for si in acts[ai].sequences.indices {
-                for sci in acts[ai].sequences[si].scenes.indices {
-                    if acts[ai].sequences[si].scenes[sci].name == name { return (ai, si, sci) }
+        for ai in acts.wrappedValue.indices {
+            for si in acts.wrappedValue[ai].sequences.indices {
+                for sci in acts.wrappedValue[ai].sequences[si].scenes.indices {
+                    if acts.wrappedValue[ai].sequences[si].scenes[sci].name == name { return (ai, si, sci) }
                 }
             }
         }
@@ -118,11 +203,11 @@ struct StoryboardDetailView: View {
     }
 
     private func findPanel(_ id: String) -> (Int, Int, Int, Int)? {
-        for ai in acts.indices {
-            for si in acts[ai].sequences.indices {
-                for sci in acts[ai].sequences[si].scenes.indices {
-                    for pi in acts[ai].sequences[si].scenes[sci].panels.indices {
-                        if acts[ai].sequences[si].scenes[sci].panels[pi].panelID == id { return (ai, si, sci, pi) }
+        for ai in acts.wrappedValue.indices {
+            for si in acts.wrappedValue[ai].sequences.indices {
+                for sci in acts.wrappedValue[ai].sequences[si].scenes.indices {
+                    for pi in acts.wrappedValue[ai].sequences[si].scenes[sci].panels.indices {
+                        if acts.wrappedValue[ai].sequences[si].scenes[sci].panels[pi].panelID == id { return (ai, si, sci, pi) }
                     }
                 }
             }
@@ -132,8 +217,6 @@ struct StoryboardDetailView: View {
 }
 
 // MARK: - Node detail with panel list
-/// #45: Shows name editor + list of all descendant panels
-/// #47: PDF export button
 
 private struct NodeDetailWithPanels: View {
     let level: String
@@ -198,9 +281,7 @@ private struct NodeDetailWithPanels: View {
                     } else {
                         ForEach(panels) { panel in
                             CompactPanelRow(panel: panel, isSelected: selection == .panel(panel.panelID))
-                                .onTapGesture {
-                                    selection = .panel(panel.panelID)
-                                }
+                                .onTapGesture { selection = .panel(panel.panelID) }
                         }
                     }
                 }
@@ -236,28 +317,22 @@ private struct CompactPanelRow: View {
                             .foregroundStyle(Color.yellow.opacity(0.5))
                     }
             }
-
             VStack(alignment: .leading, spacing: 2) {
                 Text(panel.name).font(.callout).lineLimit(1)
                 if !panel.description.isEmpty {
                     Text(panel.description).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
-
             Spacer()
-
             HStack(spacing: 4) {
                 if panel.hasSmallImage {
-                    Text("S").font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.orange)
+                    Text("S").font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(.orange)
                 }
                 if panel.hasLargeImage {
-                    Text("L").font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.green)
+                    Text("L").font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(.green)
                 }
                 if !panel.refIDs.isEmpty {
-                    Text("\(panel.refIDs.count)R").font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.blue)
+                    Text("\(panel.refIDs.count)R").font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(.blue)
                 }
             }
         }
@@ -269,21 +344,31 @@ private struct CompactPanelRow: View {
 }
 
 // MARK: - Panel detail
-/// #42: Interactive asset slots with location-first constraint
-/// #53: Panel jobs carry modelID
-/// #57: bestImageID uses storyboard styleID
+/// Resolves style/model from storyboard entry directly
 
 private struct PanelDetailView: View {
     @Binding var panel: PanelEntry
     @Binding var generationQueue: [GenerationJob]
     let assets: AssetsFile
-    var resolvedStyleName: String? = nil
-    var styleDescription: String = ""
+    let styles: StylesFile
+    let models: ModelsFile
     var config: AppConfig = AppConfig()
-    var modelID: String = ""
     var storyboardStyleID: String = ""
+    var storyboardModelID: String = ""
 
     @State private var showLargeImageSheet = false
+
+    private var resolvedStyleName: String {
+        styles.styles.first { $0.styleID == storyboardStyleID }?.name ?? ""
+    }
+
+    private var styleDescription: String {
+        styles.styles.first { $0.styleID == storyboardStyleID }?.style ?? ""
+    }
+
+    private var canGenerate: Bool {
+        !storyboardStyleID.isEmpty && !storyboardModelID.isEmpty && hasDescription
+    }
 
     private var assignedIDs: [String] {
         [panel.ref1ID, panel.ref2ID, panel.ref3ID, panel.ref4ID].filter { !$0.isEmpty }
@@ -293,7 +378,6 @@ private struct PanelDetailView: View {
         assets.assets.first { $0.assetID == id }
     }
 
-    /// #57: Uses storyboard styleID to pick the right variant
     private func bestImageID(for entry: AssetEntry) -> String {
         entry.bestImageID(forStyle: storyboardStyleID)
     }
@@ -302,16 +386,11 @@ private struct PanelDetailView: View {
         assignedIDs.contains { id in asset(for: id)?.isLocation == true }
     }
 
-    private var locationAsset: AssetEntry? {
-        for id in assignedIDs {
-            if let entry = asset(for: id), entry.isLocation { return entry }
-        }
-        return nil
-    }
-
     private var locationImageID: String {
-        guard let loc = locationAsset else { return "" }
-        return bestImageID(for: loc)
+        for id in assignedIDs {
+            if let entry = asset(for: id), entry.isLocation { return bestImageID(for: entry) }
+        }
+        return ""
     }
 
     private var characterImageIDs: [String] {
@@ -339,15 +418,11 @@ private struct PanelDetailView: View {
     }
 
     private var isSmallQueued: Bool {
-        generationQueue.contains {
-            $0.panelID == panel.panelID && $0.jobType == .generatePanel && $0.size == .small
-        }
+        generationQueue.contains { $0.panelID == panel.panelID && $0.jobType == .generatePanel && $0.size == .small }
     }
 
     private var isLargeQueued: Bool {
-        generationQueue.contains {
-            $0.panelID == panel.panelID && $0.jobType == .generatePanel && $0.size == .large
-        }
+        generationQueue.contains { $0.panelID == panel.panelID && $0.jobType == .generatePanel && $0.size == .large }
     }
 
     private var combinedPrompt: String {
@@ -367,6 +442,19 @@ private struct PanelDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 panelHeader
+
+                // Show warning if no style or model assigned
+                if storyboardStyleID.isEmpty || storyboardModelID.isEmpty {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        Text("Assign a Model and Style to this storyboard before generating panels.")
+                            .font(.caption).foregroundStyle(.orange)
+                    }
+                    .padding(.vertical, 8).padding(.horizontal, 8)
+                    .background(RoundedRectangle(cornerRadius: 7).fill(Color.orange.opacity(0.1)))
+                    .padding(.bottom, 12)
+                }
+
                 statusSection
                 Divider().padding(.vertical, 8)
                 nameSection
@@ -428,8 +516,7 @@ private struct PanelDetailView: View {
     @ViewBuilder private var cameraSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             sectionLabel("Camera Movement")
-            TextField("e.g. Pan left, Zoom in", text: $panel.cameraMovement)
-                .textFieldStyle(.roundedBorder)
+            TextField("e.g. Pan left, Zoom in", text: $panel.cameraMovement).textFieldStyle(.roundedBorder)
         }
         .padding(.bottom, 12)
     }
@@ -484,20 +571,13 @@ private struct PanelDetailView: View {
             }
             ForEach(Array(assignedIDs.enumerated()), id: \.element) { index, assetID in
                 if let entry = asset(for: assetID) {
-                    AssetSlotRow(asset: entry, slotIndex: index, onRemove: {
-                        removeAsset(id: assetID)
-                    })
+                    AssetSlotRow(asset: entry, slotIndex: index, onRemove: { removeAsset(id: assetID) })
                 }
             }
             assetTransferIndicators
             if canAddMoreRefs { assetPickerMenu }
-            if assignedIDs.isEmpty && !canAddMoreRefs {
-                Text("No assets referenced.")
-                    .font(.caption).foregroundStyle(.tertiary).padding(.vertical, 8)
-            }
         }
         .padding(.bottom, 12)
-        .help("Maximum 4 asset references per panel (Draw Things limitation). Location always in slot 1.")
     }
 
     @ViewBuilder private var assetTransferIndicators: some View {
@@ -597,7 +677,7 @@ private struct PanelDetailView: View {
                     Button { generateImage(size: .small) } label: {
                         Label("Generate", systemImage: "paintbrush.pointed").font(.caption)
                     }
-                    .buttonStyle(.bordered).controlSize(.mini).disabled(!hasDescription)
+                    .buttonStyle(.bordered).controlSize(.mini).disabled(!canGenerate)
                 }
             }
         }
@@ -620,7 +700,7 @@ private struct PanelDetailView: View {
                     Button { generateImage(size: .large) } label: {
                         Label("Generate", systemImage: "arrow.up.left.and.arrow.down.right.rectangle").font(.caption)
                     }
-                    .buttonStyle(.bordered).controlSize(.mini).disabled(!hasDescription)
+                    .buttonStyle(.bordered).controlSize(.mini).disabled(!canGenerate)
                 }
             }
             if panel.hasLargeImage {
@@ -635,17 +715,17 @@ private struct PanelDetailView: View {
     }
 
     private func generateImage(size: GenerationSize) {
-        guard hasDescription else { return }
+        guard canGenerate else { return }
         let seed = panel.seed == 0 ? SeedHelper.randomSeed() : panel.seed
         let w = size == .large ? config.largeImageWidth : config.smallImageWidth
         let h = size == .large ? config.largeImageHeight : config.smallImageHeight
         let job = GenerationJob(
             id: UUID().uuidString, itemName: panel.name, jobType: .generatePanel,
-            size: size, styleName: resolvedStyleName ?? "", queuedAt: Date(),
+            size: size, styleName: resolvedStyleName, queuedAt: Date(),
             estimatedDuration: size == .large ? 180 : 60, itemIcon: "list.and.film",
             seed: seed, width: w, height: h, combinedPrompt: combinedPrompt,
             styleID: storyboardStyleID,
-            panelID: panel.panelID, modelID: modelID,
+            panelID: panel.panelID, modelID: storyboardModelID,
             initImageID: locationImageID,
             moodboardImageIDs: characterImageIDs
         )

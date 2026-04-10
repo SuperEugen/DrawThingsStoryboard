@@ -12,22 +12,17 @@ enum StoryboardSelection: Hashable {
 }
 
 // MARK: - StoryboardBrowserView
-/// #45: Storyboard picker, move up/down for all tree levels
-/// #52: Model picker in storyboard header
-/// #56: SF Symbols 7 icons for storyboard sections
+/// Tree view only — Model/Style pickers moved to StoryboardDetailView
 
 struct StoryboardBrowserView: View {
 
     @Binding var storyboards: StoryboardsFile
     @Binding var selectedStoryboardIndex: Int
     @Binding var selection: StoryboardSelection?
-    let styles: StylesFile
-    @Binding var currentStyleID: String
     let models: ModelsFile
-    @Binding var currentModelID: String
+    let styles: StylesFile
     var onFountainImport: (([ActEntry], String) -> Void)? = nil
 
-    /// The acts of the currently selected storyboard.
     private var acts: Binding<[ActEntry]> {
         guard storyboards.storyboards.indices.contains(selectedStoryboardIndex) else {
             return .constant([])
@@ -53,7 +48,6 @@ struct StoryboardBrowserView: View {
             } else {
                 ScrollView {
                     VStack(spacing: 0) {
-                        // Storyboard name row
                         storyboardRow
 
                         ForEach(acts.wrappedValue.indices, id: \.self) { ai in
@@ -76,15 +70,13 @@ struct StoryboardBrowserView: View {
         .background(Color(NSColor.windowBackgroundColor))
     }
 
-    // MARK: - Header
+    // MARK: - Header (tree actions only)
 
     @ViewBuilder
     private var headerBar: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Image(systemName: "film.stack").font(.title2).foregroundStyle(.secondary)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Storyboards").font(.title2.bold())
-            }
+            Text("Storyboards").font(.title2.bold())
             Spacer()
             // Storyboard picker (when multiple exist)
             if storyboards.storyboards.count > 1 {
@@ -95,19 +87,6 @@ struct StoryboardBrowserView: View {
                 }
                 .pickerStyle(.menu).labelsHidden().frame(maxWidth: 180)
             }
-            // #52: Model picker
-            Picker("Model", selection: $currentModelID) {
-                ForEach(models.models) { m in
-                    Text(m.name).tag(m.modelID)
-                }
-            }
-            .pickerStyle(.menu).labelsHidden().frame(maxWidth: 160)
-            Picker("Style", selection: $currentStyleID) {
-                ForEach(styles.styles) { s in
-                    Text(s.name).tag(s.styleID)
-                }
-            }
-            .pickerStyle(.menu).labelsHidden().frame(maxWidth: 160)
             // Add Act
             Button { addAct() } label: {
                 Image(systemName: "plus").frame(width: 22, height: 22)
@@ -192,7 +171,6 @@ struct StoryboardBrowserView: View {
 }
 
 // MARK: - Act row
-/// #56: Act icon → theatermasks
 
 private struct ActRow: View {
     @Binding var act: ActEntry
@@ -268,7 +246,6 @@ private struct ActRow: View {
 }
 
 // MARK: - Sequence row
-/// #56: Sequence icon → ellipsis.rectangle
 
 private struct SequenceRow: View {
     @Binding var sequence: SequenceEntry
@@ -344,7 +321,6 @@ private struct SequenceRow: View {
 }
 
 // MARK: - Scene row
-/// #56: Scene icon → photo
 
 private struct SceneRow: View {
     @Binding var scene: SceneEntry
@@ -412,7 +388,6 @@ private struct SceneRow: View {
 }
 
 // MARK: - Panel row
-/// #56: Panel icon → list.and.film
 
 private struct PanelRow: View {
     @Binding var panel: PanelEntry
