@@ -111,7 +111,7 @@ struct AssetsBrowserView: View {
                         .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
                 }
 
-                // GROUP 3: Add — fixed Location icon to mappin.and.ellipse
+                // GROUP 3: Add
                 GroupBox {
                     HStack(spacing: 8) {
                         Button { addAsset(type: "character", subType: "male") } label: {
@@ -217,7 +217,7 @@ struct AssetsBrowserView: View {
     }
 
     private func deleteAsset(_ asset: AssetEntry) {
-        // Delete all generated images
+        // Delete all generated image files from disk
         for (_, sv) in asset.styleVariants {
             for v in sv.variants where v.hasImage {
                 StorageService.shared.deleteImage(id: v.smallImageID)
@@ -226,11 +226,14 @@ struct AssetsBrowserView: View {
                 StorageService.shared.deleteImage(id: sv.largeImageID)
             }
         }
+        // Remove from in-memory state
         assets.assets.removeAll { $0.assetID == asset.assetID }
         if selectedAssetID == asset.assetID {
             selectedAssetID = assets.assets.first?.assetID
         }
         assetToDelete = nil
+        // Persist to assets.json
+        StorageLoadService.shared.saveAssets(assets)
     }
 
     private func generateAllVariants() {
