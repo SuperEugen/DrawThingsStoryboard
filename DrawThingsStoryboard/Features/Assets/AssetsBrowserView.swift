@@ -1,10 +1,7 @@
 import SwiftUI
 
 // MARK: - Assets browser
-/// #65: Generate group icon → wand.and.sparkles
-/// #66: Add group icon → plus
-/// #67: Two separate Add buttons (Character + Location)
-/// #68: Style filter with proper badges (approved, large image indicators)
+/// Delete via x-button on thumbnail, Location Add button fixed
 
 struct AssetsBrowserView: View {
     @Binding var assets: AssetsFile
@@ -15,6 +12,9 @@ struct AssetsBrowserView: View {
     @Binding var assetStyleID: String
     let models: ModelsFile
     @Binding var assetModelID: String
+
+    @State private var assetToDelete: AssetEntry? = nil
+    @State private var showDeleteConfirmation = false
 
     private var characters: [AssetEntry] { assets.assets.filter { $0.isCharacter } }
     private var locations: [AssetEntry] { assets.assets.filter { $0.isLocation } }
@@ -49,6 +49,14 @@ struct AssetsBrowserView: View {
         }
         .background(Color(NSColor.windowBackgroundColor))
         .onAppear { ensureSelection() }
+        .alert("Delete \(assetToDelete?.name ?? "")?", isPresented: $showDeleteConfirmation) {
+            Button("Delete", role: .destructive) {
+                if let asset = assetToDelete { deleteAsset(asset) }
+            }
+            Button("Cancel", role: .cancel) { assetToDelete = nil }
+        } message: {
+            Text("This will permanently remove the asset and all generated variants and large images for all styles.")
+        }
     }
 
     // MARK: - Header
@@ -78,7 +86,7 @@ struct AssetsBrowserView: View {
                         .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
                 }
 
-                // GROUP 2: Generate (#65: wand.and.sparkles)
+                // GROUP 2: Generate
                 GroupBox {
                     HStack(spacing: 8) {
                         Picker("Model", selection: $assetModelID) {
@@ -103,7 +111,7 @@ struct AssetsBrowserView: View {
                         .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
                 }
 
-                // GROUP 3: Add (#66: plus icon, #67: two separate buttons)
+                // GROUP 3: Add — fixed Location icon to mappin.and.ellipse
                 GroupBox {
                     HStack(spacing: 8) {
                         Button { addAsset(type: "character", subType: "male") } label: {
@@ -113,7 +121,7 @@ struct AssetsBrowserView: View {
                         .help("Add new character")
 
                         Button { addAsset(type: "location", subType: "interior") } label: {
-                            Image(systemName: "building.and.ellipse").font(.callout)
+                            Image(systemName: "mappin.and.ellipse").font(.callout)
                         }
                         .buttonStyle(.bordered).controlSize(.regular)
                         .help("Add new location")
@@ -130,7 +138,6 @@ struct AssetsBrowserView: View {
     }
 
     // MARK: - Grid
-    /// #68: Tiles show style-filtered images with badges
 
     @ViewBuilder
     private var assetGrid: some View {
@@ -160,7 +167,7 @@ struct AssetsBrowserView: View {
         }
     }
 
-    /// #68: Style-aware tile with approved + large image badges
+    /// Tile with x-button for deletion
     private func assetTile(_ asset: AssetEntry) -> some View {
         let isSelected = selectedAssetID == asset.assetID
         let thumbType: ThumbnailItemType = asset.isCharacter
@@ -170,15 +177,30 @@ struct AssetsBrowserView: View {
         let showApproved = sv.hasApprovedVariant
         let showLargeIndicator = sv.hasLargeImage
 
-        return UnifiedThumbnailView(
-            itemType: thumbType, name: asset.name, sizeMode: .standard,
-            badges: ThumbnailBadges(
-                showApprovedBadge: showApproved,
-                showSelectionStroke: isSelected,
-                showLargeImageIndicator: showLargeIndicator
-            ),
-            imageID: displayImageID
-        )
+        return ZStack(alignment: .topTrailing) {
+            UnifiedThumbnailView(
+                itemType: thumbType, name: asset.name, sizeMode: .standard,
+                badges: ThumbnailBadges(
+                    showApprovedBadge: showApproved,
+                    showSelectionStroke: isSelected,
+                    showLargeImageIndicator: showLargeIndicator
+                ),
+                imageID: displayImageID
+            )
+
+            // x-button for deletion
+            Button {
+                assetToDelete = asset
+                showDeleteConfirmation = true
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 16))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .padding(6)
+        }
         .padding(3)
         .background(RoundedRectangle(cornerRadius: 12).fill(isSelected ? Color.accentColor.opacity(0.07) : Color.clear))
         .onTapGesture { selectedAssetID = asset.assetID }
@@ -192,6 +214,23 @@ struct AssetsBrowserView: View {
                              type: type, subType: subType, description: "")
         assets.assets.append(new)
         selectedAssetID = id
+    }
+
+    private func deleteAsset(_ asset: AssetEntry) {
+        // Delete all generated images
+        for (_, sv) in asset.styleVariants {
+            for v in sv.variants where v.hasImage {
+                StorageService.shared.deleteImage(id: v.smallImageID)
+            }
+            if sv.hasLargeImage {
+                StorageService.shared.deleteImage(id: sv.largeImageID)
+            }
+        }
+        assets.assets.removeAll { $0.assetID == asset.assetID }
+        if selectedAssetID == asset.assetID {
+            selectedAssetID = assets.assets.first?.assetID
+        }
+        assetToDelete = nil
     }
 
     private func generateAllVariants() {

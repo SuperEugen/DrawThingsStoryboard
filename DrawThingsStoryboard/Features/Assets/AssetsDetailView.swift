@@ -1,13 +1,8 @@
 import SwiftUI
 
 // MARK: - Assets detail
-/// #69: Delete with image cleanup, x-button on tile
-/// #70: Subtype compact in same row as Type
-/// #71: "other" subtype for characters
-/// #72: Variant thumbnails use standard size
-/// #73: Collapsible variant sections
-/// #74: Eye indicator on large-image thumbnails
-/// #75: Eye button removed from style section header
+/// Delete button removed (now on thumbnail in browser)
+/// Subtype picker: label hidden, no "Subtype" text
 
 struct AssetsDetailView: View {
     @Binding var assets: AssetsFile
@@ -29,20 +24,7 @@ struct AssetsDetailView: View {
                 generationQueue: $generationQueue,
                 config: config,
                 styles: styles,
-                assetModelID: assetModelID,
-                onDelete: {
-                    // #69: Delete all generated images for this asset
-                    let asset = assets.assets[idx]
-                    for (_, sv) in asset.styleVariants {
-                        for v in sv.variants where v.hasImage {
-                            StorageService.shared.deleteImage(id: v.smallImageID)
-                        }
-                        if sv.hasLargeImage {
-                            StorageService.shared.deleteImage(id: sv.largeImageID)
-                        }
-                    }
-                    assets.assets.remove(at: idx)
-                }
+                assetModelID: assetModelID
             )
         } else {
             ContentUnavailableView(
@@ -62,8 +44,6 @@ private struct AssetEditorView: View {
     let config: AppConfig
     let styles: StylesFile
     let assetModelID: String
-    let onDelete: () -> Void
-    @State private var showDeleteConfirmation = false
     @State private var showLargeImageSheet = false
     @State private var largeImageSheetStyleID: String = ""
 
@@ -93,7 +73,7 @@ private struct AssetEditorView: View {
                 UnifiedThumbnailView(itemType: thumbType, name: "", sizeMode: .header, imageID: headerImageID)
                     .padding(.bottom, 16)
 
-                // #70: Type + Subtype in one compact row with picker
+                // Type + Subtype: no "Subtype" label text, picker labels hidden
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Type")
                     HStack(spacing: 8) {
@@ -101,19 +81,18 @@ private struct AssetEditorView: View {
                             .foregroundStyle(asset.isCharacter ? .blue : .teal)
                         Text(asset.isCharacter ? "Character" : "Location").font(.callout)
                         Spacer()
-                        // #70, #71: Subtype picker inline
                         if asset.isCharacter {
-                            Picker("Subtype", selection: $asset.subType) {
+                            Picker(selection: $asset.subType) {
                                 Text("Male").tag("male")
                                 Text("Female").tag("female")
                                 Text("Other").tag("other")
-                            }
+                            } label: { EmptyView() }
                             .pickerStyle(.segmented).frame(maxWidth: 200)
                         } else {
-                            Picker("Subtype", selection: $asset.subType) {
+                            Picker(selection: $asset.subType) {
                                 Text("Interior").tag("interior")
                                 Text("Exterior").tag("exterior")
-                            }
+                            } label: { EmptyView() }
                             .pickerStyle(.segmented).frame(maxWidth: 160)
                         }
                     }
@@ -153,20 +132,6 @@ private struct AssetEditorView: View {
                     Divider().padding(.vertical, 6)
                 }
 
-                // #69: Delete button with warning about image deletion
-                Button(role: .destructive) {
-                    showDeleteConfirmation = true
-                } label: {
-                    Label("Delete Asset", systemImage: "trash")
-                }
-                .buttonStyle(.bordered)
-                .alert("Delete \(asset.name)?", isPresented: $showDeleteConfirmation) {
-                    Button("Delete", role: .destructive, action: onDelete)
-                    Button("Cancel", role: .cancel) {}
-                } message: {
-                    Text("This will permanently remove the asset and all generated variants and large images for all styles.")
-                }
-
                 Spacer(minLength: 20)
             }
             .padding(14)
@@ -181,10 +146,6 @@ private struct AssetEditorView: View {
 }
 
 // MARK: - Per-style variants section
-/// #72: standard-size thumbnails for variants
-/// #73: collapsible, auto-collapses when large image exists
-/// #74: eye indicator on large-image variant thumbnails (handled in badges)
-/// #75: eye button removed
 
 private struct StyleVariantsSection: View {
     @Binding var asset: AssetEntry
@@ -209,7 +170,6 @@ private struct StyleVariantsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // #73: Collapsible header
             HStack(spacing: 8) {
                 Button { isExpanded.toggle() } label: {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
@@ -221,7 +181,6 @@ private struct StyleVariantsSection: View {
                 Text(style.name).font(.callout.weight(.semibold))
                 Spacer()
 
-                // Generate variants
                 if sv.emptySlotCount > 0 && !sv.hasApprovedVariant {
                     if isVariantsQueued {
                         Text("Queued").font(.caption).foregroundStyle(.purple)
@@ -233,7 +192,6 @@ private struct StyleVariantsSection: View {
                     }
                 }
 
-                // Generate large
                 if sv.hasApprovedVariant && !sv.hasLargeImage {
                     if isLargeQueued {
                         Text("Queued").font(.caption).foregroundStyle(.purple)
@@ -244,13 +202,11 @@ private struct StyleVariantsSection: View {
                         .buttonStyle(.bordered).controlSize(.mini)
                     }
                 }
-                // #75: eye button removed
             }
             .padding(.vertical, 5).padding(.horizontal, 8)
             .background(RoundedRectangle(cornerRadius: 7).fill(Color.orange.opacity(0.07)))
 
             if isExpanded {
-                // #72: standard-size variant tiles (2 columns)
                 if !sv.variants.isEmpty {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                         ForEach(0..<4, id: \.self) { idx in
@@ -262,7 +218,6 @@ private struct StyleVariantsSection: View {
                         .font(.caption).foregroundStyle(.tertiary).padding(.vertical, 4)
                 }
 
-                // Large image preview
                 if sv.hasLargeImage, let img = StorageService.shared.loadImage(id: sv.largeImageID) {
                     Button { onViewLargeImage(style.styleID) } label: {
                         Image(nsImage: img)
@@ -275,7 +230,6 @@ private struct StyleVariantsSection: View {
             }
         }
         .onAppear {
-            // #73: Auto-collapse when large image exists
             if sv.hasLargeImage { isExpanded = false }
         }
     }
@@ -286,7 +240,6 @@ private struct StyleVariantsSection: View {
             ? .character(subType: asset.subType) : .location(subType: asset.subType)
 
         return VStack(spacing: 4) {
-            // #72: standard size, #74: eye indicator via showEyeIndicator badge
             UnifiedThumbnailView(
                 itemType: thumbType, name: "", sizeMode: .standard,
                 badges: ThumbnailBadges(
