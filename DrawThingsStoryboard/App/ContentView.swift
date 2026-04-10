@@ -1,7 +1,6 @@
 import SwiftUI
 
 /// Root layout: three-pane NavigationSplitView.
-/// Cleaned up: no more resolved style/model helpers — Storyboard detail resolves its own context
 struct ContentView: View {
 
     // MARK: - Navigation
@@ -35,13 +34,6 @@ struct ContentView: View {
     @StateObject private var queueRunner = QueueRunnerService()
 
     // MARK: - Helpers
-
-    private var currentActsBinding: Binding<[ActEntry]> {
-        guard storyboards.storyboards.indices.contains(selectedStoryboardIndex) else {
-            return .constant([])
-        }
-        return $storyboards.storyboards[selectedStoryboardIndex].acts
-    }
 
     private var pushoverConfigured: Bool {
         !config.pushoverToken.isEmpty && !config.pushoverUser.isEmpty
@@ -246,7 +238,6 @@ struct ContentView: View {
     }
 
     // MARK: - Job completion
-    /// Jobs always carry styleID and modelID — no fallback needed
 
     private func handleJobCompleted(_ job: GenerationJob) {
         var done = job
@@ -256,7 +247,6 @@ struct ContentView: View {
 
         let isoFormatter = ISO8601DateFormatter()
 
-        // Write production log entries with per-image timestamps
         for (i, imgID) in job.savedImageIDs.enumerated() {
             let startStr: String
             let endStr: String
@@ -295,21 +285,15 @@ struct ContentView: View {
         case .generateAsset:
             if let idx = assets.assets.firstIndex(where: { $0.assetID == job.assetID }) {
                 var sv = assets.assets[idx].variantsFor(style: job.styleID)
-
                 if job.size == .large {
                     sv.largeImageID = firstImageID
                 } else {
                     for imgID in job.savedImageIDs {
                         guard sv.variants.count < 4 else { break }
                         let effectiveSeed = job.seed == 0 ? SeedHelper.randomSeed() : job.seed + sv.variants.count
-                        sv.variants.append(AssetVariant(
-                            smallImageID: imgID,
-                            seed: effectiveSeed,
-                            isApproved: false
-                        ))
+                        sv.variants.append(AssetVariant(smallImageID: imgID, seed: effectiveSeed, isApproved: false))
                     }
                 }
-
                 assets.assets[idx].styleVariants[job.styleID] = sv
                 StorageLoadService.shared.saveAssets(assets)
             }
