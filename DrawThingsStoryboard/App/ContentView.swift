@@ -1,6 +1,7 @@
 import SwiftUI
 
 /// Root layout: three-pane NavigationSplitView.
+/// #84: Clear Done empties production-log.json via callback
 struct ContentView: View {
 
     // MARK: - Navigation
@@ -152,7 +153,11 @@ struct ContentView: View {
                 queueRunner: queueRunner,
                 productionLog: productionLog,
                 notificationsEnabled: $notificationsEnabled,
-                pushoverConfigured: pushoverConfigured
+                pushoverConfigured: pushoverConfigured,
+                onClearProductionLog: {
+                    productionLog = ProductionLogFile(generatedImages: [])
+                    StorageLoadService.shared.saveProductionLog(productionLog)
+                }
             )
         case .settings:
             SettingsContentView(config: $config)

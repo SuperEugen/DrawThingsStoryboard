@@ -1,7 +1,8 @@
 import SwiftUI
 
 // MARK: - Assets browser
-/// Delete via x-button on thumbnail, Location Add button fixed
+/// #78: "Model" label in front of model picker in Generate group
+/// #79: Variants label shows "Variants (N × 4)" format
 
 struct AssetsBrowserView: View {
     @Binding var assets: AssetsFile
@@ -89,13 +90,16 @@ struct AssetsBrowserView: View {
                 // GROUP 2: Generate
                 GroupBox {
                     HStack(spacing: 8) {
+                        // #78: "Model" label before picker
+                        Text("Model").font(.caption).foregroundStyle(.secondary)
                         Picker("Model", selection: $assetModelID) {
                             ForEach(models.models) { m in Text(m.name).tag(m.modelID) }
                         }
                         .pickerStyle(.menu).labelsHidden().frame(minWidth: 120)
 
+                        // #79: Show "Variants (N × 4)" format
                         Button { generateAllVariants() } label: {
-                            Label("Variants (\(assetsNeedingVariants.count))", systemImage: "square.grid.2x2").font(.callout)
+                            Label("Variants (\(assetsNeedingVariants.count) \u{00d7} 4)", systemImage: "square.grid.2x2").font(.callout)
                         }
                         .buttonStyle(.bordered).controlSize(.regular)
                         .disabled(assetsNeedingVariants.isEmpty)

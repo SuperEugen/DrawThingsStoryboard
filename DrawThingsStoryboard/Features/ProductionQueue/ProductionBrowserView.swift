@@ -2,8 +2,9 @@ import SwiftUI
 import Combine
 
 // MARK: - Production browser
-/// #56: Header icon updated to square.and.arrow.down.on.square
-/// #59: Notifications toggle in header
+/// #82: Job type icons instead of letters
+/// #83: Pushover hint when not configured
+/// #84: Clear Done also empties production-log.json
 
 struct ProductionBrowserView: View {
     @Binding var queue: [GenerationJob]
@@ -14,6 +15,8 @@ struct ProductionBrowserView: View {
     let productionLog: ProductionLogFile
     @Binding var notificationsEnabled: Bool
     let pushoverConfigured: Bool
+    /// #84: Callback to clear production log in ContentView
+    var onClearProductionLog: (() -> Void)? = nil
 
     var body: some View {
         VSplitView {
@@ -29,7 +32,7 @@ struct ProductionBrowserView: View {
             )
             .frame(minHeight: 120)
 
-            DoneSection(doneQueue: $doneQueue, models: models)
+            DoneSection(doneQueue: $doneQueue, models: models, onClearProductionLog: onClearProductionLog)
                 .frame(minHeight: 100)
         }
         .background(Color(NSColor.windowBackgroundColor))
@@ -110,17 +113,21 @@ private struct QueueSection: View {
                     Image(systemName: "square.and.arrow.down.on.square").font(.title2).foregroundStyle(.secondary)
                     Text("Production Queue").font(.title2.bold())
                     Spacer()
-                    // #59: Notifications toggle
-                    Toggle(isOn: $notificationsEnabled) {
-                        Image(systemName: notificationsEnabled ? "bell.fill" : "bell.slash")
-                            .font(.caption)
-                            .foregroundStyle(notificationsEnabled ? .blue : .secondary)
+
+                    // #83: Show toggle only when configured, otherwise show hint
+                    if pushoverConfigured {
+                        Toggle(isOn: $notificationsEnabled) {
+                            Image(systemName: notificationsEnabled ? "bell.fill" : "bell.slash")
+                                .font(.caption)
+                                .foregroundStyle(notificationsEnabled ? .blue : .secondary)
+                        }
+                        .toggleStyle(.switch).controlSize(.mini)
+                        .help("Send Pushover notifications when jobs complete")
+                    } else {
+                        Label("Set up Pushover in Settings", systemImage: "bell.badge")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
                     }
-                    .toggleStyle(.switch).controlSize(.mini)
-                    .disabled(!pushoverConfigured)
-                    .help(pushoverConfigured
-                          ? "Send Pushover notifications when jobs complete"
-                          : "Configure Pushover token and user in Settings first")
 
                     if queueRunner.isRunning && waitingCount > 0 {
                         Button {
@@ -176,6 +183,7 @@ private struct QueueSection: View {
 private struct DoneSection: View {
     @Binding var doneQueue: [GenerationJob]
     let models: ModelsFile
+    var onClearProductionLog: (() -> Void)? = nil
 
     private func modelName(for id: String) -> String {
         models.models.first(where: { $0.modelID == id })?.name ?? "?"
@@ -188,7 +196,11 @@ private struct DoneSection: View {
                 Text("Done").font(.subheadline.bold())
                 Spacer()
                 if !doneQueue.isEmpty {
-                    Button { doneQueue.removeAll() } label: { Text("Clear").font(.caption) }
+                    Button {
+                        doneQueue.removeAll()
+                        // #84: Also clear production log
+                        onClearProductionLog?()
+                    } label: { Text("Clear").font(.caption) }
                     .buttonStyle(.borderless).foregroundStyle(.secondary)
                 }
             }
@@ -208,6 +220,7 @@ private struct DoneSection: View {
 }
 
 // MARK: - Job row
+/// #82: Icons instead of letters for job type
 
 private struct JobRow: View {
     let job: GenerationJob
@@ -216,16 +229,31 @@ private struct JobRow: View {
     let modelName: String
     let onDelete: () -> Void
 
+    /// #82: Icon for job type
+    private var jobTypeIcon: String {
+        switch job.jobType {
+        case .generateStyle: return "paintbrush"
+        case .generateAsset:
+            return job.variantCount > 1 ? "square.grid.2x2" : "photo"
+        case .generatePanel: return "list.and.film"
+        }
+    }
+
     var body: some View {
         HStack(spacing: 6) {
             if isRunning {
                 ProgressView().controlSize(.mini)
                     .frame(width: 14)
             } else {
-                Text(job.jobType.letter).font(.system(size: 11, weight: .bold, design: .monospaced))
+                Image(systemName: jobTypeIcon)
+                    .font(.system(size: 11))
                     .foregroundStyle(job.jobType.color).frame(width: 14)
             }
-            Text(job.size.letter).font(.system(size: 11, weight: .bold, design: .monospaced))
+            // Size icon: small or large
+            Image(systemName: job.size == .large
+                  ? "arrow.up.left.and.arrow.down.right.rectangle"
+                  : "arrow.down.right.and.arrow.up.left.square")
+                .font(.system(size: 10))
                 .foregroundStyle(job.size == .large ? .green : .orange).frame(width: 14)
             VStack(alignment: .leading, spacing: 1) {
                 Text(job.itemName).font(.callout.weight(.medium)).lineLimit(1)
@@ -256,10 +284,20 @@ private struct JobRow: View {
 }
 
 // MARK: - Done job row
+/// #82: Icons instead of letters in done rows
 
 private struct DoneJobRow: View {
     let job: GenerationJob
     let modelName: String
+
+    private var jobTypeIcon: String {
+        switch job.jobType {
+        case .generateStyle: return "paintbrush"
+        case .generateAsset:
+            return job.variantCount > 1 ? "square.grid.2x2" : "photo"
+        case .generatePanel: return "list.and.film"
+        }
+    }
 
     private var durationString: String {
         guard let completed = job.completedAt, let started = job.startedAt else { return "" }
@@ -271,7 +309,8 @@ private struct DoneJobRow: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).font(.system(size: 12))
-            Text(job.jobType.letter).font(.system(size: 11, weight: .bold, design: .monospaced))
+            Image(systemName: jobTypeIcon)
+                .font(.system(size: 11))
                 .foregroundStyle(job.jobType.color).frame(width: 14)
             VStack(alignment: .leading, spacing: 1) {
                 Text(job.itemName).font(.callout.weight(.medium)).lineLimit(1)

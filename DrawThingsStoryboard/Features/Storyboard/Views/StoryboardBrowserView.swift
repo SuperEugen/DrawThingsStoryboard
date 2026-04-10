@@ -14,7 +14,7 @@ enum StoryboardSelection: Hashable {
 }
 
 // MARK: - StoryboardBrowserView
-/// All storyboards shown as top-level branches in the tree.
+/// #87: Storyboard tree shows model + style names
 
 struct StoryboardBrowserView: View {
 
@@ -44,6 +44,8 @@ struct StoryboardBrowserView: View {
                                 storyboardIndex: si,
                                 selection: $selection,
                                 selectedStoryboardIndex: $selectedStoryboardIndex,
+                                models: models,
+                                styles: styles,
                                 onDelete: storyboards.storyboards.count > 1 ? {
                                     storyboards.storyboards.remove(at: si)
                                     if selectedStoryboardIndex >= storyboards.storyboards.count {
@@ -122,17 +124,27 @@ struct StoryboardBrowserView: View {
 }
 
 // MARK: - Storyboard row (top-level branch)
+/// #87: Shows model name + style name below storyboard name
 
 private struct StoryboardRow: View {
     @Binding var storyboard: StoryboardEntry
     let storyboardIndex: Int
     @Binding var selection: StoryboardSelection?
     @Binding var selectedStoryboardIndex: Int
+    let models: ModelsFile
+    let styles: StylesFile
     let onDelete: (() -> Void)?
     @State private var isExpanded = true
 
     private var isSelected: Bool {
         selection == .storyboard(storyboardIndex)
+    }
+
+    private var modelName: String {
+        models.models.first(where: { $0.modelID == storyboard.modelID })?.name ?? "—"
+    }
+    private var styleName: String {
+        styles.styles.first(where: { $0.styleID == storyboard.styleID })?.name ?? "—"
     }
 
     var body: some View {
@@ -145,7 +157,15 @@ private struct StoryboardRow: View {
                 .buttonStyle(.plain).foregroundStyle(.secondary)
                 Image(systemName: "film")
                     .foregroundStyle(.indigo).frame(width: 16)
-                Text(storyboard.name).font(.subheadline.weight(.bold))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(storyboard.name).font(.subheadline.weight(.bold))
+                    // #87: Model + Style names
+                    HStack(spacing: 4) {
+                        Text(modelName).font(.caption2).foregroundStyle(.blue.opacity(0.8)).lineLimit(1)
+                        Text("\u{00b7}").font(.caption2).foregroundStyle(.quaternary)
+                        Text(styleName).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                }
                 Spacer()
                 Text("\(storyboard.acts.count) act(s)").font(.caption).foregroundStyle(.secondary)
                 Button { addAct() } label: {

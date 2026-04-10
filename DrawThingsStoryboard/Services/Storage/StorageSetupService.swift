@@ -2,6 +2,7 @@ import Foundation
 
 // MARK: - StorageSetupService
 /// #57: Demo assets use new styleVariants structure (no pre-generated variants)
+/// #77: ZIB default gen times updated to 380/1500
 
 final class StorageSetupService {
 
@@ -45,8 +46,8 @@ final class StorageSetupService {
                 guidanceScale: 4,
                 model: "z_image_1.0_q8p.ckpt",
                 steps: 35,
-                defaultGenTimeSmall: 360,
-                defaultGenTimeLarge: 900,
+                defaultGenTimeSmall: 380,
+                defaultGenTimeLarge: 1500,
                 sampler: "UniPC Trailing",
                 isImg2ImgCapable: false
             )
