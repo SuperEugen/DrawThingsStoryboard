@@ -82,13 +82,6 @@ struct ContentView: View {
         !config.pushoverToken.isEmpty && !config.pushoverUser.isEmpty
     }
 
-    private var windowTitle: String {
-        if let sb = currentStoryboard {
-            return "Draw Things Storyboard \u{2014} \(sb.name)"
-        }
-        return "Draw Things Storyboard"
-    }
-
     // MARK: - Body
 
     var body: some View {
@@ -115,7 +108,7 @@ struct ContentView: View {
             queueRunner.notificationsEnabled = enabled
         }
         .frame(minWidth: 1100, minHeight: 680)
-        .navigationTitle(windowTitle)
+        .navigationTitle("Draw Things Storyboard")
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 QueueStatusToolbarView(
