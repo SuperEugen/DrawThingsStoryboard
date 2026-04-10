@@ -4,7 +4,7 @@ import DrawThingsClient
 
 /// Runs the production queue automatically, processing one job at a time.
 /// #59: Sends Pushover notifications on job completion and queue finish
-/// Fix: Track per-image start/end times for accurate time estimation
+/// #86: Tracks per-image seeds for accurate variant seed storage
 @MainActor
 final class QueueRunnerService: ObservableObject {
 
@@ -20,18 +20,18 @@ final class QueueRunnerService: ObservableObject {
     @Published var stepsPerVariant: Int = 1
 
     // MARK: - Per-image timing (for accurate production log)
-    /// Start/end times for each individual image in the current job.
     var perImageStartTimes: [Date] = []
     var perImageEndTimes: [Date] = []
+    /// #86: Seeds used per image in the current job
+    var perImageSeeds: [Int] = []
 
     // MARK: - Internal
     private var isBusy: Bool = false
     private var onJobCompleted: ((GenerationJob) -> Void)?
 
-    /// #59: Notification config — set by ContentView before each run
+    /// #59: Notification config
     var notificationsEnabled: Bool = false
     var notificationConfig: AppConfig = AppConfig()
-    /// Remaining queue count (set by caller so we know when queue is done)
     var remainingQueueCount: Int = 0
 
     func configure(onJobCompleted: @escaping (GenerationJob) -> Void) {
@@ -44,7 +44,6 @@ final class QueueRunnerService: ObservableObject {
         models: ModelsFile,
         selectedModelID: String?
     ) {
-        // #59: Keep notification context up to date
         notificationConfig = config
         remainingQueueCount = queue.count
 
@@ -80,6 +79,7 @@ final class QueueRunnerService: ObservableObject {
         currentStep = 0
         perImageStartTimes = []
         perImageEndTimes = []
+        perImageSeeds = []
 
         let count: Int
         if job.jobType == .generateAsset && job.size == .small {
@@ -154,11 +154,13 @@ final class QueueRunnerService: ObservableObject {
                 vm.sampler = model.sampler
             }
 
+            // #86: Generate a unique seed per variant and track it
             if count > 1 {
                 vm.seed = SeedHelper.randomSeed()
             } else {
-                vm.seed = job.seed
+                vm.seed = job.seed == 0 ? SeedHelper.randomSeed() : job.seed
             }
+            perImageSeeds.append(vm.seed)
 
             if isPanelJob {
                 vm.initImage = initImage
@@ -196,7 +198,7 @@ final class QueueRunnerService: ObservableObject {
                 }
             } else {
                 errorMessage = vm.errorMessage ?? "No image returned"
-                perImageEndTimes.append(imageEndTime) // ensure arrays stay aligned
+                perImageEndTimes.append(imageEndTime)
                 break
             }
         }
@@ -207,7 +209,7 @@ final class QueueRunnerService: ObservableObject {
         done.savedImageIDs = savedImageIDs
         onJobCompleted?(done)
 
-        // #59: Send Pushover notification for completed job
+        // #59: Send Pushover notification
         if notificationsEnabled {
             let duration: String = {
                 guard let s = done.startedAt, let e = done.completedAt else { return "" }

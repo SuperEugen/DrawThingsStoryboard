@@ -1,6 +1,7 @@
 import SwiftUI
 
 // MARK: - Models detail editor
+/// #76: Default gen times now show calculated averages (auto-updated by #85)
 
 struct ModelsDetailView: View {
     @Binding var models: ModelsFile
@@ -29,7 +30,6 @@ struct ModelsDetailView: View {
 private struct ModelEditorView: View {
     @Binding var model: ModelEntry
 
-    // #30: Validation errors
     private var modelError: String? {
         model.model.isEmpty ? nil :
             (ValidationHelper.isValidModelFilename(model.model) ? nil : "Must end in .ckpt or .safetensors")
@@ -39,6 +39,14 @@ private struct ModelEditorView: View {
     }
     private var stepsError: String? {
         model.steps > 0 ? nil : "Must be at least 1"
+    }
+
+    private func formattedTime(_ seconds: Int) -> String {
+        let m = seconds / 60
+        let s = seconds % 60
+        if m > 0 && s > 0 { return "\(m)m \(s)s" }
+        if m > 0 { return "\(m)m" }
+        return "\(s)s"
     }
 
     var body: some View {
@@ -65,7 +73,6 @@ private struct ModelEditorView: View {
                         .font(.caption).foregroundStyle(.secondary)
                     TextField("model filename", text: $model.model)
                         .textFieldStyle(.roundedBorder).font(.callout.monospaced())
-                    // #30: Inline validation
                     if let err = modelError {
                         Text(err).font(.caption2).foregroundStyle(.red)
                     }
@@ -94,14 +101,13 @@ private struct ModelEditorView: View {
                             .textFieldStyle(.roundedBorder).frame(width: 80)
                         Text("CFG scale").font(.callout).foregroundStyle(.secondary)
                     }
-                    // #30: Inline validation
                     if let err = guidanceError {
                         Text(err).font(.caption2).foregroundStyle(.red)
                     }
                 }
                 .padding(.bottom, 12)
 
-                // #51: Sampler
+                // Sampler
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Sampler")
                     TextField("e.g. UniPC Trailing", text: $model.sampler)
@@ -109,7 +115,7 @@ private struct ModelEditorView: View {
                 }
                 .padding(.bottom, 12)
 
-                // #51: Img2Img Capable
+                // Img2Img Capable
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Img2Img")
                     Toggle("Img2Img Capable", isOn: $model.isImg2ImgCapable)
@@ -119,21 +125,31 @@ private struct ModelEditorView: View {
 
                 Divider().padding(.vertical, 8)
 
-                // Gen times
+                // #76: Gen times — display formatted + editable
                 VStack(alignment: .leading, spacing: 6) {
-                    sectionLabel("Default Generation Times")
-                    HStack(spacing: 12) {
-                        HStack(spacing: 4) {
-                            Text("Small:").font(.callout)
-                            TextField("sec", value: $model.defaultGenTimeSmall, format: .number)
-                                .textFieldStyle(.roundedBorder).frame(width: 60)
-                            Text("s").font(.callout).foregroundStyle(.secondary)
+                    sectionLabel("Average Generation Times")
+                    Text("Auto-updated after each completed job. Can also be edited manually.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    HStack(spacing: 16) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Small Image").font(.caption).foregroundStyle(.secondary)
+                            HStack(spacing: 4) {
+                                TextField("sec", value: $model.defaultGenTimeSmall, format: .number)
+                                    .textFieldStyle(.roundedBorder).frame(width: 70)
+                                Text("s").font(.callout).foregroundStyle(.secondary)
+                            }
+                            Text(formattedTime(model.defaultGenTimeSmall))
+                                .font(.caption2).foregroundStyle(.tertiary)
                         }
-                        HStack(spacing: 4) {
-                            Text("Large:").font(.callout)
-                            TextField("sec", value: $model.defaultGenTimeLarge, format: .number)
-                                .textFieldStyle(.roundedBorder).frame(width: 60)
-                            Text("s").font(.callout).foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Large Image").font(.caption).foregroundStyle(.secondary)
+                            HStack(spacing: 4) {
+                                TextField("sec", value: $model.defaultGenTimeLarge, format: .number)
+                                    .textFieldStyle(.roundedBorder).frame(width: 70)
+                                Text("s").font(.callout).foregroundStyle(.secondary)
+                            }
+                            Text(formattedTime(model.defaultGenTimeLarge))
+                                .font(.caption2).foregroundStyle(.tertiary)
                         }
                     }
                 }

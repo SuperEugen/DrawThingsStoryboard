@@ -2,6 +2,8 @@ import SwiftUI
 
 /// Root layout: three-pane NavigationSplitView.
 /// #84: Clear Done empties production-log.json via callback
+/// #85: Average gen times written back to models.json
+/// #86: Per-variant seeds stored in AssetVariant + production log
 struct ContentView: View {
 
     // MARK: - Navigation
@@ -243,6 +245,8 @@ struct ContentView: View {
     }
 
     // MARK: - Job completion
+    /// #85: Updates model default gen times from production log averages
+    /// #86: Stores per-variant seeds from QueueRunner
 
     private func handleJobCompleted(_ job: GenerationJob) {
         var done = job
@@ -251,6 +255,9 @@ struct ContentView: View {
         generationQueue.removeAll { $0.id == job.id }
 
         let isoFormatter = ISO8601DateFormatter()
+
+        // #86: Collect per-image seeds from QueueRunner
+        let seeds = queueRunner.perImageSeeds
 
         for (i, imgID) in job.savedImageIDs.enumerated() {
             let startStr: String
@@ -262,6 +269,8 @@ struct ContentView: View {
                 startStr = job.startedAt.map { isoFormatter.string(from: $0) } ?? ""
                 endStr = isoFormatter.string(from: done.completedAt ?? Date())
             }
+            // #86: Use per-image seed if available
+            let imageSeed = i < seeds.count ? seeds[i] : job.seed
             let entry = GeneratedImageEntry(
                 imageID: imgID,
                 type: job.jobType.rawValue,
@@ -270,12 +279,15 @@ struct ContentView: View {
                 startTime: startStr,
                 endTime: endStr,
                 size: job.size.rawValue,
-                seed: job.seed,
+                seed: imageSeed,
                 combinedPrompt: job.combinedPrompt
             )
             productionLog.generatedImages.append(entry)
         }
         StorageLoadService.shared.saveProductionLog(productionLog)
+
+        // #85: Update model default gen times from production log averages (last 3)
+        updateModelGenTimes(modelID: job.modelID, size: job.size)
 
         guard let firstImageID = job.savedImageIDs.first else { return }
 
@@ -293,10 +305,11 @@ struct ContentView: View {
                 if job.size == .large {
                     sv.largeImageID = firstImageID
                 } else {
-                    for imgID in job.savedImageIDs {
+                    // #86: Store per-variant seeds from QueueRunner
+                    for (imgIdx, imgID) in job.savedImageIDs.enumerated() {
                         guard sv.variants.count < 4 else { break }
-                        let effectiveSeed = job.seed == 0 ? SeedHelper.randomSeed() : job.seed + sv.variants.count
-                        sv.variants.append(AssetVariant(smallImageID: imgID, seed: effectiveSeed, isApproved: false))
+                        let variantSeed = imgIdx < seeds.count ? seeds[imgIdx] : SeedHelper.randomSeed()
+                        sv.variants.append(AssetVariant(smallImageID: imgID, seed: variantSeed, isApproved: false))
                     }
                 }
                 assets.assets[idx].styleVariants[job.styleID] = sv
@@ -325,6 +338,32 @@ struct ContentView: View {
                 }
             }
         }
+    }
+
+    // MARK: - #85: Update model gen times from production log
+
+    private func updateModelGenTimes(modelID: String, size: GenerationSize) {
+        guard let modelIdx = models.models.firstIndex(where: { $0.modelID == modelID }) else { return }
+        let sizeStr = size.rawValue
+        let isoFormatter = ISO8601DateFormatter()
+        let matching = productionLog.generatedImages.filter { entry in
+            entry.modelID == modelID && entry.size == sizeStr
+                && !entry.startTime.isEmpty && !entry.endTime.isEmpty
+        }
+        let recent = Array(matching.suffix(3))
+        guard !recent.isEmpty else { return }
+        let totalDuration = recent.reduce(0.0) { acc, entry in
+            guard let start = isoFormatter.date(from: entry.startTime),
+                  let end = isoFormatter.date(from: entry.endTime) else { return acc }
+            return acc + end.timeIntervalSince(start)
+        }
+        let avg = Int(totalDuration / Double(recent.count))
+        if size == .small {
+            models.models[modelIdx].defaultGenTimeSmall = avg
+        } else {
+            models.models[modelIdx].defaultGenTimeLarge = avg
+        }
+        StorageLoadService.shared.saveModels(models)
     }
 
     // MARK: - Helpers
