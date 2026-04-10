@@ -1,7 +1,6 @@
 import SwiftUI
 
 // MARK: - Thumbnail item type
-/// #56: SF Symbols 7 icons for asset types
 
 enum ThumbnailItemType {
     case character(subType: String)
@@ -82,6 +81,8 @@ enum ThumbnailSizeMode {
 }
 
 // MARK: - Badge configuration
+/// #68: showLargeImageIndicator for browser tiles
+/// #74: showEyeIndicator for detail variant thumbnails
 
 struct ThumbnailBadges {
     var showExampleIndicator: Bool = false
@@ -90,17 +91,17 @@ struct ThumbnailBadges {
     var onDelete: (() -> Void)? = nil
     var showApprovedBadge: Bool = false
     var showSelectionStroke: Bool = false
+    var showLargeImageIndicator: Bool = false
+    var showEyeIndicator: Bool = false
 }
 
 // MARK: - Unified thumbnail view
-/// #18, #17: Now supports displaying real generated images via imageID.
 
 struct UnifiedThumbnailView: View {
     let itemType: ThumbnailItemType
     let name: String
     let sizeMode: ThumbnailSizeMode
     var badges: ThumbnailBadges = ThumbnailBadges()
-    /// Optional image ID — if set and image exists on disk, it is shown instead of the placeholder icon.
     var imageID: String = ""
 
     private var loadedImage: NSImage? {
@@ -115,8 +116,7 @@ struct UnifiedThumbnailView: View {
 
                 if let img = loadedImage {
                     Image(nsImage: img)
-                        .resizable()
-                        .scaledToFill()
+                        .resizable().scaledToFill()
                         .frame(width: sizeMode.width, height: sizeMode.height)
                         .clipShape(RoundedRectangle(cornerRadius: sizeMode.cornerRadius))
                 } else {
@@ -156,6 +156,7 @@ struct UnifiedThumbnailView: View {
 
     @ViewBuilder
     private var badgeOverlays: some View {
+        // Upper left: approved badge
         if badges.showApprovedBadge {
             VStack {
                 HStack {
@@ -169,6 +170,7 @@ struct UnifiedThumbnailView: View {
             }
         }
 
+        // Upper right: delete button
         if badges.showDeleteButton, let onDelete = badges.onDelete {
             VStack {
                 HStack {
@@ -178,14 +180,47 @@ struct UnifiedThumbnailView: View {
                             .font(.system(size: sizeMode == .compact ? 9 : 12))
                             .symbolRenderingMode(.palette)
                             .foregroundStyle(.white, .secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(sizeMode == .compact ? 1 : 2)
+                    }.buttonStyle(.plain).padding(sizeMode == .compact ? 1 : 2)
                 }
                 Spacer()
             }
         }
 
+        // Lower left: large image indicator (#68)
+        if badges.showLargeImageIndicator {
+            VStack {
+                Spacer()
+                HStack {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right.rectangle")
+                        .font(.system(size: sizeMode == .compact ? 7 : 10))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, sizeMode == .compact ? 2 : 4)
+                        .padding(.vertical, 2)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 3))
+                        .padding(sizeMode == .compact ? 2 : 4)
+                    Spacer()
+                }
+            }
+        }
+
+        // Lower right: eye indicator (#74)
+        if badges.showEyeIndicator {
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Image(systemName: "eye")
+                        .font(.system(size: sizeMode == .compact ? 7 : 10))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, sizeMode == .compact ? 2 : 4)
+                        .padding(.vertical, 2)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 3))
+                        .padding(sizeMode == .compact ? 2 : 4)
+                }
+            }
+        }
+
+        // Lower right: example indicator (for styles, kept for backward compat)
         if badges.showExampleIndicator {
             VStack {
                 Spacer()

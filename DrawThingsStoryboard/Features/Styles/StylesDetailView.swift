@@ -1,7 +1,7 @@
 import SwiftUI
 
 // MARK: - Styles detail
-/// #56: Style detail example generation carries modelID, icon → paintbrush.pointed
+/// #64: Status section removed, only Generate button remains
 
 struct StylesDetailView: View {
     @Binding var styles: StylesFile
@@ -50,49 +50,37 @@ private struct StyleEditorView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-
                 ZStack {
                     if let img = exampleImage {
                         Image(nsImage: img)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 160)
+                            .resizable().scaledToFill()
+                            .frame(maxWidth: .infinity).frame(height: 160)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                     } else {
                         UnifiedThumbnailView(itemType: .style, name: "", sizeMode: .header)
                     }
                 }
-                .padding(.bottom, 16)
+                .padding(.bottom, 12)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    sectionLabel("Status")
-                    HStack(spacing: 8) {
-                        Text("E").font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundStyle(style.isGenerated ? .green : .gray)
-                        Text("Example:").font(.callout)
-                        Text(style.isGenerated ? "available" : "not yet").font(.callout)
-                            .foregroundStyle(style.isGenerated ? .green : .secondary)
-                        Spacer()
-                        if isQueued {
-                            Text("Queued").font(.caption).foregroundStyle(.purple)
-                        } else {
-                            Button { generateExample() } label: {
-                                Label(style.isGenerated ? "Regenerate Example" : "Generate Example", systemImage: "paintbrush.pointed").font(.caption)
-                            }
-                            .buttonStyle(.bordered).controlSize(.mini)
-                            .keyboardShortcut(.return, modifiers: .command)
+                // #64: Just the generate button, no status section
+                HStack {
+                    Spacer()
+                    if isQueued {
+                        Text("Queued").font(.caption).foregroundStyle(.purple)
+                    } else {
+                        Button { generateExample() } label: {
+                            Label(style.isGenerated ? "Regenerate Example" : "Generate Example", systemImage: "paintbrush.pointed")
+                                .font(.callout)
                         }
+                        .buttonStyle(.bordered).controlSize(.regular)
+                        .keyboardShortcut(.return, modifiers: .command)
                     }
-                    .padding(.vertical, 5).padding(.horizontal, 8)
-                    .background(RoundedRectangle(cornerRadius: 7).fill(Color.accentColor.opacity(0.07)))
                 }
                 .padding(.bottom, 12)
 
                 VStack(alignment: .leading, spacing: 6) {
                     sectionLabel("Name")
-                    TextField("Style name", text: $style.name)
-                        .textFieldStyle(.roundedBorder)
+                    TextField("Style name", text: $style.name).textFieldStyle(.roundedBorder)
                 }
                 .padding(.bottom, 12)
 
@@ -128,20 +116,12 @@ private struct StyleEditorView: View {
             .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
             .joined(separator: ", ")
         let job = GenerationJob(
-            id: UUID().uuidString,
-            itemName: style.name,
-            jobType: .generateStyle,
-            size: .small,
-            styleName: style.name,
-            queuedAt: Date(),
-            estimatedDuration: 60,
-            itemIcon: "paintbrush.pointed",
+            id: UUID().uuidString, itemName: style.name, jobType: .generateStyle,
+            size: .small, styleName: style.name, queuedAt: Date(),
+            estimatedDuration: 60, itemIcon: "paintbrush.pointed",
             seed: SeedHelper.randomSeed(),
-            width: config.smallImageWidth,
-            height: config.smallImageHeight,
-            combinedPrompt: combined,
-            styleID: style.styleID,
-            modelID: stylesModelID
+            width: config.smallImageWidth, height: config.smallImageHeight,
+            combinedPrompt: combined, styleID: style.styleID, modelID: stylesModelID
         )
         generationQueue.append(job)
     }

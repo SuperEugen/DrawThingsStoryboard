@@ -1,8 +1,10 @@
 import SwiftUI
 
 // MARK: - Assets browser
-/// #57: Per-style variants, header redesign (Filter | Generate | Add)
-/// Model picker moved to Generate group
+/// #65: Generate group icon → wand.and.sparkles
+/// #66: Add group icon → plus
+/// #67: Two separate Add buttons (Character + Location)
+/// #68: Style filter with proper badges (approved, large image indicators)
 
 struct AssetsBrowserView: View {
     @Binding var assets: AssetsFile
@@ -14,24 +16,16 @@ struct AssetsBrowserView: View {
     let models: ModelsFile
     @Binding var assetModelID: String
 
-    private var characters: [AssetEntry] {
-        assets.assets.filter { $0.isCharacter }
-    }
-    private var locations: [AssetEntry] {
-        assets.assets.filter { $0.isLocation }
-    }
-
+    private var characters: [AssetEntry] { assets.assets.filter { $0.isCharacter } }
+    private var locations: [AssetEntry] { assets.assets.filter { $0.isLocation } }
     private let columns = [GridItem(.adaptive(minimum: 288, maximum: 320), spacing: 12)]
 
     private var resolvedStyleDescription: String {
         styles.styles.first(where: { $0.styleID == assetStyleID })?.style ?? ""
     }
-
     private var resolvedStyleName: String {
         styles.styles.first(where: { $0.styleID == assetStyleID })?.name ?? ""
     }
-
-    // MARK: - Generate helpers
 
     private var assetsNeedingVariants: [AssetEntry] {
         assets.assets.filter { asset in
@@ -40,7 +34,6 @@ struct AssetsBrowserView: View {
                 && !asset.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }
     }
-
     private var assetsNeedingLargeImage: [AssetEntry] {
         assets.assets.filter { asset in
             let sv = asset.variantsFor(style: assetStyleID)
@@ -58,7 +51,7 @@ struct AssetsBrowserView: View {
         .onAppear { ensureSelection() }
     }
 
-    // MARK: - Header (3 groups: Filter | Generate | Add)
+    // MARK: - Header
 
     @ViewBuilder
     private var headerBar: some View {
@@ -76,9 +69,7 @@ struct AssetsBrowserView: View {
                     HStack(spacing: 8) {
                         Text("Style").font(.caption).foregroundStyle(.secondary)
                         Picker("Style", selection: $assetStyleID) {
-                            ForEach(styles.styles) { s in
-                                Text(s.name).tag(s.styleID)
-                            }
+                            ForEach(styles.styles) { s in Text(s.name).tag(s.styleID) }
                         }
                         .pickerStyle(.menu).labelsHidden().frame(minWidth: 120)
                     }
@@ -87,58 +78,48 @@ struct AssetsBrowserView: View {
                         .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
                 }
 
-                // GROUP 2: Generate (with Model picker)
+                // GROUP 2: Generate (#65: wand.and.sparkles)
                 GroupBox {
                     HStack(spacing: 8) {
                         Picker("Model", selection: $assetModelID) {
-                            ForEach(models.models) { m in
-                                Text(m.name).tag(m.modelID)
-                            }
+                            ForEach(models.models) { m in Text(m.name).tag(m.modelID) }
                         }
                         .pickerStyle(.menu).labelsHidden().frame(minWidth: 120)
 
-                        Button {
-                            generateAllVariants()
-                        } label: {
-                            Label("Variants (\(assetsNeedingVariants.count))", systemImage: "square.grid.2x2")
-                                .font(.callout)
+                        Button { generateAllVariants() } label: {
+                            Label("Variants (\(assetsNeedingVariants.count))", systemImage: "square.grid.2x2").font(.callout)
                         }
                         .buttonStyle(.bordered).controlSize(.regular)
                         .disabled(assetsNeedingVariants.isEmpty)
-                        .help("Generate missing variants for all assets in style \u{201c}\(resolvedStyleName)\u{201d}")
 
-                        Button {
-                            generateAllLargeImages()
-                        } label: {
-                            Label("Large (\(assetsNeedingLargeImage.count))", systemImage: "arrow.up.left.and.arrow.down.right.rectangle")
-                                .font(.callout)
+                        Button { generateAllLargeImages() } label: {
+                            Label("Large (\(assetsNeedingLargeImage.count))", systemImage: "arrow.up.left.and.arrow.down.right.rectangle").font(.callout)
                         }
                         .buttonStyle(.bordered).controlSize(.regular)
                         .disabled(assetsNeedingLargeImage.isEmpty)
-                        .help("Generate missing large images for approved variants in style \u{201c}\(resolvedStyleName)\u{201d}")
                     }
                 } label: {
-                    Label("Generate", systemImage: "paintbrush.pointed")
+                    Label("Generate", systemImage: "wand.and.sparkles")
                         .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
                 }
 
-                // GROUP 3: Add
+                // GROUP 3: Add (#66: plus icon, #67: two separate buttons)
                 GroupBox {
-                    Menu {
+                    HStack(spacing: 8) {
                         Button { addAsset(type: "character", subType: "male") } label: {
-                            Label("New Character", systemImage: "figure.stand")
+                            Image(systemName: "figure.stand.dress.line.vertical.figure").font(.callout)
                         }
+                        .buttonStyle(.bordered).controlSize(.regular)
+                        .help("Add new character")
+
                         Button { addAsset(type: "location", subType: "interior") } label: {
-                            Label("New Location", systemImage: "sofa")
+                            Image(systemName: "building.and.ellipse").font(.callout)
                         }
-                    } label: {
-                        Label("Add", systemImage: "plus")
-                            .font(.callout)
+                        .buttonStyle(.bordered).controlSize(.regular)
+                        .help("Add new location")
                     }
-                    .menuStyle(.borderlessButton)
-                    .frame(width: 60)
                 } label: {
-                    Label("Add", systemImage: "plus.circle")
+                    Label("Add", systemImage: "plus")
                         .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
                 }
 
@@ -148,7 +129,8 @@ struct AssetsBrowserView: View {
         }
     }
 
-    // MARK: - Asset grid
+    // MARK: - Grid
+    /// #68: Tiles show style-filtered images with badges
 
     @ViewBuilder
     private var assetGrid: some View {
@@ -158,27 +140,19 @@ struct AssetsBrowserView: View {
                     Text("Characters").font(.subheadline.weight(.medium))
                         .foregroundStyle(.secondary).padding(.horizontal, 16).padding(.top, 8)
                     LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(characters) { asset in
-                            assetTile(asset)
-                        }
-                    }
-                    .padding(.horizontal, 16)
+                        ForEach(characters) { asset in assetTile(asset) }
+                    }.padding(.horizontal, 16)
                 }
-
                 if !locations.isEmpty {
                     Text("Locations").font(.subheadline.weight(.medium))
                         .foregroundStyle(.secondary).padding(.horizontal, 16).padding(.top, 8)
                     LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(locations) { asset in
-                            assetTile(asset)
-                        }
-                    }
-                    .padding(.horizontal, 16)
+                        ForEach(locations) { asset in assetTile(asset) }
+                    }.padding(.horizontal, 16)
                 }
-
                 if assets.assets.isEmpty {
                     ContentUnavailableView("No assets yet", systemImage: "person.crop.square.on.square.angled",
-                        description: Text("Add a character or location using the Add button above."))
+                        description: Text("Add a character or location using the Add buttons above."))
                         .padding(.top, 40)
                 }
             }
@@ -186,23 +160,23 @@ struct AssetsBrowserView: View {
         }
     }
 
-    // MARK: - Tile
-
+    /// #68: Style-aware tile with approved + large image badges
     private func assetTile(_ asset: AssetEntry) -> some View {
         let isSelected = selectedAssetID == asset.assetID
         let thumbType: ThumbnailItemType = asset.isCharacter
-            ? .character(subType: asset.subType)
-            : .location(subType: asset.subType)
-        let displayImageID: String = {
-            let styleImg = asset.bestImageID(forStyle: assetStyleID)
-            if !styleImg.isEmpty { return styleImg }
-            return asset.bestDisplayImageID
-        }()
+            ? .character(subType: asset.subType) : .location(subType: asset.subType)
+        let sv = asset.variantsFor(style: assetStyleID)
+        let displayImageID = sv.bestImageID
+        let showApproved = sv.hasApprovedVariant
+        let showLargeIndicator = sv.hasLargeImage
+
         return UnifiedThumbnailView(
-            itemType: thumbType,
-            name: asset.name,
-            sizeMode: .standard,
-            badges: ThumbnailBadges(showSelectionStroke: isSelected),
+            itemType: thumbType, name: asset.name, sizeMode: .standard,
+            badges: ThumbnailBadges(
+                showApprovedBadge: showApproved,
+                showSelectionStroke: isSelected,
+                showLargeImageIndicator: showLargeIndicator
+            ),
             imageID: displayImageID
         )
         .padding(3)
@@ -214,11 +188,8 @@ struct AssetsBrowserView: View {
 
     private func addAsset(type: String, subType: String) {
         let id = UUID().uuidString
-        let new = AssetEntry(
-            assetID: id,
-            name: type == "character" ? "New Character" : "New Location",
-            type: type, subType: subType, description: ""
-        )
+        let new = AssetEntry(assetID: id, name: type == "character" ? "New Character" : "New Location",
+                             type: type, subType: subType, description: "")
         assets.assets.append(new)
         selectedAssetID = id
     }
@@ -232,13 +203,11 @@ struct AssetsBrowserView: View {
             let job = GenerationJob(
                 id: UUID().uuidString, itemName: asset.name, jobType: .generateAsset,
                 size: .small, styleName: resolvedStyleName, queuedAt: Date(),
-                estimatedDuration: TimeInterval(count * 60),
-                itemIcon: icon,
+                estimatedDuration: TimeInterval(count * 60), itemIcon: icon,
                 seed: 0, width: config.smallImageWidth, height: config.smallImageHeight,
                 combinedPrompt: prompt, variantCount: count,
                 assetType: asset.type, assetSubType: asset.subType,
-                styleID: assetStyleID, assetID: asset.assetID,
-                modelID: assetModelID
+                styleID: assetStyleID, assetID: asset.assetID, modelID: assetModelID
             )
             generationQueue.append(job)
         }
@@ -252,13 +221,11 @@ struct AssetsBrowserView: View {
             let job = GenerationJob(
                 id: UUID().uuidString, itemName: asset.name, jobType: .generateAsset,
                 size: .large, styleName: resolvedStyleName, queuedAt: Date(),
-                estimatedDuration: 180,
-                itemIcon: icon,
+                estimatedDuration: 180, itemIcon: icon,
                 seed: sv.approvedSeed, width: config.largeImageWidth, height: config.largeImageHeight,
                 combinedPrompt: prompt, variantCount: 1,
                 assetType: asset.type, assetSubType: asset.subType,
-                styleID: assetStyleID, assetID: asset.assetID,
-                modelID: assetModelID
+                styleID: assetStyleID, assetID: asset.assetID, modelID: assetModelID
             )
             generationQueue.append(job)
         }

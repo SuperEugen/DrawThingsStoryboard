@@ -2,10 +2,7 @@ import AppKit
 import Foundation
 
 // MARK: - StorageService
-//
-// Manages the root folder and image persistence.
-// All images are stored as <UUID>.png directly in the root folder.
-// The 6 JSON files also live in the root folder.
+/// #69: Added deleteImage method
 
 enum StorageError: LocalizedError {
     case couldNotCreateDirectory(URL)
@@ -28,7 +25,6 @@ final class StorageService {
 
     // MARK: - Root
 
-    /// ~/Pictures/DrawThings-Storyboard
     var rootURL: URL {
         FileManager.default
             .urls(for: .picturesDirectory, in: .userDomainMask)[0]
@@ -46,14 +42,12 @@ final class StorageService {
 
     // MARK: - Image URLs
 
-    /// Returns the URL for a given image ID (UUID string).
     func imageURL(for imageID: String) -> URL {
         rootURL.appendingPathComponent("\(imageID).png")
     }
 
     // MARK: - Save image
 
-    /// Saves an NSImage as PNG with a new UUID filename. Returns the UUID string.
     @discardableResult
     func saveImage(_ image: NSImage) throws -> String {
         let id = UUID().uuidString
@@ -68,6 +62,14 @@ final class StorageService {
     func loadImage(id: String) -> NSImage? {
         guard !id.isEmpty else { return nil }
         return NSImage(contentsOf: imageURL(for: id))
+    }
+
+    // MARK: - Delete image (#69)
+
+    func deleteImage(id: String) {
+        guard !id.isEmpty else { return }
+        let url = imageURL(for: id)
+        try? FileManager.default.removeItem(at: url)
     }
 
     // MARK: - JSON read/write helpers

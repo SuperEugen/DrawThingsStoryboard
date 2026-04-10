@@ -1,8 +1,9 @@
 import SwiftUI
 
 // MARK: - Styles browser
-/// #53: Style jobs carry modelID
-/// #56: Model picker in styles header, Generate Example icon → paintbrush.pointed
+/// #60: GroupBox header like Assets (Generate + Add groups)
+/// #61: Full-width placeholder background
+/// #62, #63: E indicators removed
 
 struct StylesBrowserView: View {
     @Binding var styles: StylesFile
@@ -19,34 +20,7 @@ struct StylesBrowserView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "paintpalette").font(.title2).foregroundStyle(.secondary)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Styles").font(.title2.bold())
-                    Text("Visual style templates applied to generated images.")
-                        .font(.caption).foregroundStyle(.tertiary)
-                }
-                Spacer()
-                // #56: Model picker
-                Picker("Model", selection: $stylesModelID) {
-                    ForEach(models.models) { m in
-                        Text(m.name).tag(m.modelID)
-                    }
-                }
-                .pickerStyle(.menu).labelsHidden().frame(maxWidth: 160)
-                // #7/#56: Generate all missing examples
-                if ungeneratedCount > 0 {
-                    Button { generateAllExamples() } label: {
-                        Label("Generate \(ungeneratedCount) Example\(ungeneratedCount == 1 ? "" : "s")", systemImage: "paintbrush.pointed")
-                            .font(.caption)
-                    }
-                    .buttonStyle(.bordered).controlSize(.mini)
-                    .help("Generate all missing example images for all styles")
-                }
-                Button(action: addStyle) { Image(systemName: "plus").frame(width: 22, height: 22) }
-                .buttonStyle(.bordered).controlSize(.mini)
-            }
-            .padding(.horizontal, 14).padding(.vertical, 12)
+            headerBar
             Divider()
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 12) {
@@ -66,6 +40,64 @@ struct StylesBrowserView: View {
         .background(Color(NSColor.windowBackgroundColor))
         .onAppear { ensureSelection() }
         .onChange(of: styles.styles.count) { _, _ in ensureSelection() }
+    }
+
+    // MARK: - Header with GroupBoxes
+
+    @ViewBuilder
+    private var headerBar: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "paintpalette").font(.title2).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Styles").font(.title2.bold())
+                    Text("Visual style templates applied to generated images.")
+                        .font(.caption).foregroundStyle(.tertiary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 8)
+
+            HStack(spacing: 16) {
+                // GROUP 1: Generate
+                GroupBox {
+                    HStack(spacing: 8) {
+                        Picker("Model", selection: $stylesModelID) {
+                            ForEach(models.models) { m in
+                                Text(m.name).tag(m.modelID)
+                            }
+                        }
+                        .pickerStyle(.menu).labelsHidden().frame(minWidth: 120)
+
+                        Button { generateAllExamples() } label: {
+                            Label("Examples (\(ungeneratedCount))", systemImage: "paintbrush.pointed")
+                                .font(.callout)
+                        }
+                        .buttonStyle(.bordered).controlSize(.regular)
+                        .disabled(ungeneratedCount == 0)
+                        .help("Generate all missing example images")
+                    }
+                } label: {
+                    Label("Generate", systemImage: "wand.and.sparkles")
+                        .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
+                }
+
+                // GROUP 2: Add
+                GroupBox {
+                    Button(action: addStyle) {
+                        Label("New Style", systemImage: "plus")
+                            .font(.callout)
+                    }
+                    .buttonStyle(.bordered).controlSize(.regular)
+                } label: {
+                    Label("Add", systemImage: "plus")
+                        .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 14).padding(.bottom, 10)
+        }
     }
 
     private func addStyle() {
@@ -88,7 +120,6 @@ struct StylesBrowserView: View {
         }
     }
 
-    // #7/#53: Generate all missing examples with modelID
     private func generateAllExamples() {
         for style in styles.styles where !style.isGenerated {
             guard !generationQueue.contains(where: { $0.styleID == style.styleID && $0.jobType == .generateStyle }) else { continue }
@@ -96,20 +127,12 @@ struct StylesBrowserView: View {
                 .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
                 .joined(separator: ", ")
             let job = GenerationJob(
-                id: UUID().uuidString,
-                itemName: style.name,
-                jobType: .generateStyle,
-                size: .small,
-                styleName: style.name,
-                queuedAt: Date(),
-                estimatedDuration: 60,
-                itemIcon: "paintbrush.pointed",
+                id: UUID().uuidString, itemName: style.name, jobType: .generateStyle,
+                size: .small, styleName: style.name, queuedAt: Date(),
+                estimatedDuration: 60, itemIcon: "paintbrush.pointed",
                 seed: SeedHelper.randomSeed(),
-                width: config.smallImageWidth,
-                height: config.smallImageHeight,
-                combinedPrompt: combined,
-                styleID: style.styleID,
-                modelID: stylesModelID
+                width: config.smallImageWidth, height: config.smallImageHeight,
+                combinedPrompt: combined, styleID: style.styleID, modelID: stylesModelID
             )
             generationQueue.append(job)
         }
@@ -117,6 +140,8 @@ struct StylesBrowserView: View {
 }
 
 // MARK: - Style tile
+/// #61: Full-width placeholder
+/// #62, #63: E indicators removed
 
 struct StyleTile: View {
     let style: StyleEntry
@@ -132,20 +157,21 @@ struct StyleTile: View {
                 ZStack {
                     if let img = exampleImage {
                         Image(nsImage: img)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(height: 160)
-                            .clipped()
+                            .resizable().scaledToFill()
+                            .frame(height: 160).clipped()
                     } else {
-                        UnifiedThumbnailView(
-                            itemType: .style, name: "", sizeMode: .standard,
-                            badges: ThumbnailBadges(
-                                showExampleIndicator: true,
-                                exampleAvailable: style.isGenerated
-                            )
-                        )
+                        // #61: full-width placeholder
+                        RoundedRectangle(cornerRadius: 0)
+                            .fill(Color.orange.opacity(0.15))
+                            .frame(height: 160)
+                            .overlay {
+                                Image(systemName: "paintpalette")
+                                    .font(.system(size: 40))
+                                    .foregroundStyle(Color.orange.opacity(0.4))
+                            }
                     }
                 }
+                .frame(maxWidth: .infinity)
                 .frame(height: 160)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
@@ -158,19 +184,6 @@ struct StyleTile: View {
             .overlay(RoundedRectangle(cornerRadius: 10)
                 .stroke(isSelected ? Color.accentColor : Color.secondary.opacity(0.2),
                         lineWidth: isSelected ? 2 : 0.5))
-
-            VStack {
-                Spacer()
-                HStack {
-                    Text("E").font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .foregroundStyle(style.isGenerated ? .green : .gray)
-                        .padding(4)
-                        .background(Circle().fill(Color(NSColor.windowBackgroundColor).opacity(0.8)))
-                        .padding(6)
-                    Spacer()
-                }
-            }
-            .frame(height: 160)
 
             if canDelete {
                 Button(action: onDelete) {
