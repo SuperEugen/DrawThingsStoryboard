@@ -216,6 +216,7 @@ private struct DoneSection: View {
                     DoneJobRow(job: job, modelName: modelName(for: job.modelID))
                         .tag(job.id)
                 }.listStyle(.plain)
+                .id(doneQueue.count)
             }
         }
     }
