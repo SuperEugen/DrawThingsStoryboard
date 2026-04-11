@@ -32,7 +32,7 @@ struct ProductionBrowserView: View {
             )
             .frame(minHeight: 120)
 
-            DoneSection(doneQueue: $doneQueue, models: models, onClearProductionLog: onClearProductionLog)
+            DoneSection(doneQueue: $doneQueue, selectedJobID: $selectedJobID, models: models, onClearProductionLog: onClearProductionLog)
                 .frame(minHeight: 100)
         }
         .background(Color(NSColor.windowBackgroundColor))
@@ -182,6 +182,7 @@ private struct QueueSection: View {
 
 private struct DoneSection: View {
     @Binding var doneQueue: [GenerationJob]
+    @Binding var selectedJobID: String?
     let models: ModelsFile
     var onClearProductionLog: (() -> Void)? = nil
 
@@ -211,8 +212,9 @@ private struct DoneSection: View {
                 Text("Completed jobs will appear here.").font(.caption).foregroundStyle(.tertiary)
                 Spacer()
             } else {
-                List(doneQueue) { job in
+                List(doneQueue, selection: $selectedJobID) { job in
                     DoneJobRow(job: job, modelName: modelName(for: job.modelID))
+                        .tag(job.id)
                 }.listStyle(.plain)
             }
         }

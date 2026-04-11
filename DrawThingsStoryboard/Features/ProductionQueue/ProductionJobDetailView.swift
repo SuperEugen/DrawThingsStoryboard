@@ -3,9 +3,12 @@ import SwiftUI
 // MARK: - Production job detail
 /// #53: Shows modelID in job info
 /// #58: Step-level progress bar
+/// #92: Done jobs show production log entry
 
 struct ProductionJobDetailView: View {
     let queue: [GenerationJob]
+    let doneQueue: [GenerationJob]
+    let productionLog: ProductionLogFile
     let selectedJobID: String?
     let models: ModelsFile
     let selectedModelID: String?
@@ -15,12 +18,24 @@ struct ProductionJobDetailView: View {
 
     private var selectedJob: GenerationJob? {
         guard let id = selectedJobID else { return nil }
-        return queue.first { $0.id == id }
+        return queue.first { $0.id == id } ?? doneQueue.first { $0.id == id }
+    }
+
+    private var isDoneJob: Bool {
+        guard let id = selectedJobID else { return false }
+        return doneQueue.contains { $0.id == id }
     }
 
     private var isCurrentlyRunning: Bool {
         guard let job = selectedJob else { return false }
         return queueRunner.currentJobID == job.id
+    }
+
+    /// Production log entries matching the selected done job's saved image IDs.
+    private var logEntries: [GeneratedImageEntry] {
+        guard let job = selectedJob, isDoneJob else { return [] }
+        let ids = Set(job.savedImageIDs)
+        return productionLog.generatedImages.filter { ids.contains($0.imageID) }
     }
 
     private func modelName(for id: String) -> String {
@@ -66,11 +81,15 @@ struct ProductionJobDetailView: View {
 
                     Divider().padding(.vertical, 8)
 
-                    GenerationProgressPanel(
-                        isCurrentJob: isCurrentlyRunning,
-                        queueRunner: queueRunner,
-                        queuePosition: queuePosition(for: job)
-                    )
+                    if isDoneJob {
+                        ProductionLogPanel(logEntries: logEntries, models: models)
+                    } else {
+                        GenerationProgressPanel(
+                            isCurrentJob: isCurrentlyRunning,
+                            queueRunner: queueRunner,
+                            queuePosition: queuePosition(for: job)
+                        )
+                    }
 
                     Spacer(minLength: 20)
                 }
@@ -164,6 +183,64 @@ private struct GenerationProgressPanel: View {
                     Text("Waiting \u{2014} position \(queuePosition) in queue")
                         .font(.callout)
                         .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(.bottom, 12)
+    }
+}
+
+// MARK: - Production log panel
+/// #92: Shows production log entries for a completed job
+
+private struct ProductionLogPanel: View {
+    let logEntries: [GeneratedImageEntry]
+    let models: ModelsFile
+
+    private func modelName(for id: String) -> String {
+        models.models.first(where: { $0.modelID == id })?.name ?? id
+    }
+
+    private func durationString(for entry: GeneratedImageEntry) -> String {
+        let fmt = ISO8601DateFormatter()
+        guard let start = fmt.date(from: entry.startTime),
+              let end = fmt.date(from: entry.endTime) else { return "" }
+        let secs = Int(end.timeIntervalSince(start))
+        let m = secs / 60; let s = secs % 60
+        return m > 0 ? "\(m)m \(s)s" : "\(s)s"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionLabel("Production Log")
+
+            if logEntries.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "doc.text").foregroundStyle(.secondary)
+                    Text("No log entry available for this job.")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
+            } else {
+                ForEach(logEntries) { entry in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).font(.caption)
+                            Text(entry.type.isEmpty ? "Generated" : entry.type)
+                                .font(.callout.weight(.medium))
+                            Spacer()
+                            Text(durationString(for: entry))
+                                .font(.caption).foregroundStyle(.tertiary)
+                        }
+                        HStack(spacing: 4) {
+                            Text(modelName(for: entry.modelID)).font(.caption2).foregroundStyle(.blue.opacity(0.8))
+                            Text("\u{00b7}").font(.caption2).foregroundStyle(.quaternary)
+                            Text(entry.size).font(.caption2).foregroundStyle(.secondary)
+                            Text("\u{00b7}").font(.caption2).foregroundStyle(.quaternary)
+                            Text("Seed: \(entry.seed)").font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(8)
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.05)))
                 }
             }
         }

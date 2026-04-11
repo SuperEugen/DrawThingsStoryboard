@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - Models browser
 /// #58: White background
 /// #59: x-button for deletion
+/// #91: Add button moved into action menu
 
 struct ModelsBrowserView: View {
     @Binding var models: ModelsFile
@@ -14,12 +15,25 @@ struct ModelsBrowserView: View {
                 Image(systemName: "camera").font(.title2).foregroundStyle(.secondary)
                 Text("Models").font(.title2.bold())
                 Spacer()
-                Button(action: addModel) {
-                    Image(systemName: "plus").frame(width: 22, height: 22)
-                }
-                .buttonStyle(.bordered).controlSize(.mini)
             }
             .padding(.horizontal, 14).padding(.vertical, 12)
+            Divider()
+
+            // Action menu
+            HStack(spacing: 12) {
+                GroupBox {
+                    Button(action: addModel) {
+                        Image(systemName: "camera").font(.callout)
+                    }
+                    .buttonStyle(.bordered).controlSize(.regular)
+                    .help("Add new model")
+                } label: {
+                    Label("Add", systemImage: "plus")
+                        .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 14).padding(.bottom, 10).padding(.top, 6)
             Divider()
 
             ScrollView {

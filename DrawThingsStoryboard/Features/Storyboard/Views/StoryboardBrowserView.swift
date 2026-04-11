@@ -15,6 +15,7 @@ enum StoryboardSelection: Hashable {
 
 // MARK: - StoryboardBrowserView
 /// #89: Action menu (Generate/Add/Arrange/Export) replaces context menus; x-buttons for deletion
+/// #90: Fountain import moved into Import group in action menu
 
 struct StoryboardBrowserView: View {
 
@@ -77,11 +78,6 @@ struct StoryboardBrowserView: View {
             Image(systemName: "film.stack").font(.title2).foregroundStyle(.secondary)
             Text("Storyboards").font(.title2.bold())
             Spacer()
-            Button { importFountainFile() } label: {
-                Image(systemName: "doc.badge.arrow.up").frame(width: 22, height: 22)
-            }
-            .buttonStyle(.borderless)
-            .help("Import Fountain screenplay (.fountain)")
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
     }
@@ -189,6 +185,18 @@ struct StoryboardBrowserView: View {
                 .help("Export panels to PDF")
             } label: {
                 Label("Export", systemImage: "square.and.arrow.up")
+                    .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
+            }
+
+            // GROUP 5: Import
+            GroupBox {
+                Button { importFountainFile() } label: {
+                    Image(systemName: "text.page").font(.callout)
+                }
+                .buttonStyle(.bordered).controlSize(.regular)
+                .help("Import Fountain screenplay (.fountain)")
+            } label: {
+                Label("Import", systemImage: "square.and.arrow.down")
                     .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
             }
 

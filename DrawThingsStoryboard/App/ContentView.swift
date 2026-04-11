@@ -117,6 +117,9 @@ struct ContentView: View {
                 selection: $storyboardSelection,
                 models: models,
                 styles: styles,
+                generationQueue: $generationQueue,
+                config: config,
+                assets: assets,
                 onFountainImport: { importedActs, name in
                     handleFountainImport(acts: importedActs, name: name)
                 }
@@ -209,6 +212,8 @@ struct ContentView: View {
         case .productionQueue:
             ProductionJobDetailView(
                 queue: generationQueue,
+                doneQueue: doneQueue,
+                productionLog: productionLog,
                 selectedJobID: selectedJobID,
                 models: models,
                 selectedModelID: selectedModelID,
