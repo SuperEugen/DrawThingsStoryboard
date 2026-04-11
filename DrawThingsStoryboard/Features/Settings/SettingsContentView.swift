@@ -45,7 +45,7 @@ struct SettingsContentView: View {
     private var headerBar: some View {
         VStack(spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "gearshape").font(.title2).foregroundStyle(.secondary)
+                Image(systemName: "slider.horizontal.3").font(.title2).foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Settings").font(.title2.bold())
                     Text("App configuration, image sizes, and service credentials.")

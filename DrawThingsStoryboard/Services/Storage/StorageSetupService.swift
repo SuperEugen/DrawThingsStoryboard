@@ -88,25 +88,8 @@ final class StorageSetupService {
         ])
         storage.write(storyboards, to: storage.storyboardsURL)
 
-        // assets.json — #57: new structure with empty styleVariants
-        let assets = AssetsFile(assets: [
-            AssetEntry(assetID: "A1", name: "SuperEugen", type: "character", subType: "male",
-                       description: "A 60yo man with a slight belly and a prominent chin wearing black glasses with a thick frame."),
-            AssetEntry(assetID: "A2", name: "Michael", type: "character", subType: "male",
-                       description: "A 65yo man with a bald head wearing glasses with a thin frame."),
-            AssetEntry(assetID: "A3", name: "Olli", type: "character", subType: "male",
-                       description: "A 40yo sportive man."),
-            AssetEntry(assetID: "A4", name: "Sylli", type: "character", subType: "female",
-                       description: "A 55yo sportive slim woman with a ponytail."),
-            AssetEntry(assetID: "A5", name: "SuperEugen's apartment", type: "location", subType: "interior",
-                       description: "Attic apartment with slope walls a round window and a red brick church outside."),
-            AssetEntry(assetID: "A6", name: "Park", type: "location", subType: "exterior",
-                       description: "A small park with a basketball court and a red brick church in the background."),
-            AssetEntry(assetID: "A7", name: "Restaurant", type: "location", subType: "interior",
-                       description: "A restaurant with a bar in the middle of the room and floor to ceiling windows on street level."),
-            AssetEntry(assetID: "A8", name: "Staircase", type: "location", subType: "interior",
-                       description: "A staircase in an old Berlin building.")
-        ])
+        // assets.json — empty by default, import via Assets view
+        let assets = AssetsFile(assets: [])
         storage.write(assets, to: storage.assetsURL)
 
         // production-log.json

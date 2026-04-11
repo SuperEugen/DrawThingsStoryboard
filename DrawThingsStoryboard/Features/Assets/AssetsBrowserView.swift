@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - Assets browser
 /// #78: "Model" label in front of model picker in Generate group
@@ -16,6 +17,7 @@ struct AssetsBrowserView: View {
 
     @State private var assetToDelete: AssetEntry? = nil
     @State private var showDeleteConfirmation = false
+    @State private var showImportError = false
 
     private var characters: [AssetEntry] { assets.assets.filter { $0.isCharacter } }
     private var locations: [AssetEntry] { assets.assets.filter { $0.isLocation } }
@@ -57,6 +59,11 @@ struct AssetsBrowserView: View {
         }
         .background(Color(NSColor.windowBackgroundColor))
         .onAppear { ensureSelection() }
+        .alert("Invalid File", isPresented: $showImportError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("The selected file is not a valid DrawThingsStoryboard assets file (DTSB-Assets).")
+        }
         .alert("Delete \(assetToDelete?.name ?? "")?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 if let asset = assetToDelete { deleteAsset(asset) }
@@ -145,7 +152,19 @@ struct AssetsBrowserView: View {
                         .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
                 }
 
-                // GROUP 4: Export
+                // GROUP 4: Import
+                GroupBox {
+                    Button { importAssetsFile() } label: {
+                        Image(systemName: "photo.on.rectangle.angled").font(.callout)
+                    }
+                    .buttonStyle(.bordered).controlSize(.regular)
+                    .help("Import assets from a DTSB-Assets JSON file")
+                } label: {
+                    Label("Import", systemImage: "square.and.arrow.down")
+                        .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
+                }
+
+                // GROUP 5: Export
                 GroupBox {
                     Button { exportCharacterSheets() } label: {
                         Label("(\(exportableCharacters.count))", systemImage: "figure").font(.callout)
@@ -271,6 +290,33 @@ struct AssetsBrowserView: View {
         assetToDelete = nil
         // Persist to assets.json
         StorageLoadService.shared.saveAssets(assets)
+    }
+
+    private func importAssetsFile() {
+        let panel = NSOpenPanel()
+        panel.title = "Import Assets"
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [UTType.json]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let data = try Data(contentsOf: url)
+            let imported = try JSONDecoder().decode(AssetsFile.self, from: data)
+            guard imported.type == "DTSB-Assets" else {
+                showImportError = true
+                return
+            }
+            let newEntries = imported.assets.map { entry in
+                AssetEntry(assetID: UUID().uuidString, name: entry.name,
+                           type: entry.type, subType: entry.subType,
+                           description: entry.description)
+            }
+            assets.assets.append(contentsOf: newEntries)
+            StorageLoadService.shared.saveAssets(assets)
+        } catch {
+            showImportError = true
+            print("[AssetsImport] Error: \(error)")
+        }
     }
 
     private func generateAllVariants() {
