@@ -97,8 +97,8 @@ Completed: April 2026
 
 Overall improved import and deeper integration with Fountain screenplay files.
 
-- [ ] Import assets (without images)
-- [ ] Import styles (without examples)
+- [x] Import assets (without images)
+- [x] Import styles (without examples)
 - [ ] Import dialogue lines from Fountain files into panel dialogue fields
 - [ ] Auto-create character assets from Fountain character names
 - [ ] Map Fountain scene headings to location assets
