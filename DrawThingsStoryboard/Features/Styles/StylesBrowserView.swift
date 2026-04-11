@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - Styles browser
 /// #60: GroupBox header like Assets (Generate + Add groups)
@@ -12,6 +13,7 @@ struct StylesBrowserView: View {
     let config: AppConfig
     let models: ModelsFile
     @Binding var stylesModelID: String
+    @State private var showImportError = false
     private let columns = [GridItem(.adaptive(minimum: 288, maximum: 320), spacing: 12)]
 
     private var ungeneratedCount: Int {
@@ -40,6 +42,11 @@ struct StylesBrowserView: View {
         .background(Color(NSColor.windowBackgroundColor))
         .onAppear { ensureSelection() }
         .onChange(of: styles.styles.count) { _, _ in ensureSelection() }
+        .alert("Invalid File", isPresented: $showImportError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("The selected file is not a valid DrawThingsStoryboard styles file (DTSB-Styles).")
+        }
     }
 
     // MARK: - Header with GroupBoxes
@@ -97,6 +104,18 @@ struct StylesBrowserView: View {
                         .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
                 }
 
+                // GROUP 3: Import
+                GroupBox {
+                    Button { importStylesFile() } label: {
+                        Image(systemName: "paintpalette").font(.callout)
+                    }
+                    .buttonStyle(.bordered).controlSize(.regular)
+                    .help("Import styles from a DTSB-Styles JSON file")
+                } label: {
+                    Label("Import", systemImage: "square.and.arrow.down")
+                        .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
+                }
+
                 Spacer()
             }
             .padding(.horizontal, 14).padding(.bottom, 10)
@@ -107,6 +126,31 @@ struct StylesBrowserView: View {
         let id = UUID().uuidString
         styles.styles.append(StyleEntry(styleID: id, name: "New Style", style: ""))
         selectedStyleID = id
+    }
+
+    private func importStylesFile() {
+        let panel = NSOpenPanel()
+        panel.title = "Import Styles"
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [UTType.json]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let data = try Data(contentsOf: url)
+            let imported = try JSONDecoder().decode(StylesFile.self, from: data)
+            guard imported.type == "DTSB-Styles" else {
+                showImportError = true
+                return
+            }
+            let newEntries = imported.styles.map { entry in
+                StyleEntry(styleID: UUID().uuidString, name: entry.name, smallImageID: "", isGenerated: false, style: entry.style)
+            }
+            styles.styles.append(contentsOf: newEntries)
+            StorageLoadService.shared.saveStyles(styles)
+        } catch {
+            showImportError = true
+            print("[StylesImport] Error: \(error)")
+        }
     }
 
     private func removeStyle(id: String) {

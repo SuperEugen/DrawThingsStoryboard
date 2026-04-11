@@ -19,6 +19,7 @@ struct AppConfig: Codable, Equatable {
     var pushoverToken: String = ""
     var pushoverUser: String = ""
     var version: Int = 1
+    var type: String = "DTSB-Config"
 }
 
 // MARK: - models.json
@@ -26,6 +27,7 @@ struct AppConfig: Codable, Equatable {
 struct ModelsFile: Codable {
     var models: [ModelEntry]
     var version: Int = 1
+    var type: String = "DTSB-Models"
 }
 
 struct ModelEntry: Codable, Identifiable {
@@ -49,6 +51,7 @@ struct ModelEntry: Codable, Identifiable {
 struct StylesFile: Codable {
     var styles: [StyleEntry]
     var version: Int = 1
+    var type: String = "DTSB-Styles"
 }
 
 struct StyleEntry: Codable, Identifiable {
@@ -66,6 +69,7 @@ struct StyleEntry: Codable, Identifiable {
 struct StoryboardsFile: Codable, Equatable {
     var storyboards: [StoryboardEntry]
     var version: Int = 1
+    var type: String = "DTSB-Storyboards"
 }
 
 struct StoryboardEntry: Codable, Identifiable, Equatable {
@@ -129,6 +133,7 @@ struct PanelEntry: Codable, Identifiable, Equatable {
 struct AssetsFile: Codable {
     var assets: [AssetEntry]
     var version: Int = 1
+    var type: String = "DTSB-Assets"
 }
 
 /// Per-style collection of up to 4 variants + one large image.
@@ -236,6 +241,7 @@ struct AssetVariant: Codable {
 struct ProductionLogFile: Codable {
     var generatedImages: [GeneratedImageEntry]
     var version: Int = 1
+    var type: String = "DTSB-Log"
 }
 
 struct GeneratedImageEntry: Codable, Identifiable {
