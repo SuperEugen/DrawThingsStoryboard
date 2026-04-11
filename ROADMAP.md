@@ -127,3 +127,5 @@ The user interface and the code must be checked for a proper v1.
 - **Export Pitch Book** — export a pitch book to present the story
 - **Export Video** — create a video from the storyboard
 - **Support LoRAs** — add LoRA support in image generation
+- **Wardrobe** - add more customization for character assets
+- **Probs** - add more customization to character and location assets
