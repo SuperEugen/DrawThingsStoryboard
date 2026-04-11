@@ -175,7 +175,19 @@ struct StoryboardBrowserView: View {
                     .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
             }
 
-            // GROUP 4: Export
+            // GROUP 4: Import
+            GroupBox {
+                Button { importFountainFile() } label: {
+                    Image(systemName: "text.page").font(.callout)
+                }
+                .buttonStyle(.bordered).controlSize(.regular)
+                .help("Import Fountain screenplay (.fountain)")
+            } label: {
+                Label("Import", systemImage: "square.and.arrow.down")
+                    .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
+            }
+
+            // GROUP 5: Export
             GroupBox {
                 Button { exportPDF() } label: {
                     Label("(\(panelsInScope.count))", systemImage: "doc").font(.callout)
@@ -185,18 +197,6 @@ struct StoryboardBrowserView: View {
                 .help("Export panels to PDF")
             } label: {
                 Label("Export", systemImage: "square.and.arrow.up")
-                    .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
-            }
-
-            // GROUP 5: Import
-            GroupBox {
-                Button { importFountainFile() } label: {
-                    Image(systemName: "text.page").font(.callout)
-                }
-                .buttonStyle(.bordered).controlSize(.regular)
-                .help("Import Fountain screenplay (.fountain)")
-            } label: {
-                Label("Import", systemImage: "square.and.arrow.down")
                     .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
             }
 

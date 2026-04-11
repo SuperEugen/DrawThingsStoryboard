@@ -60,16 +60,6 @@ final class StorageSetupService {
                 styleID: "S1",
                 name: "Photorealistic",
                 style: "Photorealistic, cinematic lighting, 8k resolution, dramatic shadows."
-            ),
-            StyleEntry(
-                styleID: "S2",
-                name: "Comic Style",
-                style: "Illustration in 2-d flat color art style. Highly stylised with very low detail and no textures, simplified. Minimalistic background."
-            ),
-            StyleEntry(
-                styleID: "S3",
-                name: "Sketch",
-                style: "A rough hand-drawn sketch from a 1950s cartoon, very sketchy. Mainly rough outlines with shadows in charcoal. Very minimalistic, very loose, very few details. Few colors, UPA style. No signing on the drawing."
             )
         ])
         storage.write(styles, to: storage.stylesURL)
@@ -93,7 +83,7 @@ final class StorageSetupService {
                     ])
                 ],
                 modelID: "M1",
-                styleID: "S2"
+                styleID: "S1"
             )
         ])
         storage.write(storyboards, to: storage.storyboardsURL)

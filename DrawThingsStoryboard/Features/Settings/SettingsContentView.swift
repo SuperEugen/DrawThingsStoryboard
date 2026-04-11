@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - Settings content (shown as center pane when Settings selected)
 /// #49: Assets section with Character Turn-Around setting
@@ -7,6 +8,7 @@ import SwiftUI
 struct SettingsContentView: View {
     @Binding var config: AppConfig
     @State private var showSavedFlash: Bool = false
+    @State private var showImportError = false
 
     // #30: Validation errors
     private var smallWidthError: String? {
@@ -26,6 +28,56 @@ struct SettingsContentView: View {
     }
 
     var body: some View {
+        VStack(spacing: 0) {
+            headerBar
+            Divider()
+            settingsForm
+        }
+        .alert("Invalid File", isPresented: $showImportError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("The selected file is not a valid DrawThingsStoryboard config file (DTSB-Config).")
+        }
+    }
+
+    // MARK: - Header
+
+    private var headerBar: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "gearshape").font(.title2).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Settings").font(.title2.bold())
+                    Text("App configuration, image sizes, and service credentials.")
+                        .font(.caption).foregroundStyle(.tertiary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 8)
+
+            HStack(spacing: 16) {
+                // GROUP 1: Import
+                GroupBox {
+                    Button { importConfigFile() } label: {
+                        Image(systemName: "slider.horizontal.3").font(.callout)
+                    }
+                    .buttonStyle(.bordered).controlSize(.regular)
+                    .help("Import settings from a DTSB-Config JSON file")
+                } label: {
+                    Label("Import", systemImage: "square.and.arrow.down")
+                        .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 14).padding(.bottom, 10)
+        }
+    }
+
+    // MARK: - Settings form
+
+    @ViewBuilder
+    private var settingsForm: some View {
         ZStack(alignment: .top) {
             Form {
                 // #19: Draw Things connection settings
@@ -148,6 +200,30 @@ struct SettingsContentView: View {
                 .transition(.opacity)
                 .padding(.top, 8)
             }
+        }
+    }
+
+    // MARK: - Import
+
+    private func importConfigFile() {
+        let panel = NSOpenPanel()
+        panel.title = "Import Settings"
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.allowedContentTypes = [UTType.json]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let data = try Data(contentsOf: url)
+            let imported = try JSONDecoder().decode(AppConfig.self, from: data)
+            guard imported.type == "DTSB-Config" else {
+                showImportError = true
+                return
+            }
+            config = imported
+            StorageLoadService.shared.saveConfig(config)
+        } catch {
+            showImportError = true
+            print("[SettingsImport] Error: \(error)")
         }
     }
 }
