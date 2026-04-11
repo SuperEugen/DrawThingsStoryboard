@@ -93,10 +93,12 @@ Completed: April 2026
 - [x] Export Character Sheets as PDF (one full-page per character: large image + name caption)
 - [x] Character sheet export scoped to current style and characters with large images
 
-## v0.8 — Fountain Import Phase 2
+## v0.8 — Improved Import
 
-Deeper integration with Fountain screenplay files.
+Overall improved import and deeper integration with Fountain screenplay files.
 
+- [ ] Import assets (without images)
+- [ ] Import styles (without examples)
 - [ ] Import dialogue lines from Fountain files into panel dialogue fields
 - [ ] Auto-create character assets from Fountain character names
 - [ ] Map Fountain scene headings to location assets
