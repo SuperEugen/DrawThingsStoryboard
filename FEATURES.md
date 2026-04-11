@@ -1,6 +1,6 @@
 # DrawThingsStoryboard — Feature Status (April 2026)
 
-**Current version: v0.6**
+**Current version: v0.7**
 
 ## Implemented ✅
 
@@ -30,28 +30,31 @@
 ### Assets
 - Character and location list with type/subType
 - Grid view with Characters and Locations sections
-- Model picker + Style picker in Assets header
-- Variant thumbnails (4 slots, 2×2 grid)
+- Model picker + Style picker in Assets header (icon-only with tooltips)
+- Variant thumbnails (4 slots, 2×2 grid) — per style
 - Generate Variants button per individual asset in detail view
-- "Generate all Variants" batch button in Assets Browser
-- "Generate all Large Images" batch button in Assets Browser
+- "Generate all Variants" batch button in Assets Browser (icon + count)
+- "Generate all Large Images" batch button in Assets Browser (icon + count)
 - Approve / disapprove variants
 - Large image generation from approved variant (with seed)
 - SubType picker (male/female, interior/exterior)
 - Add new character or location via + menu
 - Delete asset
+- **Export Character Sheets as PDF** — one full-page per character (large image + name caption) via Save panel
 
 ### Storyboard
 - Act → Sequence → Scene → Panel hierarchy
 - Collapsible tree in browser with move up/down
+- Delete buttons disabled (not hidden) when last element at level — enforces minimum structure (1 storyboard → 1 act → 1 sequence → 1 scene → 1 panel)
+- Add actions moved entirely to Action Menu (no inline Plus buttons in tree)
 - Model picker + Style picker in Storyboard header (bound to StoryboardEntry)
 - Panel detail: name, description, camera movement, dialogue, duration
 - S/L status indicators for small/large image
 - Referenced assets (ref1ID–ref4ID) with location-first constraint
 - Location image → canvas/init image, Character images → moodboard hints
-- Generate Small/Large Image buttons in Panel detail
+- Generate Small/Large Image buttons in Panel detail (icon + count, no text labels)
 - Import Fountain screenplay files (.fountain) → Act/Sequence/Scene structure
-- PDF export per act/sequence/scene (2×3 grid, A4)
+- PDF export per act/sequence/scene (2×3 grid, A4; icon + count button)
 - Multiple storyboards support with picker
 
 ### Production Queue
@@ -87,6 +90,13 @@
 - All images as <UUID>.png flat in root folder
 - First-launch setup: demo data (4 characters, 4 locations, 3 styles, 2 models, 1 storyboard)
 - StorageService, StorageSetupService, StorageLoadService
+
+### Action Menus (UX v0.7)
+- All action menus use icon-only buttons with full-text tooltips
+- Dividers separate model/style pickers from action buttons
+- Styles: camera icon + model picker | divider | example count button | paintpalette add button
+- Assets: paintpalette + style picker | camera + model picker | divider | variant/large count buttons | character sheet export
+- Storyboard: compact generate (small/large count) + add + arrange + export groups
 
 ### Generation Pipeline
 - Jobs carry modelID → QueueRunner resolves model from job (not global state)

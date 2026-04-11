@@ -3,9 +3,11 @@
 ## Project Overview
 Native macOS SwiftUI app (macOS 14.0) for AI-assisted storyboard creation.
 Integrates Draw Things via gRPC for image generation.
-Repo: https://github.com/SuperEugen/DrawThingsStoryboard
+GitHub-Repo: https://github.com/SuperEugen/DrawThingsStoryboard
 Local: /Users/ingo/DocsMacMini/hobbies/programming/xcode/DrawThingsStoryboard
-Current version: **v0.6** (April 2026)
+Data (Runtime): /Users/ingo/Pictures/DrawThings-Storyboard/
+Xcode-Build: /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild
+Current version: **v0.7** (April 2026)
 
 ## Architecture
 - **MVVM**, strict, files under 300 lines where possible
@@ -45,7 +47,8 @@ All generated images are `<UUID>.png` in the same folder (no subfolders).
 - **StyleEntry** — styleID, name, style (prompt text), smallImageID, isGenerated
 - **StoryboardEntry** — name, modelID, styleID, acts[ActEntry]
 - **PanelEntry** — panelID, name, description, cameraMovement, dialogue, duration, seed, smallImageID, largeImageID, ref1ID–ref4ID
-- **AssetEntry** — assetID, name, type, subType, description, variant1–4 (AssetVariant), smallImageID, largeImageID
+- **AssetEntry** — assetID, name, type, subType, description, styleVariants: [styleID: AssetStyleVariants]
+- **AssetStyleVariants** — variants: [AssetVariant] (up to 4), largeImageID, approvedVariantIndex, seed
 - **GenerationJob** — id, itemName, jobType, size, styleName, modelID, seed, dimensions, combinedPrompt, styleID/assetID/panelID, initImageID, moodboardImageIDs, savedImageIDs
 - **GeneratedImageEntry** — imageID, type, modelID, styleID, startTime, endTime, size, seed, combinedPrompt
 
@@ -58,10 +61,10 @@ All generated images are `<UUID>.png` in the same folder (no subfolders).
 - **StorageLoadService** — reads all 6 JSONs into AppState, individual save methods per file
 - **QueueRunnerService** — @MainActor ObservableObject, auto-processes queue. Resolves model from job.modelID. Publishes step-level progress. Sends Pushover notifications.
 - **PushoverService** — fire-and-forget HTTP POST to pushover.net API
-- **PDFExportService** — exports panels as 2×3 grid PDF (A4)
+- **PDFExportService** — exports panels as 2×3 grid PDF (A4); exports character sheets (one full-page per character with large image + name caption)
 - **FountainParser** — parses .fountain screenplay files into Act/Sequence/Scene structure
 
-## Generation Flow (v0.6 — model-aware, with notifications)
+## Generation Flow (v0.7 — model-aware, with notifications)
 1. User clicks Generate button or batch button
 2. GenerationJob created with modelID from active model picker
 3. QueueRunnerService auto-starts: resolves model from `job.modelID` (not global state)
@@ -129,6 +132,20 @@ DrawThingsStoryboard/
 - `github:create_or_update_file` requires current SHA from `github:get_file_contents`
 - Closing issues: always `add_issue_comment` first, then `update_issue` with state closed
 - `github:push_files` cannot delete files; deletions must be done locally with `git rm`
+
+## Build via Terminal (Claude-Sessions)
+```bash
+/Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild \
+  -project /Users/ingo/DocsMacMini/hobbies/programming/xcode/DrawThingsStoryboard/DrawThingsStoryboard.xcodeproj \
+  -scheme DrawThingsStoryboard \
+  -destination 'platform=macOS' build 2>&1 | grep -E "error:|BUILD"
+```
+
+## GitHub Issues abrufen (gh CLI — falls GitHub MCP-Tools deaktiviert)
+```bash
+gh issue list --repo SuperEugen/DrawThingsStoryboard --state open
+gh issue view <NUMBER> --repo SuperEugen/DrawThingsStoryboard
+```
 
 ## Known Swift Patterns & Pitfalls
 - Type-checker timeout → split body into private structs with @Binding

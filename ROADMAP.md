@@ -81,14 +81,17 @@ Completed: April 2026
 - [x] Sidebar reordered: Models, Styles, Assets, Storyboards, Production Queue, Settings
 - [x] Removed global Model Selector from Production Queue (jobs carry own model)
 
-## v0.7 — Improved Character Assets Handling
+## v0.7 — UX Improvements & Character Sheet Export ✅
 
-Character turn-around sheets improve panel creation and asset export.
+Completed: April 2026
 
-- [ ] Create assets for all styles
-- [ ] Export one or all character turn-around sheets
-- [ ] Add prompt fragment to character assets to separate body parts for 2D animation
-- [ ] Export one or all character parts sheets
+- [x] Action menus compacted: icon-only buttons with full-text tooltips (Styles, Assets, Storyboard views)
+- [x] Dividers between model/style pickers and action buttons in Styles and Assets menus
+- [x] Storyboard tree: inline Plus buttons removed — all add actions via Action Menu
+- [x] Storyboard tree: delete buttons disabled (not hidden) when last element at level
+- [x] Minimum structure enforced: 1 storyboard → 1 act → 1 sequence → 1 scene → 1 panel
+- [x] Export Character Sheets as PDF (one full-page per character: large image + name caption)
+- [x] Character sheet export scoped to current style and characters with large images
 
 ## v0.8 — Fountain Import Phase 2
 

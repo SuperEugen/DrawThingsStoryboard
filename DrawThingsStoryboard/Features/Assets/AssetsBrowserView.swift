@@ -41,6 +41,13 @@ struct AssetsBrowserView: View {
             return sv.hasApprovedVariant && !sv.hasLargeImage
         }
     }
+    private var exportableCharacters: [(name: String, imageID: String)] {
+        characters.compactMap { asset in
+            let sv = asset.variantsFor(style: assetStyleID)
+            guard sv.hasLargeImage else { return nil }
+            return (name: asset.name, imageID: sv.largeImageID)
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -76,7 +83,7 @@ struct AssetsBrowserView: View {
                 // GROUP 1: Filter
                 GroupBox {
                     HStack(spacing: 8) {
-                        Text("Style").font(.caption).foregroundStyle(.secondary)
+                        Image(systemName: "paintpalette").foregroundStyle(.secondary)
                         Picker("Style", selection: $assetStyleID) {
                             ForEach(styles.styles) { s in Text(s.name).tag(s.styleID) }
                         }
@@ -90,25 +97,28 @@ struct AssetsBrowserView: View {
                 // GROUP 2: Generate
                 GroupBox {
                     HStack(spacing: 8) {
-                        // #78: "Model" label before picker
-                        Text("Model").font(.caption).foregroundStyle(.secondary)
+                        // #78: icon before picker
+                        Image(systemName: "camera").foregroundStyle(.secondary)
                         Picker("Model", selection: $assetModelID) {
                             ForEach(models.models) { m in Text(m.name).tag(m.modelID) }
                         }
                         .pickerStyle(.menu).labelsHidden().frame(minWidth: 120)
 
-                        // #79: Show "Variants (N × 4)" format
+                        Divider().frame(height: 20)
+
                         Button { generateAllVariants() } label: {
-                            Label("Variants (\(assetsNeedingVariants.count) \u{00d7} 4)", systemImage: "square.grid.2x2").font(.callout)
+                            Label("(\(assetsNeedingVariants.count) \u{00d7} 4)", systemImage: "square.grid.2x2").font(.callout)
                         }
                         .buttonStyle(.bordered).controlSize(.regular)
                         .disabled(assetsNeedingVariants.isEmpty)
+                        .help("Generate missing variants for all assets")
 
                         Button { generateAllLargeImages() } label: {
-                            Label("Large (\(assetsNeedingLargeImage.count))", systemImage: "arrow.up.left.and.arrow.down.right.rectangle").font(.callout)
+                            Label("(\(assetsNeedingLargeImage.count))", systemImage: "arrow.up.left.and.arrow.down.right.rectangle").font(.callout)
                         }
                         .buttonStyle(.bordered).controlSize(.regular)
                         .disabled(assetsNeedingLargeImage.isEmpty)
+                        .help("Generate large images for all assets")
                     }
                 } label: {
                     Label("Generate", systemImage: "wand.and.sparkles")
@@ -132,6 +142,19 @@ struct AssetsBrowserView: View {
                     }
                 } label: {
                     Label("Add", systemImage: "plus")
+                        .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
+                }
+
+                // GROUP 4: Export
+                GroupBox {
+                    Button { exportCharacterSheets() } label: {
+                        Label("(\(exportableCharacters.count))", systemImage: "figure").font(.callout)
+                    }
+                    .buttonStyle(.bordered).controlSize(.regular)
+                    .disabled(exportableCharacters.isEmpty)
+                    .help("Export Character Sheets as PDF")
+                } label: {
+                    Label("Export", systemImage: "square.and.arrow.up")
                         .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
                 }
 
@@ -211,6 +234,16 @@ struct AssetsBrowserView: View {
     }
 
     // MARK: - Actions
+
+    @MainActor
+    private func exportCharacterSheets() {
+        let chars = exportableCharacters
+        guard !chars.isEmpty else { return }
+        PDFExportService.exportCharacterSheetsWithSavePanel(
+            characters: chars,
+            defaultFilename: "Character_Sheets.pdf"
+        )
+    }
 
     private func addAsset(type: String, subType: String) {
         let id = UUID().uuidString

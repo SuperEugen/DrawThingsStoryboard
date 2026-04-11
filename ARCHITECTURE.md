@@ -4,7 +4,7 @@
 
 DrawThingsStoryboard is a native macOS SwiftUI app (macOS 14.0+) built on strict MVVM. All state lives in `ContentView` as `@State` and flows down through `@Binding`. There is no SwiftData, no CoreData, and no global singletons beyond `StorageService.shared` and `QueueRunnerService` (held as `@StateObject` in ContentView).
 
-Current version: **v0.6** (April 2026).
+Current version: **v0.7** (April 2026).
 
 ## Layer overview
 
@@ -70,8 +70,9 @@ storyboards.json   → StoryboardsFile
 
 assets.json        → AssetsFile
                      └── [AssetEntry]  (assetID, name, type, subType, description,
-                                        smallImageID, largeImageID, seed,
-                                        variant1–4: AssetVariant)
+                                        styleVariants: [styleID → AssetStyleVariants])
+                           └── AssetStyleVariants  (variants: [AssetVariant] (≤4),
+                                                    largeImageID, approvedVariantIndex, seed)
 
 production-log.json → ProductionLogFile
                       └── [GeneratedImageEntry]  (imageID, type, modelID, styleID,
@@ -100,7 +101,7 @@ Jobs carry their own `modelID`. The QueueRunner resolves the model with this pri
 2. `selectedModelID` (global fallback)
 3. First model in models.json (last resort)
 
-## Generation flow (v0.6 — fully automatic with notifications)
+## Generation flow (v0.7 — fully automatic with notifications)
 
 1. User clicks Generate button (Style, Asset, Panel) or batch button
 2. A `GenerationJob` is created (carrying modelID, styleID, combined prompt)
@@ -149,6 +150,17 @@ DrawThingsStoryboard/
     ├── Storage/            # StorageService, StorageSetupService, StorageLoadService
     ├── QueueRunnerService.swift
     ├── PushoverService.swift
-    ├── PDFExportService.swift
+    ├── PDFExportService.swift      # panel grid export + character sheet export
     └── FountainParser.swift
 ```
+
+## PDF Export (PDFExportService)
+
+Two export modes:
+
+| Method | Output | Trigger |
+|--------|--------|---------|
+| `exportWithSavePanel(panels:headerTitle:defaultFilename:)` | 2×3 grid A4, all scope panels | Storyboard Export group |
+| `exportCharacterSheetsWithSavePanel(characters:defaultFilename:)` | One full-page per character (large image + name caption) | Assets Export group |
+
+Character sheets only include characters that have a **large image** for the currently active style.

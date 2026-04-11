@@ -108,6 +108,87 @@ enum PDFExportService {
         }
     }
 
+    // MARK: - Character Sheet Export
+
+    /// Export one page per character (large image + name caption).
+    static func exportCharacterSheets(
+        characters: [(name: String, imageID: String)],
+        to url: URL
+    ) throws {
+        var mediaBox = CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight)
+        guard let context = CGContext(url as CFURL, mediaBox: &mediaBox, nil) else {
+            throw PDFExportError.contextCreationFailed
+        }
+
+        let captionHeight: CGFloat = 28
+        let imageAreaHeight = pageHeight - margin * 2 - captionHeight - 8
+
+        for character in characters {
+            context.beginPage(mediaBox: &mediaBox)
+            context.translateBy(x: 0, y: pageHeight)
+            context.scaleBy(x: 1, y: -1)
+
+            let imageRect = CGRect(x: margin, y: margin, width: pageWidth - margin * 2, height: imageAreaHeight)
+
+            if let nsImage = StorageService.shared.loadImage(id: character.imageID),
+               let cgImage = nsImage.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                let imgAspect = CGFloat(cgImage.width) / CGFloat(cgImage.height)
+                let boxAspect = imageRect.width / imageRect.height
+                var drawRect: CGRect
+                if imgAspect > boxAspect {
+                    let h = imageRect.width / imgAspect
+                    drawRect = CGRect(x: imageRect.minX, y: imageRect.minY + (imageRect.height - h) / 2,
+                                     width: imageRect.width, height: h)
+                } else {
+                    let w = imageRect.height * imgAspect
+                    drawRect = CGRect(x: imageRect.minX + (imageRect.width - w) / 2, y: imageRect.minY,
+                                     width: w, height: imageRect.height)
+                }
+                context.saveGState()
+                context.translateBy(x: drawRect.origin.x, y: drawRect.origin.y + drawRect.height)
+                context.scaleBy(x: 1, y: -1)
+                context.draw(cgImage, in: CGRect(origin: .zero, size: drawRect.size))
+                context.restoreGState()
+            } else {
+                context.setFillColor(NSColor.quaternaryLabelColor.cgColor)
+                context.fill(imageRect)
+            }
+
+            let captionFont = NSFont.boldSystemFont(ofSize: 14)
+            let nameWidth = measureText(character.name, font: captionFont)
+            let captionX = margin + (pageWidth - margin * 2 - nameWidth) / 2
+            let captionY = margin + imageAreaHeight + 10
+            drawText(character.name, in: context, at: CGPoint(x: captionX, y: captionY),
+                     font: captionFont)
+
+            context.endPage()
+        }
+
+        context.closePDF()
+    }
+
+    /// Show NSSavePanel and export character sheets.
+    @MainActor
+    static func exportCharacterSheetsWithSavePanel(
+        characters: [(name: String, imageID: String)],
+        defaultFilename: String
+    ) {
+        let panel = NSSavePanel()
+        panel.title = "Export Character Sheets"
+        panel.allowedContentTypes = [.pdf]
+        panel.nameFieldStringValue = defaultFilename
+        panel.canCreateDirectories = true
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            try exportCharacterSheets(characters: characters, to: url)
+            NSWorkspace.shared.open(url)
+        } catch {
+            print("[PDFExport] Character sheets error: \(error)")
+        }
+    }
+
     // MARK: - Drawing helpers
 
     private static func drawText(

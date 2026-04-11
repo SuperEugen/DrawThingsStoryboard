@@ -62,6 +62,7 @@ struct StylesBrowserView: View {
                 // GROUP 1: Generate
                 GroupBox {
                     HStack(spacing: 8) {
+                        Image(systemName: "camera").foregroundStyle(.secondary)
                         Picker("Model", selection: $stylesModelID) {
                             ForEach(models.models) { m in
                                 Text(m.name).tag(m.modelID)
@@ -69,8 +70,10 @@ struct StylesBrowserView: View {
                         }
                         .pickerStyle(.menu).labelsHidden().frame(minWidth: 120)
 
+                        Divider().frame(height: 20)
+
                         Button { generateAllExamples() } label: {
-                            Label("Examples (\(ungeneratedCount))", systemImage: "paintbrush.pointed")
+                            Label("(\(ungeneratedCount))", systemImage: "paintbrush.pointed")
                                 .font(.callout)
                         }
                         .buttonStyle(.bordered).controlSize(.regular)
@@ -85,10 +88,10 @@ struct StylesBrowserView: View {
                 // GROUP 2: Add
                 GroupBox {
                     Button(action: addStyle) {
-                        Label("New Style", systemImage: "plus")
-                            .font(.callout)
+                        Image(systemName: "paintpalette").font(.callout)
                     }
                     .buttonStyle(.bordered).controlSize(.regular)
+                    .help("Add a new style")
                 } label: {
                     Label("Add", systemImage: "plus")
                         .font(.caption2.weight(.medium)).foregroundStyle(.secondary)
