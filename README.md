@@ -77,6 +77,163 @@ Every generation job assembles its prompt from style description + item-specific
 
 Panels can reference up to 4 assets (characters/locations) via ref1ID–ref4ID. These are passed to Draw Things as ControlNet shuffle hints (moodboard) and canvas image.
 
+## Data Model
+
+> Full source: [`docs/ER-Diagram-v0.7.mermaid`](docs/ER-Diagram-v0.7.mermaid)
+
+```mermaid
+erDiagram
+    APPCONFIG {
+        string grpcAddress
+        string grpcPort
+        string stylePrompt
+        string characterTurnAround
+        int smallImageWidth
+        int smallImageHeight
+        int largeImageWidth
+        int largeImageHeight
+        int defaultPanelDuration
+        string pushoverToken
+        string pushoverUser
+    }
+
+    MODELENTRY {
+        string modelID PK
+        string name
+        string model
+        int steps
+        int guidanceScale
+        string sampler
+        int isImg2ImgCapable
+        int defaultGenTimeSmall
+        int defaultGenTimeLarge
+    }
+
+    STYLEENTRY {
+        string styleID PK
+        string name
+        string style
+        string smallImageID
+        int isGenerated
+    }
+
+    STORYBOARDENTRY {
+        string storyboardID PK
+        string name
+        string modelID FK
+        string styleID FK
+    }
+
+    ACTENTRY {
+        string actID PK
+        string storyboardID FK
+        string name
+    }
+
+    SEQUENCEENTRY {
+        string sequenceID PK
+        string actID FK
+        string name
+    }
+
+    SCENEENTRY {
+        string sceneID PK
+        string sequenceID FK
+        string name
+    }
+
+    PANELENTRY {
+        string panelID PK
+        string sceneID FK
+        string name
+        string description
+        string cameraMovement
+        string dialogue
+        int duration
+        int seed
+        string smallImageID
+        string largeImageID
+        string ref1ID
+        string ref2ID
+        string ref3ID
+        string ref4ID
+    }
+
+    ASSETENTRY {
+        string assetID PK
+        string name
+        string type
+        string subType
+        string description
+    }
+
+    ASSETSTYLEVARIANT {
+        string assetID FK
+        string styleID FK
+        string largeImageID
+        int approvedVariantIndex
+        int approvedSeed
+    }
+
+    ASSETVARIANT {
+        string assetID FK
+        string styleID FK
+        int slot
+        string smallImageID
+        int seed
+        int isApproved
+    }
+
+    GENERATIONJOB {
+        string id PK
+        string itemName
+        string jobType
+        string size
+        string modelID FK
+        string styleID FK
+        string assetID FK
+        string panelID FK
+        int seed
+        int width
+        int height
+        string combinedPrompt
+    }
+
+    GENERATEDIMAGEENTRY {
+        string imageID PK
+        string type
+        string modelID FK
+        string styleID FK
+        string size
+        int seed
+        string combinedPrompt
+        string startTime
+        string endTime
+    }
+
+    STORYBOARDENTRY ||--o{ ACTENTRY : "contains"
+    ACTENTRY ||--o{ SEQUENCEENTRY : "contains"
+    SEQUENCEENTRY ||--o{ SCENEENTRY : "contains"
+    SCENEENTRY ||--o{ PANELENTRY : "contains"
+
+    MODELENTRY ||--o{ STORYBOARDENTRY : "used by"
+    STYLEENTRY ||--o{ STORYBOARDENTRY : "applied to"
+
+    ASSETENTRY ||--o{ ASSETSTYLEVARIANT : "has"
+    STYLEENTRY ||--o{ ASSETSTYLEVARIANT : "scopes"
+    ASSETSTYLEVARIANT ||--o{ ASSETVARIANT : "holds"
+
+    PANELENTRY }o--o{ ASSETENTRY : "references"
+
+    MODELENTRY ||--o{ GENERATIONJOB : "used by"
+    STYLEENTRY ||--o{ GENERATIONJOB : "used by"
+    ASSETENTRY ||--o{ GENERATIONJOB : "generates"
+    PANELENTRY ||--o{ GENERATIONJOB : "generates"
+
+    MODELENTRY ||--o{ GENERATEDIMAGEENTRY : "logged for"
+    STYLEENTRY ||--o{ GENERATEDIMAGEENTRY : "logged for"
+```
+
 ## Project Structure
 
 ```
